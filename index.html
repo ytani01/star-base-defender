@@ -51,7 +51,7 @@
       ENEMY_ACTION_INTERVAL: 1200
     };
 
-    const BOUNDS = { MIN_X: 0, MAX_X: 800, MIN_Y: 0, MAX_Y: 800, UI_Y_LIMIT: 150 };
+    const BOUNDS = { CENTER_X: 400, CENTER_Y: 400, RADIUS: 350, UI_Y_LIMIT: 150 };
 
     // Centralized mutable game state
     const state = {
@@ -62,6 +62,7 @@
       shipText: null,
       baseText: null,
       rangeGraphics: null,
+      boundaryGraphics: null,
       barEnemies: [],
       barStars: [],
       energy: RULES.MAX_ENERGY,
@@ -80,6 +81,8 @@
         state.uiText = this.add.text(20,20,'',{fontSize:'18px',color:'#0f0'});
         state.logText = this.add.text(20,72,'COMMAND: AWAITING ORDERS',{fontSize:'15px',color:'#aaa',wordWrap:{width:760}});
         state.rangeGraphics = this.add.graphics();
+        state.boundaryGraphics = this.add.graphics();
+        this._drawBoundary();
 
         // Stars
         for(let i=0;i<RULES.STAR_QTY;i++){ const p = getRandPos(); const s = this.add.image(p.x,p.y,'starImg'); state.barStars.push({ sprite: s }); }
@@ -115,6 +118,12 @@
         if(state.fooShip?.active) state.shipText.setPosition(state.fooShip.x, state.fooShip.y + 35).setText(Math.floor((state.shields / RULES.MAX_SHIELDS) * 100) + '%');
         if(state.fooBase?.active) state.baseText.setPosition(state.fooBase.x, state.fooBase.y + 30).setText(Math.floor((state.baseShields / RULES.MAX_BASE_SHIELDS) * 100) + '%');
         for(const e of state.barEnemies) if(e.sprite.active) e.text.setPosition(e.sprite.x, e.sprite.y + 30).setText(Math.floor((e.hp / COMBAT.ENEMY_HP) * 100) + '%');
+      }
+
+      _drawBoundary(){
+        state.boundaryGraphics.clear();
+        state.boundaryGraphics.lineStyle(2, 0x0088ff, 0.5);
+        state.boundaryGraphics.strokeCircle(BOUNDS.CENTER_X, BOUNDS.CENTER_Y, BOUNDS.RADIUS);
       }
 
       // Event handlers bound with scene context
@@ -190,10 +199,19 @@
         g.clear(); g.fillStyle(0xffcc00); g.fillCircle(25,25,20); g.generateTexture('baseImg',50,50);
         // Star texture
         g.clear(); g.fillStyle(0xffffff); g.fillCircle(25,25,16); g.generateTexture('starImg',50,50);
+        g.destroy();
       }
     }
 
-    function getRandPos(){ return { x: Phaser.Math.Between(100,700), y: Phaser.Math.Between(200,700) }; }
+    function getRandPos(){
+      let x, y, dist;
+      do {
+        x = Phaser.Math.Between(BOUNDS.CENTER_X - BOUNDS.RADIUS, BOUNDS.CENTER_X + BOUNDS.RADIUS);
+        y = Phaser.Math.Between(BOUNDS.CENTER_Y - BOUNDS.RADIUS, BOUNDS.CENTER_Y + BOUNDS.RADIUS);
+        dist = Phaser.Math.Distance.Between(x, y, BOUNDS.CENTER_X, BOUNDS.CENTER_Y);
+      } while(dist > BOUNDS.RADIUS);
+      return { x, y };
+    }
 
     function lineHitsCircle(ax,ay,bx,by,cx,cy,r){
       const dx = bx - ax, dy = by - ay; const a = dx*dx + dy*dy; if(a < 0.001) return false;
@@ -244,7 +262,8 @@
             // Retreat
             const angle = Phaser.Math.Angle.Between(state.fooShip.x, state.fooShip.y, e.sprite.x, e.sprite.y);
             e.sprite.x += Math.cos(angle) * COMBAT.ENEMY_SPEED; e.sprite.y += Math.sin(angle) * COMBAT.ENEMY_SPEED;
-            if(e.sprite.x < 0 || e.sprite.x > 800 || e.sprite.y < 0 || e.sprite.y > 800){ e.sprite.destroy(); e.text.destroy(); e.isDead = true; }
+            const distFromCenter = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, BOUNDS.CENTER_X, BOUNDS.CENTER_Y);
+            if(distFromCenter > BOUNDS.RADIUS){ e.sprite.destroy(); e.text.destroy(); e.isDead = true; }
           }
         });
         delay += TIMING.ENEMY_ACTION_INTERVAL;
