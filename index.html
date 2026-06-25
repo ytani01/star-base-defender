@@ -15,7 +15,7 @@
   <body>
     <div id="gameContainer">
       <div id="statusPanel">
-        <div id="uiStatus">ENERGY: 0 | SHIELDS: 0% | BASE: 0%</div>
+        <div id="uiStatus">TURN: 1 | ENERGY: 0 | SHIELDS: 0% | BASE: 0%</div>
         <div id="logStatus">COMMAND: AWAITING ORDERS</div>
       </div>
       <div id="gameCanvas"></div>
@@ -30,13 +30,13 @@
        MAX_BASE_SHIELDS: 1000,
        DOCK_RESTORE_ENERGY: 1500,
        PHASER_COST: 100,
-       MOVE_COST_RATE: 0.2 / SCALE, // 距離が縮小されても消費エネルギー総量を維持
+       MOVE_COST_RATE: 0.2 / SCALE, 
        STAR_QTY: 6,
        ENEMY_QTY: 4
      };
 
      const COMBAT = {
-       ALPHA: 0.0075 / SCALE, // 距離が縮小される分、減衰率を強めて射程比率を維持
+       ALPHA: 0.0075 / SCALE, 
        BASE_DAMAGE: 100,
        DOCKING_RANGE: 60 * SCALE,
        HIT_RADIUS: 30 * SCALE,
@@ -79,6 +79,7 @@
      let fooShip, fooBase, shipText, baseText, rangeGraphics, boundaryGraphics;
      let barEnemies = [], barStars = [];
      let energy = RULES.MAX_ENERGY, shields = RULES.MAX_SHIELDS, baseShields = RULES.MAX_BASE_SHIELDS;
+     let turnCount = 1; // ターン数管理変数を追加
      let isPlayerTurn = true, gameOver = false;
 
      const config = {
@@ -483,14 +484,17 @@
            gameOverMessage("MISSION ACCOMPLISHED");
          }
          else if (!gameOver) {
+           turnCount++; // プレイヤーターンに戻る直前にカウントアップ
+           updateUI();  // 表示を更新
            isPlayerTurn = true; setLog("COMMAND: AWAITING ORDERS");
          }
        });
      }
 
      function updateUI() {
+       // TURN表示を先頭に追加
        document.getElementById('uiStatus').textContent = 
-         `ENERGY: ${Math.floor(energy)} | SHIELDS: ${Math.floor((shields/RULES.MAX_SHIELDS)*100)}% | BASE: ${Math.floor((baseShields/RULES.MAX_BASE_SHIELDS)*100)}%`;
+         `TURN: ${turnCount} | ENERGY: ${Math.floor(energy)} | SHIELDS: ${Math.floor((shields/RULES.MAX_SHIELDS)*100)}% | BASE: ${Math.floor((baseShields/RULES.MAX_BASE_SHIELDS)*100)}%`;
      }
 
      function setLog(msg) {
