@@ -10,207 +10,260 @@
 </head>
 <body>
   <script>
-   /**
-    * Super Star Trek - Tactical AI (Base Priority)
-    * [Fixed]
-    *  1. Move handler: isPlayerTurn=false moved after all validations (game-freeze fix)
-    *  2. Move handler: rawDist<1 guard added (NaN / division-by-zero fix)
-    *  3. enemyTurn callbacks: gameOver check added inside each delayedCall
-    *  4. Base destruction: !gameOver guard to prevent double-destroy / message overwrite
-    */
+  // Refactored: modular Phaser Scene, single state object, helper functions
+  (function(){
+    const RULES = {
+      MAX_ENERGY: 3000,
+      MAX_SHIELDS: 1000,
+      MAX_BASE_SHIELDS: 1000,
+      DOCK_RESTORE_ENERGY: 1500,
+      PHASER_COST: 100,
+      MOVE_COST_RATE: 0.1,
+      STAR_QTY: 6,
+      ENEMY_QTY: 3
+    };
 
-   const RULES = {
-     MAX_ENERGY: 3000, MAX_SHIELDS: 1000, MAX_BASE_SHIELDS: 1000,
-     DOCK_RESTORE_ENERGY: 1500, PHASER_COST: 100, MOVE_COST_RATE: 0.1,
-     STAR_QTY: 6, ENEMY_QTY: 3
-   };
+    const COMBAT = {
+      ALPHA: 0.0075,
+      BASE_DAMAGE: 100,
+      DOCKING_RANGE: 60,
+      HIT_RADIUS: 40,
+      MAX_MOVE_DIST: 130,
+      OBSTACLE_RADIUS: 24,
+      LOS_RADIUS: 16,
+      ENEMY_HP: 300,
+      ENEMY_DAMAGE: 70,
+      ENEMY_SPEED: 30,
+      ENEMY_STOP_DIST: 30,
+      ENEMY_REGEN: 0.05,
+      EFFECTIVE_THRESHOLD: 0.5,
+      MAX_PHASER_THRESHOLD: 0.1
+    };
+    COMBAT.MAX_PHASER_RANGE = Math.floor(-Math.log(COMBAT.MAX_PHASER_THRESHOLD) / COMBAT.ALPHA);
+    COMBAT.EFFECTIVE_RANGE  = Math.floor(-Math.log(COMBAT.EFFECTIVE_THRESHOLD) / COMBAT.ALPHA);
 
-   const COMBAT = {
-     ALPHA: 0.0075, BASE_DAMAGE: 100, DOCKING_RANGE: 60, HIT_RADIUS: 40,
-     MAX_MOVE_DIST: 130, OBSTACLE_RADIUS: 24, LOS_RADIUS: 16,
-     ENEMY_HP: 300, ENEMY_DAMAGE: 70, ENEMY_SPEED: 30, ENEMY_STOP_DIST: 30,
-     ENEMY_REGEN: 0.05, EFFECTIVE_THRESHOLD: 0.5, MAX_PHASER_THRESHOLD: 0.1
-   };
+    const TIMING = {
+      BEAM_DUR: 150,
+      TURN_DELAY_FIRE: 800,
+      TURN_DELAY_MOVE: 600,
+      TURN_DELAY_DOCK: 1000,
+      ENEMY_MOVE_DUR: 300,
+      ENEMY_ACTION_INTERVAL: 1200
+    };
 
-   COMBAT.MAX_PHASER_RANGE = Math.floor(-Math.log(COMBAT.MAX_PHASER_THRESHOLD) / COMBAT.ALPHA);
-   COMBAT.EFFECTIVE_RANGE  = Math.floor(-Math.log(COMBAT.EFFECTIVE_THRESHOLD) / COMBAT.ALPHA);
+    const BOUNDS = { MIN_X: 0, MAX_X: 800, MIN_Y: 0, MAX_Y: 800, UI_Y_LIMIT: 150 };
 
-   const TIMING = {
-     BEAM_DUR: 150, TURN_DELAY_FIRE: 800, TURN_DELAY_MOVE: 600,
-     TURN_DELAY_DOCK: 1000, ENEMY_MOVE_DUR: 300, ENEMY_ACTION_INTERVAL: 1200
-   };
+    // Centralized mutable game state
+    const state = {
+      fooShip: null,
+      fooBase: null,
+      uiText: null,
+      logText: null,
+      shipText: null,
+      baseText: null,
+      rangeGraphics: null,
+      barEnemies: [],
+      barStars: [],
+      energy: RULES.MAX_ENERGY,
+      shields: RULES.MAX_SHIELDS,
+      baseShields: RULES.MAX_BASE_SHIELDS,
+      isPlayerTurn: true,
+      gameOver: false
+    };
 
-   const BOUNDS = { MIN_X: 0, MAX_X: 800, MIN_Y: 0, MAX_Y: 800, UI_Y_LIMIT: 150 };
+    class GameScene extends Phaser.Scene {
+      constructor(){ super({ key: 'GameScene' }); }
 
-   let fooShip, fooBase, uiText, logText, shipText, baseText, rangeGraphics;
-   let barEnemies = [], barStars = [];
-   let energy = RULES.MAX_ENERGY, shields = RULES.MAX_SHIELDS, baseShields = RULES.MAX_BASE_SHIELDS;
-   let isPlayerTurn = true, gameOver = false;
+      preload(){ this._generateTextures(); }
 
-   const config = { type: Phaser.AUTO, width: 800, height: 800, backgroundColor: '#0a0a2a', scene: { preload, create, update } };
-   new Phaser.Game(config);
+      create(){
+        state.uiText = this.add.text(20,20,'',{fontSize:'18px',color:'#0f0'});
+        state.logText = this.add.text(20,72,'COMMAND: AWAITING ORDERS',{fontSize:'15px',color:'#aaa',wordWrap:{width:760}});
+        state.rangeGraphics = this.add.graphics();
 
-   function preload(){
-     const g = this.make.graphics({add:false});
-     g.fillStyle(0xdddddd); g.fillEllipse(25,15,40,30); g.fillStyle(0xaaaaaa); g.fillRect(22,25,6,20); g.fillStyle(0x4488ff); g.fillRect(10,30,8,20); g.fillRect(32,30,8,20); g.generateTexture('shipImg',50,60); g.clear();
-     g.fillStyle(0x228822); g.beginPath(); g.moveTo(25,0); g.lineTo(50,20); g.lineTo(40,40); g.lineTo(25,30); g.lineTo(10,40); g.lineTo(0,20); g.fillPath(); g.generateTexture('enemyImg',50,50); g.clear();
-     g.fillStyle(0xffcc00); g.fillCircle(25,25,20); g.generateTexture('baseImg',50,50); g.clear();
-     g.fillStyle(0xffffff); g.fillCircle(25,25,16); g.generateTexture('starImg',50,50);
-   }
+        // Stars
+        for(let i=0;i<RULES.STAR_QTY;i++){ const p = getRandPos(); const s = this.add.image(p.x,p.y,'starImg'); state.barStars.push({ sprite: s }); }
 
-   function create(){
-     uiText = this.add.text(20,20,'',{fontSize:'18px',color:'#0f0'});
-     logText = this.add.text(20,72,'COMMAND: AWAITING ORDERS', {fontSize:'15px',color:'#aaa',wordWrap:{width:760}});
-     rangeGraphics = this.add.graphics();
-     
-     for(let i=0; i<RULES.STAR_QTY; i++){ let p=getRandPos(); barStars.push({sprite:this.add.image(p.x, p.y, 'starImg')}); }
-     let bp=getRandPos(); fooBase=this.add.image(bp.x, bp.y, 'baseImg'); baseText=this.add.text(bp.x, bp.y+30, '', {fontSize:'14px',color:'#ffcc00',stroke:'#000',strokeThickness:3}).setOrigin(0.5,0.5);
-     for(let i=0; i<RULES.ENEMY_QTY; i++){
-       let p=getRandPos();
-       let e=this.add.image(p.x, p.y, 'enemyImg');
-       barEnemies.push({sprite:e, hp:COMBAT.ENEMY_HP, text:this.add.text(p.x, p.y+30, '', {fontSize:'14px',color:'#ff3333',stroke:'#000',strokeThickness:3}).setOrigin(0.5,0.5)});
-     }
-     let pp=getRandPos(); fooShip=this.add.image(pp.x, pp.y, 'shipImg'); shipText=this.add.text(pp.x, pp.y+35, '', {fontSize:'14px',color:'#4488ff',stroke:'#000',strokeThickness:3}).setOrigin(0.5,0.5);
+        // Base
+        const bp = getRandPos(); state.fooBase = this.add.image(bp.x,bp.y,'baseImg');
+        state.baseText = this.add.text(bp.x, bp.y+30, '', {fontSize:'14px',color:'#ffcc00',stroke:'#000',strokeThickness:3}).setOrigin(0.5,0.5);
 
-     updateUI();
-     this.input.on('pointerdown', handlePointerDown, this);
-   }
+        // Enemies
+        for(let i=0;i<RULES.ENEMY_QTY;i++){
+          const p = getRandPos(); const eSprite = this.add.image(p.x,p.y,'enemyImg');
+          state.barEnemies.push({ sprite: eSprite, hp: COMBAT.ENEMY_HP, text: this.add.text(p.x, p.y+30, '', {fontSize:'14px',color:'#ff3333',stroke:'#000',strokeThickness:3}).setOrigin(0.5,0.5) });
+        }
 
-   function update(){
-     rangeGraphics.clear();
-     [fooShip, ...barEnemies.map(e=>e.sprite)].forEach((obj, i)=>{
-       if(!obj.active) return;
-       let color = (i===0) ? 0x4488ff : 0xff3333;
-       rangeGraphics.lineStyle(1, color, 0.1); rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.MAX_PHASER_RANGE);
-       rangeGraphics.lineStyle(1, color, 0.3); rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.EFFECTIVE_RANGE);
-     });
-     if(fooShip?.active) shipText.setPosition(fooShip.x, fooShip.y + 35).setText(Math.floor((shields / RULES.MAX_SHIELDS) * 100) + '%');
-     if(fooBase?.active) baseText.setPosition(fooBase.x, fooBase.y + 30).setText(Math.floor((baseShields / RULES.MAX_BASE_SHIELDS) * 100) + '%');
-     for(const e of barEnemies) if(e.sprite.active) e.text.setPosition(e.sprite.x, e.sprite.y + 30).setText(Math.floor((e.hp / COMBAT.ENEMY_HP) * 100) + '%');
-   }
+        // Player ship
+        const pp = getRandPos(); state.fooShip = this.add.image(pp.x,pp.y,'shipImg');
+        state.shipText = this.add.text(pp.x, pp.y+35, '', {fontSize:'14px',color:'#4488ff',stroke:'#000',strokeThickness:3}).setOrigin(0.5,0.5);
 
-   function getRandPos(){ return {x: Phaser.Math.Between(100,700), y: Phaser.Math.Between(200,700)}; }
+        this.input.on('pointerdown', this.handlePointerDown, this);
+        updateUI();
+      }
 
-   function lineHitsCircle(ax,ay,bx,by,cx,cy,r){
-     const dx=bx-ax, dy=by-ay; const a=dx*dx+dy*dy; if(a<0.001) return false;
-     const fx=ax-cx, fy=ay-cy; const b=2*(fx*dx+fy*dy); const c=fx*fx+fy*fy-r*r;
-     const disc=b*b-4*a*c; if(disc<0) return false;
-     const t1=(-b-Math.sqrt(disc))/(2*a); const t2=(-b+Math.sqrt(disc))/(2*a);
-     return (t1>0.05&&t1<0.95)||(t2>0.05&&t2<0.95);
-   }
+      update(){
+        state.rangeGraphics.clear();
+        const objects = [state.fooShip, ...state.barEnemies.map(e=>e.sprite)];
+        objects.forEach((obj,i)=>{
+          if(!obj || !obj.active) return;
+          const color = (i===0) ? 0x4488ff : 0xff3333;
+          state.rangeGraphics.lineStyle(1, color, 0.1); state.rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.MAX_PHASER_RANGE);
+          state.rangeGraphics.lineStyle(1, color, 0.3); state.rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.EFFECTIVE_RANGE);
+        });
 
-   function isLOSBlocked(ax,ay,bx,by){
-     let obs = [...barStars.map(s=>s.sprite)];
-     if(baseShields > 0) obs.push(fooBase);
-     return obs.some(o => o.active && lineHitsCircle(ax,ay,bx,by,o.x,o.y,COMBAT.LOS_RADIUS));
-   }
+        if(state.fooShip?.active) state.shipText.setPosition(state.fooShip.x, state.fooShip.y + 35).setText(Math.floor((state.shields / RULES.MAX_SHIELDS) * 100) + '%');
+        if(state.fooBase?.active) state.baseText.setPosition(state.fooBase.x, state.fooBase.y + 30).setText(Math.floor((state.baseShields / RULES.MAX_BASE_SHIELDS) * 100) + '%');
+        for(const e of state.barEnemies) if(e.sprite.active) e.text.setPosition(e.sprite.x, e.sprite.y + 30).setText(Math.floor((e.hp / COMBAT.ENEMY_HP) * 100) + '%');
+      }
 
-   function handlePointerDown(pointer){
-     if(gameOver || !isPlayerTurn) return;
-     
-     let target = barEnemies.find(e => Phaser.Math.Distance.Between(pointer.x, pointer.y, e.sprite.x, e.sprite.y) < COMBAT.HIT_RADIUS);
-     if(!target && baseShields > 0 && Phaser.Math.Distance.Between(pointer.x, pointer.y, fooBase.x, fooBase.y) < COMBAT.HIT_RADIUS) target = {type:'base'};
+      // Event handlers bound with scene context
+      handlePointerDown(pointer){
+        if(state.gameOver || !state.isPlayerTurn) return;
 
-     if(target?.type === 'base'){
-       if(Phaser.Math.Distance.Between(fooShip.x, fooShip.y, fooBase.x, fooBase.y) <= COMBAT.DOCKING_RANGE){
-         energy = Math.min(energy + RULES.DOCK_RESTORE_ENERGY, RULES.MAX_ENERGY); shields = RULES.MAX_SHIELDS;
-         setLog("DOCKED: ENERGY/SHIELDS RESTORED");
-         isPlayerTurn = false; this.time.delayedCall(TIMING.TURN_DELAY_DOCK, () => enemyTurn(this));
-       } else { setLog("APPROACH BASE TO DOCK"); }
-       updateUI(); return;
-     }
+        // Find clicked enemy
+        let target = state.barEnemies.find(e => Phaser.Math.Distance.Between(pointer.x, pointer.y, e.sprite.x, e.sprite.y) < COMBAT.HIT_RADIUS);
+        if(!target && state.baseShields > 0 && Phaser.Math.Distance.Between(pointer.x, pointer.y, state.fooBase.x, state.fooBase.y) < COMBAT.HIT_RADIUS) target = { type: 'base' };
 
-     if(target && target.sprite.active){
-       let d = Phaser.Math.Distance.Between(fooShip.x, fooShip.y, target.sprite.x, target.sprite.y);
-       if(Math.exp(-COMBAT.ALPHA * d) < COMBAT.MAX_PHASER_THRESHOLD) { setLog("OUT OF RANGE"); return; }
-       if(isLOSBlocked(fooShip.x, fooShip.y, target.sprite.x, target.sprite.y)) { setLog("BLOCKED"); return; }
-       
-       energy -= RULES.PHASER_COST; isPlayerTurn = false;
-       target.hp -= Math.floor(COMBAT.BASE_DAMAGE * Math.exp(-COMBAT.ALPHA * d));
-       
-       const beam = this.add.graphics(); beam.lineStyle(4, 0x00ffff, 1); beam.lineBetween(fooShip.x, fooShip.y, target.sprite.x, target.sprite.y);
-       this.time.delayedCall(TIMING.BEAM_DUR, () => beam.destroy());
+        if(target?.type === 'base'){
+          if(Phaser.Math.Distance.Between(state.fooShip.x, state.fooShip.y, state.fooBase.x, state.fooBase.y) <= COMBAT.DOCKING_RANGE){
+            state.energy = Math.min(state.energy + RULES.DOCK_RESTORE_ENERGY, RULES.MAX_ENERGY);
+            state.shields = RULES.MAX_SHIELDS;
+            setLog('DOCKED: ENERGY/SHIELDS RESTORED');
+            state.isPlayerTurn = false;
+            this.time.delayedCall(TIMING.TURN_DELAY_DOCK, () => enemyTurn(this));
+          } else { setLog('APPROACH BASE TO DOCK'); }
+          updateUI();
+          return;
+        }
 
-       if(target.hp <= 0){ target.sprite.destroy(); target.text.destroy(); barEnemies = barEnemies.filter(e => e !== target); }
-       this.time.delayedCall(TIMING.TURN_DELAY_FIRE, () => enemyTurn(this));
-       updateUI(); return;
-     }
+        if(target && target.sprite.active){
+          this._playerFire(target);
+          return;
+        }
 
-     if(!target && pointer.y > BOUNDS.UI_Y_LIMIT){
-       // --- FIX 1 & 2: バリデーションをすべて先に行い、通過後に初めてisPlayerTurn=falseにする ---
-       let rawDist = Phaser.Math.Distance.Between(fooShip.x, fooShip.y, pointer.x, pointer.y);
-       if(rawDist < 1) return; // FIX 2: ゼロ除算ガード (船の真上クリック対策)
-       let moveDist = Math.min(rawDist, COMBAT.MAX_MOVE_DIST);
-       let ratio = moveDist / rawDist;
-       let destX = fooShip.x + (pointer.x - fooShip.x) * ratio;
-       let destY = fooShip.y + (pointer.y - fooShip.y) * ratio;
-       if(isMoveForbidden(fooShip.x, fooShip.y, destX, destY)) { setLog("BLOCKED"); return; } // FIX 1: ここでreturnしてもisPlayerTurnはまだtrue
-       let cost = Math.max(1, Math.ceil(moveDist * RULES.MOVE_COST_RATE));
-       if(energy < cost) { setLog("NOT ENOUGH ENERGY"); return; }                              // FIX 1: 同上
-       // --- バリデーション通過後にターン消費 ---
-       isPlayerTurn = false;
-       energy -= cost;
-       this.tweens.add({ targets: fooShip, x: destX, y: destY, duration: 500, onComplete: () => this.time.delayedCall(TIMING.TURN_DELAY_MOVE, () => enemyTurn(this)) });
-       updateUI();
-     }
-   }
+        if(!target && pointer.y > BOUNDS.UI_Y_LIMIT){
+          this._playerMove(pointer);
+        }
+      }
 
-   function isMoveForbidden(x1,y1,x2,y2){
-     return barStars.some(s => s.sprite.active && lineHitsCircle(x1,y1,x2,y2,s.sprite.x,s.sprite.y,COMBAT.OBSTACLE_RADIUS));
-   }
+      _playerFire(target){
+        const d = Phaser.Math.Distance.Between(state.fooShip.x, state.fooShip.y, target.sprite.x, target.sprite.y);
+        if(Math.exp(-COMBAT.ALPHA * d) < COMBAT.MAX_PHASER_THRESHOLD){ setLog('OUT OF RANGE'); return; }
+        if(isLOSBlocked(state.fooShip.x, state.fooShip.y, target.sprite.x, target.sprite.y)){ setLog('BLOCKED'); return; }
 
-   function enemyTurn(scene){
-     if(gameOver) return;
-     let delay = 0;
-     barEnemies.forEach(e => {
-       scene.time.delayedCall(delay, () => {
-         // FIX 3: 各敵のコールバック先頭でgameOverを再チェック
-         if(gameOver || !e.sprite.active) return;
-         e.hp = Math.min(COMBAT.ENEMY_HP, e.hp + (COMBAT.ENEMY_HP * COMBAT.ENEMY_REGEN));
-         
-         let dToBase = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, fooBase.x, fooBase.y);
-         let dToShip = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, fooShip.x, fooShip.y);
-         
-         // 攻撃優先度判定
-         let canAttackBase = (baseShields > 0 && dToBase <= COMBAT.EFFECTIVE_RANGE && !isLOSBlocked(e.sprite.x, e.sprite.y, fooBase.x, fooBase.y));
-         let canAttackShip = (dToShip <= COMBAT.EFFECTIVE_RANGE && !isLOSBlocked(e.sprite.x, e.sprite.y, fooShip.x, fooShip.y));
+        state.energy -= RULES.PHASER_COST; state.isPlayerTurn = false;
+        target.hp -= Math.floor(COMBAT.BASE_DAMAGE * Math.exp(-COMBAT.ALPHA * d));
 
-         if(e.hp / COMBAT.ENEMY_HP >= 0.5){
-           if(canAttackBase) {
-             // 基地を攻撃
-             baseShields -= Math.floor(COMBAT.ENEMY_DAMAGE * Math.exp(-COMBAT.ALPHA * dToBase));
-             // FIX 4: !gameOver ガードで多重destroy/メッセージ上書きを防ぐ
-             if(baseShields <= 0 && !gameOver) { fooBase.destroy(); gameOverMessage("BASE DESTROYED"); }
-           } else if(canAttackShip) {
-             // 自機を攻撃
-             shields -= Math.floor(COMBAT.ENEMY_DAMAGE * Math.exp(-COMBAT.ALPHA * dToShip));
-             if(shields <= 0 && !gameOver) gameOverMessage("ENTERPRISE DESTROYED");
-           } else {
-             // 接近 (基地優先で接近)
-             let target = (dToBase < dToShip) ? {x:fooBase.x, y:fooBase.y} : {x:fooShip.x, y:fooShip.y};
-             let angle = Phaser.Math.Angle.Between(e.sprite.x, e.sprite.y, target.x, target.y);
-             e.sprite.x += Math.cos(angle) * COMBAT.ENEMY_SPEED; e.sprite.y += Math.sin(angle) * COMBAT.ENEMY_SPEED;
-           }
-         } else {
-           // 撤退
-           let angle = Phaser.Math.Angle.Between(fooShip.x, fooShip.y, e.sprite.x, e.sprite.y);
-           e.sprite.x += Math.cos(angle) * COMBAT.ENEMY_SPEED; e.sprite.y += Math.sin(angle) * COMBAT.ENEMY_SPEED;
-           if(e.sprite.x < 0 || e.sprite.x > 800 || e.sprite.y < 0 || e.sprite.y > 800) { e.sprite.destroy(); e.text.destroy(); e.isDead = true; }
-         }
-       });
-       delay += TIMING.ENEMY_ACTION_INTERVAL;
-     });
+        const beam = this.add.graphics(); beam.lineStyle(4, 0x00ffff, 1); beam.lineBetween(state.fooShip.x, state.fooShip.y, target.sprite.x, target.sprite.y);
+        this.time.delayedCall(TIMING.BEAM_DUR, () => beam.destroy());
 
-     scene.time.delayedCall(delay, () => {
-       barEnemies = barEnemies.filter(e => !e.isDead && e.sprite.active);
-       if(barEnemies.length === 0 && !gameOver) gameOverMessage("MISSION ACCOMPLISHED");
-       else if(!gameOver) { isPlayerTurn = true; setLog("COMMAND: AWAITING ORDERS"); }
-     });
-   }
+        if(target.hp <= 0){ target.sprite.destroy(); target.text.destroy(); state.barEnemies = state.barEnemies.filter(e => e !== target); }
+        this.time.delayedCall(TIMING.TURN_DELAY_FIRE, () => enemyTurn(this));
+        updateUI();
+      }
 
-   function updateUI(){ uiText.setText(`ENERGY:${Math.floor(energy)} SHIELDS:${Math.floor((shields/RULES.MAX_SHIELDS)*100)}% BASE:${Math.floor((baseShields/RULES.MAX_BASE_SHIELDS)*100)}%`); }
-   function setLog(msg){logText.setText(msg);}
-   function gameOverMessage(msg){gameOver=true;isPlayerTurn=false;logText.setText(msg);}
+      _playerMove(pointer){
+        // All validations first (FIX 1) then consume turn
+        const rawDist = Phaser.Math.Distance.Between(state.fooShip.x, state.fooShip.y, pointer.x, pointer.y);
+        if(rawDist < 1) return; // FIX 2: guard against division by zero / click on ship
+        const moveDist = Math.min(rawDist, COMBAT.MAX_MOVE_DIST);
+        const ratio = moveDist / rawDist;
+        const destX = state.fooShip.x + (pointer.x - state.fooShip.x) * ratio;
+        const destY = state.fooShip.y + (pointer.y - state.fooShip.y) * ratio;
+        if(isMoveForbidden(state.fooShip.x, state.fooShip.y, destX, destY)) { setLog('BLOCKED'); return; }
+        const cost = Math.max(1, Math.ceil(moveDist * RULES.MOVE_COST_RATE));
+        if(state.energy < cost) { setLog('NOT ENOUGH ENERGY'); return; }
+
+        state.isPlayerTurn = false; state.energy -= cost;
+        this.tweens.add({ targets: state.fooShip, x: destX, y: destY, duration: 500, onComplete: () => this.time.delayedCall(TIMING.TURN_DELAY_MOVE, () => enemyTurn(this)) });
+        updateUI();
+      }
+
+      _generateTextures(){
+        const g = this.make.graphics({ add: false });
+        // Ship texture
+        g.clear(); g.fillStyle(0xdddddd); g.fillEllipse(25,15,40,30); g.fillStyle(0xaaaaaa); g.fillRect(22,25,6,20); g.fillStyle(0x4488ff); g.fillRect(10,30,8,20); g.fillRect(32,30,8,20); g.generateTexture('shipImg',50,50);
+        // Enemy texture
+        g.clear(); g.fillStyle(0x228822); g.beginPath(); g.moveTo(25,0); g.lineTo(50,20); g.lineTo(40,40); g.lineTo(25,30); g.lineTo(10,40); g.lineTo(0,20); g.fillPath(); g.generateTexture('enemyImg',50,50);
+        // Base texture
+        g.clear(); g.fillStyle(0xffcc00); g.fillCircle(25,25,20); g.generateTexture('baseImg',50,50);
+        // Star texture
+        g.clear(); g.fillStyle(0xffffff); g.fillCircle(25,25,16); g.generateTexture('starImg',50,50);
+      }
+    }
+
+    function getRandPos(){ return { x: Phaser.Math.Between(100,700), y: Phaser.Math.Between(200,700) }; }
+
+    function lineHitsCircle(ax,ay,bx,by,cx,cy,r){
+      const dx = bx - ax, dy = by - ay; const a = dx*dx + dy*dy; if(a < 0.001) return false;
+      const fx = ax - cx, fy = ay - cy; const b = 2*(fx*dx + fy*dy); const c = fx*fx + fy*fy - r*r;
+      const disc = b*b - 4*a*c; if(disc < 0) return false;
+      const t1 = (-b - Math.sqrt(disc)) / (2*a); const t2 = (-b + Math.sqrt(disc)) / (2*a);
+      return (t1 > 0.05 && t1 < 0.95) || (t2 > 0.05 && t2 < 0.95);
+    }
+
+    function isLOSBlocked(ax,ay,bx,by){
+      const obs = [...state.barStars.map(s => s.sprite)];
+      if(state.baseShields > 0) obs.push(state.fooBase);
+      return obs.some(o => o.active && lineHitsCircle(ax,ay,bx,by,o.x,o.y,COMBAT.LOS_RADIUS));
+    }
+
+    function isMoveForbidden(x1,y1,x2,y2){
+      return state.barStars.some(s => s.sprite.active && lineHitsCircle(x1,y1,x2,y2,s.sprite.x,s.sprite.y,COMBAT.OBSTACLE_RADIUS));
+    }
+
+    function enemyTurn(scene){
+      if(state.gameOver) return;
+      let delay = 0;
+      state.barEnemies.forEach(e => {
+        scene.time.delayedCall(delay, () => {
+          // FIX 3: re-check gameOver inside each enemy callback
+          if(state.gameOver || !e.sprite.active) return;
+          e.hp = Math.min(COMBAT.ENEMY_HP, e.hp + (COMBAT.ENEMY_HP * COMBAT.ENEMY_REGEN));
+
+          const dToBase = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, state.fooBase.x, state.fooBase.y);
+          const dToShip = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, state.fooShip.x, state.fooShip.y);
+
+          const canAttackBase = (state.baseShields > 0 && dToBase <= COMBAT.EFFECTIVE_RANGE && !isLOSBlocked(e.sprite.x, e.sprite.y, state.fooBase.x, state.fooBase.y));
+          const canAttackShip = (dToShip <= COMBAT.EFFECTIVE_RANGE && !isLOSBlocked(e.sprite.x, e.sprite.y, state.fooShip.x, state.fooShip.y));
+
+          if(e.hp / COMBAT.ENEMY_HP >= 0.5){
+            if(canAttackBase){
+              state.baseShields -= Math.floor(COMBAT.ENEMY_DAMAGE * Math.exp(-COMBAT.ALPHA * dToBase));
+              if(state.baseShields <= 0 && !state.gameOver){ state.fooBase.destroy(); gameOverMessage('BASE DESTROYED'); }
+            } else if(canAttackShip){
+              state.shields -= Math.floor(COMBAT.ENEMY_DAMAGE * Math.exp(-COMBAT.ALPHA * dToShip));
+              if(state.shields <= 0 && !state.gameOver) gameOverMessage('ENTERPRISE DESTROYED');
+            } else {
+              const target = (dToBase < dToShip) ? { x: state.fooBase.x, y: state.fooBase.y } : { x: state.fooShip.x, y: state.fooShip.y };
+              const angle = Phaser.Math.Angle.Between(e.sprite.x, e.sprite.y, target.x, target.y);
+              e.sprite.x += Math.cos(angle) * COMBAT.ENEMY_SPEED; e.sprite.y += Math.sin(angle) * COMBAT.ENEMY_SPEED;
+            }
+          } else {
+            // Retreat
+            const angle = Phaser.Math.Angle.Between(state.fooShip.x, state.fooShip.y, e.sprite.x, e.sprite.y);
+            e.sprite.x += Math.cos(angle) * COMBAT.ENEMY_SPEED; e.sprite.y += Math.sin(angle) * COMBAT.ENEMY_SPEED;
+            if(e.sprite.x < 0 || e.sprite.x > 800 || e.sprite.y < 0 || e.sprite.y > 800){ e.sprite.destroy(); e.text.destroy(); e.isDead = true; }
+          }
+        });
+        delay += TIMING.ENEMY_ACTION_INTERVAL;
+      });
+
+      scene.time.delayedCall(delay, () => {
+        state.barEnemies = state.barEnemies.filter(e => !e.isDead && e.sprite.active);
+        if(state.barEnemies.length === 0 && !state.gameOver) gameOverMessage('MISSION ACCOMPLISHED');
+        else if(!state.gameOver){ state.isPlayerTurn = true; setLog('COMMAND: AWAITING ORDERS'); }
+      });
+    }
+
+    function updateUI(){ state.uiText.setText(`ENERGY:${Math.floor(state.energy)} SHIELDS:${Math.floor((state.shields/RULES.MAX_SHIELDS)*100)}% BASE:${Math.floor((state.baseShields/RULES.MAX_BASE_SHIELDS)*100)}%`); }
+    function setLog(msg){ state.logText.setText(msg); }
+    function gameOverMessage(msg){ state.gameOver = true; state.isPlayerTurn = false; state.logText.setText(msg); }
+
+    const config = { type: Phaser.AUTO, width: 800, height: 800, backgroundColor: '#0a0a2a', scene: [ GameScene ] };
+    new Phaser.Game(config);
+  })();
   </script>
 </body>
 </html>
