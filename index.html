@@ -57,15 +57,15 @@
        ENEMY_ACTION_INTERVAL: 1200
      };
 
+     // 円形領域に変更
      const BOUNDS = {
-       MIN_X: 0,
-       MAX_X: 800,
-       MIN_Y: 0,
-       MAX_Y: 800,
+       CENTER_X: 400,
+       CENTER_Y: 400,
+       RADIUS: 350,
        UI_Y_LIMIT: 150
      };
 
-     let fooShip, fooBase, uiText, logText, shipText, baseText, rangeGraphics;
+     let fooShip, fooBase, uiText, logText, shipText, baseText, rangeGraphics, boundaryGraphics;
      let barEnemies = [], barStars = [];
      let energy = RULES.MAX_ENERGY, shields = RULES.MAX_SHIELDS, baseShields = RULES.MAX_BASE_SHIELDS;
      let isPlayerTurn = true, gameOver = false;
@@ -110,6 +110,7 @@
        g.fillStyle(0xffffff);
        g.fillCircle(25,25,16);
        g.generateTexture('starImg',50,50);
+       g.destroy();
      }
 
      function create(){
@@ -118,6 +119,8 @@
          20,72,'COMMAND: AWAITING ORDERS', {fontSize:'15px',color:'#aaa',wordWrap:{width:760}}
        );
        rangeGraphics = this.add.graphics();
+       boundaryGraphics = this.add.graphics();
+       drawBoundary();
        
        for(let i=0; i<RULES.STAR_QTY; i++) {
          let p=getRandPos();
@@ -168,6 +171,12 @@
        this.input.on('pointerdown', handlePointerDown, this);
      }
 
+     function drawBoundary(){
+       boundaryGraphics.clear();
+       boundaryGraphics.lineStyle(2, 0x0088ff, 0.5);
+       boundaryGraphics.strokeCircle(BOUNDS.CENTER_X, BOUNDS.CENTER_Y, BOUNDS.RADIUS);
+     }
+
      function update(){
        rangeGraphics.clear();
        [fooShip, ...barEnemies.map(e=>e.sprite)].forEach(
@@ -204,7 +213,13 @@
      }
 
      function getRandPos(){
-       return {x: Phaser.Math.Between(100,700), y: Phaser.Math.Between(200,700)};
+       let x, y, dist;
+       do {
+         x = Phaser.Math.Between(BOUNDS.CENTER_X - BOUNDS.RADIUS, BOUNDS.CENTER_X + BOUNDS.RADIUS);
+         y = Phaser.Math.Between(BOUNDS.CENTER_Y - BOUNDS.RADIUS, BOUNDS.CENTER_Y + BOUNDS.RADIUS);
+         dist = Phaser.Math.Distance.Between(x, y, BOUNDS.CENTER_X, BOUNDS.CENTER_Y);
+       } while(dist > BOUNDS.RADIUS);
+       return { x, y };
      }
 
      function lineHitsCircle(ax,ay,bx,by,cx,cy,r) {
@@ -453,7 +468,9 @@
              e.sprite.y = Math.floor(e.sprite.y);
              console.log(e.sprite.x, e.sprite.y);
 
-             if (e.sprite.x < 0 || e.sprite.x > 800 || e.sprite.y < 0 || e.sprite.y > 800) {
+             // 円形領域の外に出たか判定
+             const distFromCenter = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, BOUNDS.CENTER_X, BOUNDS.CENTER_Y);
+             if (distFromCenter > BOUNDS.RADIUS) {
                e.sprite.destroy();
                e.text.destroy();
                e.isDead = true;
@@ -464,7 +481,7 @@
            e.hp = Math.min(COMBAT.ENEMY_HP, e.hp + (COMBAT.ENEMY_HP * COMBAT.ENEMY_REGEN));
          });
 
-         // delay += TIMING.ENEMY_ACTION_INTERVAL;
+         delay += TIMING.ENEMY_ACTION_INTERVAL;
        });
 
        scene.time.delayedCall(
