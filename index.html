@@ -65,11 +65,11 @@
         ENEMY_ACTION_INTERVAL: 1200
       };
 
-      // 円形領域: プレー領域は 600x600 の中央に配置
+      // 円形領域: プレー領域は 800x600
       const BOUNDS = {
         CENTER_X: 400,
-        CENTER_Y: 400,
-        RADIUS: 280,
+        CENTER_Y: 300,
+        RADIUS: 250,
         PLAY_AREA_WIDTH: 800,
         PLAY_AREA_HEIGHT: 600
       };
@@ -500,15 +500,10 @@
         );
       }
 
-<<<<<<< HEAD
-         // delay += TIMING.ENEMY_ACTION_INTERVAL;
-       });
-=======
       function updateUI() {
         document.getElementById('uiStatus').textContent = 
           `ENERGY: ${Math.floor(energy)} | SHIELDS: ${Math.floor((shields/RULES.MAX_SHIELDS)*100)}% | BASE: ${Math.floor((baseShields/RULES.MAX_BASE_SHIELDS)*100)}%`;
       }
->>>>>>> eee773d3048bd10e346b982570a55975c800e26c
 
       function setLog(msg) {
         document.getElementById('logStatus').textContent = msg;
