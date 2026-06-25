@@ -16,9 +16,9 @@
        MAX_BASE_SHIELDS: 1000,
        DOCK_RESTORE_ENERGY: 1500,
        PHASER_COST: 100,
-       MOVE_COST_RATE: 0.1,
+       MOVE_COST_RATE: 0.2,
        STAR_QTY: 6,
-       ENEMY_QTY: 3
+       ENEMY_QTY: 4
      };
 
      const COMBAT = {
@@ -48,9 +48,10 @@
      //console.log(`EFFECTIVE_RANGE=${COMBAT.EFFECTIVE_RANGE}`);
 
      const TIMING = {
-       BEAM_DUR: 150,
+       BEAM_DUR: 300,
+       MOVE_DUR: 300,
        TURN_DELAY_FIRE: 800,
-       TURN_DELAY_MOVE: 600,
+       TURN_DELAY_MOVE: 300,
        TURN_DELAY_DOCK: 1000,
        ENEMY_MOVE_DUR: 300,
        ENEMY_ACTION_INTERVAL: 1200
@@ -315,7 +316,7 @@
 
        if (!target && pointer.y > BOUNDS.UI_Y_LIMIT) {
          let rawDist = Phaser.Math.Distance.Between(fooShip.x, fooShip.y, pointer.x, pointer.y);
-         if (rawDist < 1) { // FIX 2: ゼロ除算ガード (船の真上クリック対策)
+         if (rawDist < 1) {
            return;
          }
 
@@ -344,9 +345,8 @@
          this.tweens.add(
            {
              targets: fooShip,
-             x: destX,
-             y: destY,
-             duration: 500,
+             x: destX, y: destY,
+             duration: TIMING.TURN_DELAY_MOVE,
              onComplete: () => this.time.delayedCall(TIMING.TURN_DELAY_MOVE, () => enemyTurn(this))
            }
          );
@@ -355,7 +355,10 @@
      }
 
      function isMoveForbidden(x1,y1,x2,y2) {
-       return barStars.some(s => s.sprite.active && lineHitsCircle(x1,y1,x2,y2,s.sprite.x,s.sprite.y,COMBAT.OBSTACLE_RADIUS));
+       return barStars.some(
+         s => s.sprite.active && lineHitsCircle(
+           x1, y1, x2, y2, s.sprite.x, s.sprite.y, COMBAT.OBSTACLE_RADIUS)
+       );
      }
 
      function enemyTurn(scene) {
@@ -366,19 +369,20 @@
 
        barEnemies.forEach(e => {
          scene.time.delayedCall(delay, () => {
-           if (gameOver || !e.sprite.active) {
+           if ( gameOver || !e.sprite.active ) {
              return;
            }
 
-           //e.hp = Math.min(COMBAT.ENEMY_HP, e.hp + (COMBAT.ENEMY_HP * COMBAT.ENEMY_REGEN));
-           
            let dToBase = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, fooBase.x, fooBase.y);
-           console.log(`dToBase=${dToBase}: ${COMBAT.EFFECTIVE_RANGE}`);
-
            let dToShip = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, fooShip.x, fooShip.y);
+           console.log(`dToBase=${dToBase}: ${COMBAT.EFFECTIVE_RANGE}`);
            
            // 攻撃優先度判定
-           let canAttackBase = (baseShields > 0 && dToBase <= COMBAT.EFFECTIVE_RANGE && !isLOSBlocked(e.sprite.x, e.sprite.y, fooBase.x, fooBase.y, false));
+           let canAttackBase = (
+             baseShields > 0 && dToBase <= COMBAT.EFFECTIVE_RANGE && !isLOSBlocked(
+               e.sprite.x, e.sprite.y, fooBase.x, fooBase.y, false
+             )
+           );
            console.log('canAttackBase=', canAttackBase);
            
            let canAttackShip = (dToShip <= COMBAT.EFFECTIVE_RANGE && !isLOSBlocked(e.sprite.x, e.sprite.y, fooShip.x, fooShip.y));
@@ -411,15 +415,43 @@
                let target = (dToBase < dToShip) ? {x:fooBase.x, y:fooBase.y} : {x:fooShip.x, y:fooShip.y};
                let angle = Phaser.Math.Angle.Between(e.sprite.x, e.sprite.y, target.x, target.y);
 
-               e.sprite.x += Math.cos(angle) * COMBAT.ENEMY_SPEED;
-               e.sprite.y += Math.sin(angle) * COMBAT.ENEMY_SPEED;
+               const destX = e.sprite.x + Math.cos(angle) * COMBAT.ENEMY_SPEED;
+               const destY = e.sprite.y + Math.sin(angle) * COMBAT.ENEMY_SPEED;
+
+               scene.tweens.add(
+                 {
+                   targets: e.sprite,
+                   x: destX, y: destY,
+                   duration: TIMING.TURN_DELAY_MOVE,
+                   onComplete: () => scene.time.delayedCall(
+                     TIMING.TURN_DELAY_MOVE, () => {console.log(e.sprite.x, e.sprite.y);}
+                   )
+                 }
+               );
+               e.sprite.x = Math.floor(e.sprite.x);
+               e.sprite.y = Math.floor(e.sprite.y);
+               console.log(e.sprite.x, e.sprite.y);
              }
            } else {
              // 撤退
              let angle = Phaser.Math.Angle.Between(fooShip.x, fooShip.y, e.sprite.x, e.sprite.y);
 
-             e.sprite.x += Math.cos(angle) * COMBAT.ENEMY_SPEED;
-             e.sprite.y += Math.sin(angle) * COMBAT.ENEMY_SPEED;
+             const destX = e.sprite.x + Math.cos(angle) * COMBAT.ENEMY_SPEED;
+             const destY = e.sprite.y + Math.sin(angle) * COMBAT.ENEMY_SPEED;
+
+             scene.tweens.add(
+               {
+                 targets: e.sprite,
+                 x: destX, y: destY,
+                 duration: TIMING.TURN_DELAY_MOVE,
+                 onComplete: () => scene.time.delayedCall(
+                   TIMING.TURN_DELAY_MOVE, () => {console.log(e.sprite.x, e.sprite.y);}
+                 )
+               }
+             );
+             e.sprite.x = Math.floor(e.sprite.x);
+             e.sprite.y = Math.floor(e.sprite.y);
+             console.log(e.sprite.x, e.sprite.y);
 
              if (e.sprite.x < 0 || e.sprite.x > 800 || e.sprite.y < 0 || e.sprite.y > 800) {
                e.sprite.destroy();
@@ -432,7 +464,7 @@
            e.hp = Math.min(COMBAT.ENEMY_HP, e.hp + (COMBAT.ENEMY_HP * COMBAT.ENEMY_REGEN));
          });
 
-         delay += TIMING.ENEMY_ACTION_INTERVAL;
+         // delay += TIMING.ENEMY_ACTION_INTERVAL;
        });
 
        scene.time.delayedCall(
