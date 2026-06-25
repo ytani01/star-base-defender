@@ -387,10 +387,10 @@
         if (gameOver) {
           return;
         }
-        let delay = 0;
 
+        // 全敵を同時に行動させる（delay = 0）
         barEnemies.forEach(e => {
-          scene.time.delayedCall(delay, () => {
+          scene.time.delayedCall(0, () => {
             if ( gameOver || !e.sprite.active ) {
               return;
             }
@@ -478,26 +478,22 @@
                 e.text.destroy();
                 e.isDead = true;
               }
-
             }
 
             e.hp = Math.min(COMBAT.ENEMY_HP, e.hp + (COMBAT.ENEMY_HP * COMBAT.ENEMY_REGEN));
           });
-
-          delay += TIMING.ENEMY_ACTION_INTERVAL;
         });
 
-        scene.time.delayedCall(
-          delay, () => {
-            barEnemies = barEnemies.filter(e => !e.isDead && e.sprite.active);
-            if (barEnemies.length === 0 && !gameOver) {
-              gameOverMessage("MISSION ACCOMPLISHED");
-            }
-            else if (!gameOver) {
-              isPlayerTurn = true; setLog("COMMAND: AWAITING ORDERS");
-            }
+        // 敵のアニメーション完了後にプレイヤーターン復帰
+        scene.time.delayedCall(TIMING.TURN_DELAY_MOVE, () => {
+          barEnemies = barEnemies.filter(e => !e.isDead && e.sprite.active);
+          if (barEnemies.length === 0 && !gameOver) {
+            gameOverMessage("MISSION ACCOMPLISHED");
           }
-        );
+          else if (!gameOver) {
+            isPlayerTurn = true; setLog("COMMAND: AWAITING ORDERS");
+          }
+        });
       }
 
       function updateUI() {
