@@ -7,7 +7,7 @@
     <style>
       body { margin:0; background:#000; padding:0; overflow:hidden; font-family: Arial, sans-serif; }
       #gameContainer { display: flex; flex-direction: column; height: 100vh; }
-      #statusPanel { background:#111; color:#0f0; padding:15px; height:200px; border-bottom:2px solid #0088ff; overflow-y:auto; font-size:14px; font-family: monospace; }
+      #statusPanel { background:#111; color:#0f0; padding:15px; height:100px; border-bottom:2px solid #0088ff; overflow-y:auto; font-size:14px; font-family: monospace; }
       #statusPanel div { margin:5px 0; }
       #gameCanvas { flex:1; }
     </style>
@@ -191,9 +191,9 @@
             if(!obj.active) return;
             
             let color = (i===0) ? 0x4488ff : 0xff3333;
-            rangeGraphics.lineStyle(1, color, 0.1);
+            rangeGraphics.lineStyle(0.8, color, 0.2);
             rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.MAX_PHASER_RANGE);
-            rangeGraphics.lineStyle(1, color, 0.3);
+            rangeGraphics.lineStyle(1.5, color, 0.5);
             rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.EFFECTIVE_RANGE);
           }
         );
