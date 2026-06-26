@@ -139,13 +139,11 @@
          }
        ).setOrigin(0.5,0.5);
 
-       // スター生成（重ならないように生成）
        for(let i=0; i<RULES.STAR_QTY; i++) {
          let p=getSafeRandPos(COMBAT.OBSTACLE_RADIUS * 2.5);
          barStars.push({sprite:this.add.image(p.x, p.y, 'starImg').setScale(SCALE)});
        }
 
-       // 敵生成
        for(let i=0; i<RULES.ENEMY_QTY; i++){
          let p=getSafeRandPos(COMBAT.HIT_RADIUS * 2);
          let e=this.add.image(p.x, p.y, 'enemyImg').setScale(SCALE);
@@ -166,7 +164,6 @@
          );
        }
 
-       // 自機生成
        let pp=getSafeRandPos(COMBAT.HIT_RADIUS * 2);
        fooShip=this.add.image(pp.x, pp.y, 'shipImg').setScale(SCALE);
 
@@ -190,16 +187,11 @@
        rangeGraphics.clear();
        [fooShip, ...barEnemies.map(e=>e.sprite)].forEach(
          (obj, i)=>{
-           if (!obj.active) {
-             return;
-           }
+           if(!obj.active) return;
            
            let color = (i===0) ? 0x4488ff : 0xff3333;
-
-           if ( i == 0 ) {
-             rangeGraphics.lineStyle(0.8, color, 0.2);
-             rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.MAX_PHASER_RANGE);
-           }
+           rangeGraphics.lineStyle(0.8, color, 0.2);
+           rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.MAX_PHASER_RANGE);
            rangeGraphics.lineStyle(1.5, color, 0.5);
            rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.EFFECTIVE_RANGE);
          }
@@ -226,7 +218,6 @@
        }
      }
 
-     // 初期配置時にオブジェクトが重ならない安全な座標を探索する関数
      function getSafeRandPos(minDistance){
        let x, y, distToCenter;
        let safe = false;
@@ -237,12 +228,11 @@
          y = Phaser.Math.Between(BOUNDS.CENTER_Y - BOUNDS.RADIUS, BOUNDS.CENTER_Y + BOUNDS.RADIUS);
          distToCenter = Phaser.Math.Distance.Between(x, y, BOUNDS.CENTER_X, BOUNDS.CENTER_Y);
          
-         if(distToCenter > BOUNDS.RADIUS) continue; // 境界外
-         if(distToCenter < COMBAT.DOCKING_RANGE) continue; // 基地付近の除外
+         if(distToCenter > BOUNDS.RADIUS) continue;
+         if(distToCenter < COMBAT.DOCKING_RANGE) continue;
          
          safe = true;
 
-         // 星との距離判定
          for(let s of barStars) {
            if(s.sprite && s.sprite.active && Phaser.Math.Distance.Between(x, y, s.sprite.x, s.sprite.y) < minDistance) {
              safe = false; break;
@@ -250,7 +240,6 @@
          }
          if(!safe) continue;
 
-         // 敵との距離判定
          for(let e of barEnemies) {
            if(e.sprite && e.sprite.active && Phaser.Math.Distance.Between(x, y, e.sprite.x, e.sprite.y) < minDistance) {
              safe = false; break;
@@ -378,6 +367,7 @@
          let destX = fooShip.x + (pointer.x - fooShip.x) * ratio;
          let destY = fooShip.y + (pointer.y - fooShip.y) * ratio;
 
+         // 自機の移動判定（isEnemyフラグをデフォルトのfalseとして扱うため引数指定なし）
          if (isMoveForbidden(fooShip.x, fooShip.y, destX, destY)) {
            setLog("BLOCKED");
            isPlayerTurn = false;
@@ -451,7 +441,6 @@
            
            let canAttackShip = (dToShip <= COMBAT.EFFECTIVE_RANGE && !isLOSBlocked(e.sprite.x, e.sprite.y, fooShip.x, fooShip.y));
 
-           // 攻撃ロジック
            if (e.hp >= COMBAT.ENEMY_HP * 0.5 && canAttackBase) {
              const beam = scene.add.graphics();
              beam.lineStyle(4, 0xff00ff, 1);
@@ -474,7 +463,6 @@
                gameOverMessage("ENTERPRISE DESTROYED");
              }
            } else {
-             // 移動ロジック
              let angle;
              if (e.hp >= COMBAT.ENEMY_HP * 0.5) {
                let target = (dToBase < dToShip) ? {x:fooBase.x, y:fooBase.y} : {x:fooShip.x, y:fooShip.y};
@@ -517,7 +505,6 @@
                  duration: TIMING.TURN_DELAY_MOVE,
                  onComplete: () => scene.time.delayedCall(
                    TIMING.TURN_DELAY_MOVE, () => {
-                     // 撤退時の画面外消滅判定
                      if (e.hp < COMBAT.ENEMY_HP * 0.5) {
                        const distFromCenter = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, BOUNDS.CENTER_X, BOUNDS.CENTER_Y);
                        if (distFromCenter > BOUNDS.RADIUS) {
