@@ -76,7 +76,7 @@
        PLAY_AREA_HEIGHT: 600
      };
 
-     let fooShip, fooBase, shipText, baseText, rangeGraphics, boundaryGraphics;
+     let fooShip, fooBase, shipGauge, baseGauge, rangeGraphics, boundaryGraphics;
      let barEnemies = [], barStars = [];
      let energy = RULES.MAX_ENERGY, shields = RULES.MAX_SHIELDS, baseShields = RULES.MAX_BASE_SHIELDS;
      let turnCount = 1;
@@ -131,13 +131,8 @@
        boundaryGraphics = this.add.graphics();
        drawBoundary();
        
-       // 基地を先に配置（スポーン時の除外判定に使うため）
        fooBase=this.add.image(BOUNDS.CENTER_X, BOUNDS.CENTER_Y, 'baseImg').setScale(SCALE);
-       baseText=this.add.text(
-         BOUNDS.CENTER_X, BOUNDS.CENTER_Y+(35*SCALE), '', {
-           fontSize:'14px',color:'#ffcc00',stroke:'#000',strokeThickness:3
-         }
-       ).setOrigin(0.5,0.5);
+       baseGauge = this.add.graphics(); // テキストの代わりにグラフィックスを追加
 
        for(let i=0; i<RULES.STAR_QTY; i++) {
          let p=getSafeRandPos(COMBAT.OBSTACLE_RADIUS * 2.5);
@@ -152,26 +147,14 @@
            {
              sprite:e,
              hp:COMBAT.ENEMY_HP,
-             text:this.add.text(
-               p.x, p.y+(30*SCALE), '', {
-                 fontSize:'14px',
-                 color:'#ff3333',
-                 stroke:'#000',
-                 strokeThickness:3
-               }
-             ).setOrigin(0.5,0.5)
+             gauge: this.add.graphics() // テキストの代わりにグラフィックスを追加
            }
          );
        }
 
        let pp=getSafeRandPos(COMBAT.HIT_RADIUS * 2);
        fooShip=this.add.image(pp.x, pp.y, 'shipImg').setScale(SCALE);
-
-       shipText=this.add.text(
-         pp.x, pp.y+(35*SCALE), '', {
-           fontSize:'14px',color:'#4488ff',stroke:'#000',strokeThickness:3
-         }
-       ).setOrigin(0.5,0.5);
+       shipGauge = this.add.graphics(); // テキストの代わりにグラフィックスを追加
 
        updateUI();
        this.input.on('pointerdown', handlePointerDown, this);
@@ -181,6 +164,29 @@
        boundaryGraphics.clear();
        boundaryGraphics.lineStyle(2, 0x0088ff, 0.5);
        boundaryGraphics.strokeCircle(BOUNDS.CENTER_X, BOUNDS.CENTER_Y, BOUNDS.RADIUS);
+     }
+
+     // ゲージを描画する汎用関数
+     function drawGauge(graphics, cx, cy, width, height, ratio, color) {
+       graphics.clear();
+       // 指定された座標(cx, cy)を中心とするように調整
+       const x = cx - width / 2;
+       const y = cy - height / 2;
+       
+       // 背景 (暗いグレー)
+       graphics.fillStyle(0x222222, 0.8);
+       graphics.fillRect(x, y, width, height);
+       
+       // 枠線 (黒)
+       graphics.lineStyle(1, 0x000000, 1);
+       graphics.strokeRect(x, y, width, height);
+       
+       // ゲージ本体 (残量に応じて幅を変える)
+       const r = Math.max(0, Math.min(1, ratio));
+       if (r > 0) {
+         graphics.fillStyle(color, 1);
+         graphics.fillRect(x, y, width * r, height);
+       }
      }
 
      function update(){
@@ -197,23 +203,26 @@
          }
        );
 
-       if (fooShip?.active) {
-         shipText.setPosition(
-           fooShip.x, fooShip.y + (35 * SCALE)
-         ).setText(Math.floor((shields / RULES.MAX_SHIELDS) * 100) + '%');
+       // 自機ゲージの更新
+       if (fooShip?.active && shields > 0) {
+         drawGauge(shipGauge, fooShip.x, fooShip.y + (35 * SCALE), 40, 6, shields / RULES.MAX_SHIELDS, 0x4488ff);
+       } else if (shipGauge) {
+         shipGauge.clear();
        }
 
-       if (fooBase?.active) {
-         baseText.setPosition(
-           BOUNDS.CENTER_X, BOUNDS.CENTER_Y + (35 * SCALE)
-         ).setText(Math.floor((baseShields / RULES.MAX_BASE_SHIELDS) * 100) + '%');
+       // 基地ゲージの更新
+       if (fooBase?.active && baseShields > 0) {
+         drawGauge(baseGauge, fooBase.x, fooBase.y + (35 * SCALE), 40, 6, baseShields / RULES.MAX_BASE_SHIELDS, 0xffcc00);
+       } else if (baseGauge) {
+         baseGauge.clear();
        }
 
+       // 敵ゲージの更新
        for (const e of barEnemies) {
-         if(e.sprite.active) {
-           e.text.setPosition(
-             e.sprite.x, e.sprite.y + (30 * SCALE)
-           ).setText(Math.floor((e.hp / COMBAT.ENEMY_HP) * 100) + '%');
+         if(e.sprite.active && !e.isDead) {
+           drawGauge(e.gauge, e.sprite.x, e.sprite.y + (30 * SCALE), 40, 6, e.hp / COMBAT.ENEMY_HP, 0xff3333);
+         } else {
+           e.gauge.clear();
          }
        }
      }
@@ -328,7 +337,6 @@
            return;
          }
          
-         // 修正ポイント: 自機の攻撃時、第5引数をfalseにして基地を遮蔽物から除外
          if (isLOSBlocked(fooShip.x, fooShip.y, target.sprite.x, target.sprite.y, false)) {
            setLog("BLOCKED");
            isPlayerTurn = false;
@@ -347,7 +355,7 @@
 
          if (target.hp <= 0) {
            target.sprite.destroy();
-           target.text.destroy();
+           target.gauge.destroy(); // textからgaugeに変更
            barEnemies = barEnemies.filter(e => e !== target);
          }
          this.time.delayedCall(TIMING.TURN_DELAY_FIRE, () => enemyTurn(this));
@@ -367,7 +375,6 @@
          let destX = fooShip.x + (pointer.x - fooShip.x) * ratio;
          let destY = fooShip.y + (pointer.y - fooShip.y) * ratio;
 
-         // 自機の移動判定（isEnemyフラグをデフォルトのfalseとして扱うため引数指定なし）
          if (isMoveForbidden(fooShip.x, fooShip.y, destX, destY)) {
            setLog("BLOCKED");
            isPlayerTurn = false;
@@ -398,9 +405,7 @@
        }
      }
 
-     // 修正ポイント: 敵かどうかのフラグ(isEnemy)を追加
      function isMoveForbidden(x1, y1, x2, y2, isEnemy = false) {
-       // 星との衝突判定 (共通)
        let hitStar = barStars.some(
          s => {
            if (!s.sprite.active) return false;
@@ -410,7 +415,6 @@
        );
        if (hitStar) return true;
 
-       // 敵の移動の場合のみ、基地との衝突判定を実施
        if (isEnemy && baseShields > 0 && fooBase?.active) {
          if (Phaser.Math.Distance.Between(x2, y2, fooBase.x, fooBase.y) <= COMBAT.HIT_RADIUS) return true;
          if (lineHitsCircle(x1, y1, x2, y2, fooBase.x, fooBase.y, COMBAT.HIT_RADIUS)) return true;
@@ -474,7 +478,6 @@
              let destX = e.sprite.x + Math.cos(angle) * COMBAT.ENEMY_SPEED;
              let destY = e.sprite.y + Math.sin(angle) * COMBAT.ENEMY_SPEED;
 
-             // 修正ポイント: 敵の移動判定として引数にtrueを渡す
              if (isMoveForbidden(e.sprite.x, e.sprite.y, destX, destY, true)) {
                let found = false;
                for (let offset = 15; offset <= 90; offset += 15) {
@@ -509,7 +512,7 @@
                        const distFromCenter = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, BOUNDS.CENTER_X, BOUNDS.CENTER_Y);
                        if (distFromCenter > BOUNDS.RADIUS) {
                          e.sprite.destroy();
-                         e.text.destroy();
+                         e.gauge.destroy(); // textからgaugeに変更
                          e.isDead = true;
                        }
                      }
