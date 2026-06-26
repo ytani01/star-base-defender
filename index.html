@@ -79,7 +79,7 @@
      let fooShip, fooBase, shipText, baseText, rangeGraphics, boundaryGraphics;
      let barEnemies = [], barStars = [];
      let energy = RULES.MAX_ENERGY, shields = RULES.MAX_SHIELDS, baseShields = RULES.MAX_BASE_SHIELDS;
-     let turnCount = 1; // ターン数管理変数を追加
+     let turnCount = 1;
      let isPlayerTurn = true, gameOver = false;
 
      const config = {
@@ -131,24 +131,23 @@
        boundaryGraphics = this.add.graphics();
        drawBoundary();
        
-       // スター生成
-       for(let i=0; i<RULES.STAR_QTY; i++) {
-         let p=getRandPos();
-         barStars.push({sprite:this.add.image(p.x, p.y, 'starImg').setScale(SCALE)});
-       }
-
-       // 基地
+       // 基地を先に配置（スポーン時の除外判定に使うため）
        fooBase=this.add.image(BOUNDS.CENTER_X, BOUNDS.CENTER_Y, 'baseImg').setScale(SCALE);
-
        baseText=this.add.text(
          BOUNDS.CENTER_X, BOUNDS.CENTER_Y+(35*SCALE), '', {
            fontSize:'14px',color:'#ffcc00',stroke:'#000',strokeThickness:3
          }
        ).setOrigin(0.5,0.5);
 
+       // スター生成（重ならないように生成）
+       for(let i=0; i<RULES.STAR_QTY; i++) {
+         let p=getSafeRandPos(COMBAT.OBSTACLE_RADIUS * 2.5);
+         barStars.push({sprite:this.add.image(p.x, p.y, 'starImg').setScale(SCALE)});
+       }
+
        // 敵生成
        for(let i=0; i<RULES.ENEMY_QTY; i++){
-         let p=getRandPos();
+         let p=getSafeRandPos(COMBAT.HIT_RADIUS * 2);
          let e=this.add.image(p.x, p.y, 'enemyImg').setScale(SCALE);
 
          barEnemies.push(
@@ -168,7 +167,7 @@
        }
 
        // 自機生成
-       let pp=getRandPos();
+       let pp=getSafeRandPos(COMBAT.HIT_RADIUS * 2);
        fooShip=this.add.image(pp.x, pp.y, 'shipImg').setScale(SCALE);
 
        shipText=this.add.text(
@@ -191,11 +190,16 @@
        rangeGraphics.clear();
        [fooShip, ...barEnemies.map(e=>e.sprite)].forEach(
          (obj, i)=>{
-           if(!obj.active) return;
+           if (!obj.active) {
+             return;
+           }
            
            let color = (i===0) ? 0x4488ff : 0xff3333;
-           rangeGraphics.lineStyle(0.8, color, 0.2);
-           rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.MAX_PHASER_RANGE);
+
+           if ( i == 0 ) {
+             rangeGraphics.lineStyle(0.8, color, 0.2);
+             rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.MAX_PHASER_RANGE);
+           }
            rangeGraphics.lineStyle(1.5, color, 0.5);
            rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.EFFECTIVE_RANGE);
          }
@@ -222,13 +226,38 @@
        }
      }
 
-     function getRandPos(){
-       let x, y, dist;
-       do {
+     // 初期配置時にオブジェクトが重ならない安全な座標を探索する関数
+     function getSafeRandPos(minDistance){
+       let x, y, distToCenter;
+       let safe = false;
+       let attempts = 0;
+       
+       while(!safe && attempts < 100) {
          x = Phaser.Math.Between(BOUNDS.CENTER_X - BOUNDS.RADIUS, BOUNDS.CENTER_X + BOUNDS.RADIUS);
          y = Phaser.Math.Between(BOUNDS.CENTER_Y - BOUNDS.RADIUS, BOUNDS.CENTER_Y + BOUNDS.RADIUS);
-         dist = Phaser.Math.Distance.Between(x, y, BOUNDS.CENTER_X, BOUNDS.CENTER_Y);
-       } while(dist > BOUNDS.RADIUS);
+         distToCenter = Phaser.Math.Distance.Between(x, y, BOUNDS.CENTER_X, BOUNDS.CENTER_Y);
+         
+         if(distToCenter > BOUNDS.RADIUS) continue; // 境界外
+         if(distToCenter < COMBAT.DOCKING_RANGE) continue; // 基地付近の除外
+         
+         safe = true;
+
+         // 星との距離判定
+         for(let s of barStars) {
+           if(s.sprite && s.sprite.active && Phaser.Math.Distance.Between(x, y, s.sprite.x, s.sprite.y) < minDistance) {
+             safe = false; break;
+           }
+         }
+         if(!safe) continue;
+
+         // 敵との距離判定
+         for(let e of barEnemies) {
+           if(e.sprite && e.sprite.active && Phaser.Math.Distance.Between(x, y, e.sprite.x, e.sprite.y) < minDistance) {
+             safe = false; break;
+           }
+         }
+         attempts++;
+       }
        return { x, y };
      }
 
@@ -346,6 +375,7 @@
          let ratio = moveDist / rawDist;
          let destX = fooShip.x + (pointer.x - fooShip.x) * ratio;
          let destY = fooShip.y + (pointer.y - fooShip.y) * ratio;
+
          if (isMoveForbidden(fooShip.x, fooShip.y, destX, destY)) {
            setLog("BLOCKED");
            isPlayerTurn = false;
@@ -376,10 +406,15 @@
        }
      }
 
-     function isMoveForbidden(x1,y1,x2,y2) {
+     function isMoveForbidden(x1, y1, x2, y2) {
        return barStars.some(
-         s => s.sprite.active && lineHitsCircle(
-           x1, y1, x2, y2, s.sprite.x, s.sprite.y, COMBAT.OBSTACLE_RADIUS)
+         s => {
+           if (!s.sprite.active) return false;
+           // 最終目的地が星に重なっているかをチェック（追加）
+           if (Phaser.Math.Distance.Between(x2, y2, s.sprite.x, s.sprite.y) <= COMBAT.OBSTACLE_RADIUS) return true;
+           // 経路（線分）上の衝突チェック
+           return lineHitsCircle(x1, y1, x2, y2, s.sprite.x, s.sprite.y, COMBAT.OBSTACLE_RADIUS);
+         }
        );
      }
 
@@ -405,53 +440,67 @@
            
            let canAttackShip = (dToShip <= COMBAT.EFFECTIVE_RANGE && !isLOSBlocked(e.sprite.x, e.sprite.y, fooShip.x, fooShip.y));
 
-           if (e.hp >= COMBAT.ENEMY_HP * 0.5) {
-             if (canAttackBase) {
-               const beam = scene.add.graphics();
-               beam.lineStyle(4, 0xff00ff, 1);
-               beam.lineBetween(e.sprite.x, e.sprite.y, fooBase.x, fooBase.y);
-               scene.time.delayedCall(TIMING.BEAM_DUR, () => beam.destroy());
+           // 攻撃ロジック
+           if (e.hp >= COMBAT.ENEMY_HP * 0.5 && canAttackBase) {
+             const beam = scene.add.graphics();
+             beam.lineStyle(4, 0xff00ff, 1);
+             beam.lineBetween(e.sprite.x, e.sprite.y, fooBase.x, fooBase.y);
+             scene.time.delayedCall(TIMING.BEAM_DUR, () => beam.destroy());
 
-               baseShields -= Math.floor(COMBAT.ENEMY_DAMAGE * Math.exp(-COMBAT.ALPHA * dToBase));
-               if (baseShields <= 0 && !gameOver) {
-                 fooBase.destroy();
-                 gameOverMessage("BASE DESTROYED");
-               }
-             } else if (canAttackShip) {
-               const beam = scene.add.graphics();
-               beam.lineStyle(4, 0xff00ff, 1);
-               beam.lineBetween(e.sprite.x, e.sprite.y, fooShip.x, fooShip.y);
-               scene.time.delayedCall(TIMING.BEAM_DUR, () => beam.destroy());
+             baseShields -= Math.floor(COMBAT.ENEMY_DAMAGE * Math.exp(-COMBAT.ALPHA * dToBase));
+             if (baseShields <= 0 && !gameOver) {
+               fooBase.destroy();
+               gameOverMessage("BASE DESTROYED");
+             }
+           } else if (e.hp >= COMBAT.ENEMY_HP * 0.5 && canAttackShip) {
+             const beam = scene.add.graphics();
+             beam.lineStyle(4, 0xff00ff, 1);
+             beam.lineBetween(e.sprite.x, e.sprite.y, fooShip.x, fooShip.y);
+             scene.time.delayedCall(TIMING.BEAM_DUR, () => beam.destroy());
 
-               shields -= Math.floor(COMBAT.ENEMY_DAMAGE * Math.exp(-COMBAT.ALPHA * dToShip));
-               if (shields <= 0 && !gameOver) {
-                 gameOverMessage("ENTERPRISE DESTROYED");
-               }
-             } else {
-               let target = (dToBase < dToShip) ? {x:fooBase.x, y:fooBase.y} : {x:fooShip.x, y:fooShip.y};
-               let angle = Phaser.Math.Angle.Between(e.sprite.x, e.sprite.y, target.x, target.y);
-
-               const destX = e.sprite.x + Math.cos(angle) * COMBAT.ENEMY_SPEED;
-               const destY = e.sprite.y + Math.sin(angle) * COMBAT.ENEMY_SPEED;
-
-               scene.tweens.add(
-                 {
-                   targets: e.sprite,
-                   x: destX, y: destY,
-                   duration: TIMING.TURN_DELAY_MOVE,
-                   onComplete: () => scene.time.delayedCall(
-                     TIMING.TURN_DELAY_MOVE, () => {console.log(e.sprite.x, e.sprite.y);}
-                   )
-                 }
-               );
-               e.sprite.x = Math.floor(e.sprite.x);
-               e.sprite.y = Math.floor(e.sprite.y);
+             shields -= Math.floor(COMBAT.ENEMY_DAMAGE * Math.exp(-COMBAT.ALPHA * dToShip));
+             if (shields <= 0 && !gameOver) {
+               gameOverMessage("ENTERPRISE DESTROYED");
              }
            } else {
-             let angle = Phaser.Math.Angle.Between(fooShip.x, fooShip.y, e.sprite.x, e.sprite.y);
+             // 移動ロジック
+             let angle;
+             if (e.hp >= COMBAT.ENEMY_HP * 0.5) {
+               let target = (dToBase < dToShip) ? {x:fooBase.x, y:fooBase.y} : {x:fooShip.x, y:fooShip.y};
+               angle = Phaser.Math.Angle.Between(e.sprite.x, e.sprite.y, target.x, target.y);
+             } else {
+               angle = Phaser.Math.Angle.Between(fooShip.x, fooShip.y, e.sprite.x, e.sprite.y);
+             }
 
-             const destX = e.sprite.x + Math.cos(angle) * COMBAT.ENEMY_SPEED;
-             const destY = e.sprite.y + Math.sin(angle) * COMBAT.ENEMY_SPEED;
+             let destX = e.sprite.x + Math.cos(angle) * COMBAT.ENEMY_SPEED;
+             let destY = e.sprite.y + Math.sin(angle) * COMBAT.ENEMY_SPEED;
+
+             // 障害物回避ステアリング（迂回ルート探索）
+             if (isMoveForbidden(e.sprite.x, e.sprite.y, destX, destY)) {
+               let found = false;
+               for (let offset = 15; offset <= 90; offset += 15) {
+                 let rad = Phaser.Math.DegToRad(offset);
+                 
+                 // 時計回りへ迂回を試行
+                 let tx1 = e.sprite.x + Math.cos(angle + rad) * COMBAT.ENEMY_SPEED;
+                 let ty1 = e.sprite.y + Math.sin(angle + rad) * COMBAT.ENEMY_SPEED;
+                 if (!isMoveForbidden(e.sprite.x, e.sprite.y, tx1, ty1)) {
+                   destX = tx1; destY = ty1; found = true; break;
+                 }
+                 
+                 // 反時計回りへ迂回を試行
+                 let tx2 = e.sprite.x + Math.cos(angle - rad) * COMBAT.ENEMY_SPEED;
+                 let ty2 = e.sprite.y + Math.sin(angle - rad) * COMBAT.ENEMY_SPEED;
+                 if (!isMoveForbidden(e.sprite.x, e.sprite.y, tx2, ty2)) {
+                   destX = tx2; destY = ty2; found = true; break;
+                 }
+               }
+               // すべての進行方向が塞がれている場合はその場に留まる
+               if (!found) {
+                 destX = e.sprite.x;
+                 destY = e.sprite.y;
+               }
+             }
 
              scene.tweens.add(
                {
@@ -459,19 +508,22 @@
                  x: destX, y: destY,
                  duration: TIMING.TURN_DELAY_MOVE,
                  onComplete: () => scene.time.delayedCall(
-                   TIMING.TURN_DELAY_MOVE, () => {console.log(e.sprite.x, e.sprite.y);}
+                   TIMING.TURN_DELAY_MOVE, () => {
+                     // 撤退時の画面外消滅判定
+                     if (e.hp < COMBAT.ENEMY_HP * 0.5) {
+                       const distFromCenter = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, BOUNDS.CENTER_X, BOUNDS.CENTER_Y);
+                       if (distFromCenter > BOUNDS.RADIUS) {
+                         e.sprite.destroy();
+                         e.text.destroy();
+                         e.isDead = true;
+                       }
+                     }
+                   }
                  )
                }
              );
              e.sprite.x = Math.floor(e.sprite.x);
              e.sprite.y = Math.floor(e.sprite.y);
-
-             const distFromCenter = Phaser.Math.Distance.Between(e.sprite.x, e.sprite.y, BOUNDS.CENTER_X, BOUNDS.CENTER_Y);
-             if (distFromCenter > BOUNDS.RADIUS) {
-               e.sprite.destroy();
-               e.text.destroy();
-               e.isDead = true;
-             }
            }
 
            e.hp = Math.min(COMBAT.ENEMY_HP, e.hp + (COMBAT.ENEMY_HP * COMBAT.ENEMY_REGEN));
@@ -484,15 +536,14 @@
            gameOverMessage("MISSION ACCOMPLISHED");
          }
          else if (!gameOver) {
-           turnCount++; // プレイヤーターンに戻る直前にカウントアップ
-           updateUI();  // 表示を更新
+           turnCount++;
+           updateUI(); 
            isPlayerTurn = true; setLog("COMMAND: AWAITING ORDERS");
          }
        });
      }
 
      function updateUI() {
-       // TURN表示を先頭に追加
        document.getElementById('uiStatus').textContent = 
          `TURN: ${turnCount} | ENERGY: ${Math.floor(energy)} | SHIELDS: ${Math.floor((shields/RULES.MAX_SHIELDS)*100)}% | BASE: ${Math.floor((baseShields/RULES.MAX_BASE_SHIELDS)*100)}%`;
      }
