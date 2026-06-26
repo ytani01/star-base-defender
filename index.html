@@ -5,17 +5,35 @@
     <title>Starbase Defender</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-      body { margin:0; background:#000; padding:0; overflow:hidden; font-family: Arial, sans-serif; }
-      #gameContainer { display: flex; flex-direction: column; height: 100vh; }
-      #statusPanel { background:#111; color:#0f0; padding:15px; height:100px; border-bottom:2px solid #0088ff; overflow-y:auto; font-size:14px; font-family: monospace; }
-      #statusPanel div { margin:5px 0; }
-      #gameCanvas { flex:1; }
+     body { margin:0; background:#000; padding:0; overflow:hidden; font-family: Arial, sans-serif; }
+     #gameContainer { display: flex; flex-direction: column; height: 100vh; }
+     #statusPanel {
+       background:#111;
+       color:#0ff;
+       padding:15px;
+       height:100px;
+       border-bottom:2px solid #08f;
+       overflow-y:auto;
+       font-size:14px;
+       font-family: monospace;
+     }
+     #statusPanel div { margin:5px 0; }
+     #gameCanvas { flex:1; }
     </style>
   </head>
   <body>
     <div id="gameContainer">
       <div id="statusPanel">
-        <div id="uiStatus">TURN: 1 | ENERGY: 0 | SHIELDS: 0% | BASE: 0%</div>
+        TURN: <span id="statusTurn">1</span>
+        <div id="statusShip">
+          My Ship:
+          Energy: <span id="statusShipEnergy">0</span>,
+          Shields: <span id="statusShipShields">0</span>%
+        </div>
+        <div id="statusBase">
+          Star Base:
+          Shields: <span id="statusBaseShields">0</span>%
+        </div>
         <div id="logStatus">COMMAND: AWAITING ORDERS</div>
       </div>
       <div id="gameCanvas"></div>
@@ -29,18 +47,13 @@
        SCALE: 0.5,
        STAR_QTY: 6,
        ENEMY_QTY: 4,
-       BOUNDS_RADIUS: 250,
+       BOUNDS_RADIUS: 300,
        TIMING: {
          BEAM_DUR: 300,
-         MOVE_DUR: 300,
-         TURN_DELAY_FIRE: 800,
-         TURN_DELAY_MOVE: 300,
-         TURN_DELAY_DOCK: 1000,
-         ENEMY_MOVE_DUR: 300,
-         ENEMY_ACTION_INTERVAL: 1200
+         TURN_DELAY: 300,
        }
      };
-     SYSTEM.PLAY_AREA_WIDTH = SYSTEM.BOUNDS_RADIUS * 2 + 100;
+     SYSTEM.PLAY_AREA_WIDTH = SYSTEM.BOUNDS_RADIUS * 2 + 30;
      SYSTEM.PLAY_AREA_HEIGHT = SYSTEM.PLAY_AREA_WIDTH;
      SYSTEM.CENTER_X = SYSTEM.PLAY_AREA_WIDTH / 2;
      SYSTEM.CENTER_Y = SYSTEM.PLAY_AREA_HEIGHT / 2;
@@ -80,11 +93,15 @@
          MAX_THRESHOLD: 0.1
        }
      };
-     MECHANICS.WEAPON.MAX_RANGE = Math.floor(-Math.log(MECHANICS.WEAPON.MAX_THRESHOLD) / MECHANICS.WEAPON.ALPHA);
-     MECHANICS.WEAPON.EFFECTIVE_RANGE = Math.floor(-Math.log(MECHANICS.WEAPON.EFFECTIVE_THRESHOLD) / MECHANICS.WEAPON.ALPHA);
+     MECHANICS.WEAPON.MAX_RANGE = Math.floor(
+     -Math.log(MECHANICS.WEAPON.MAX_THRESHOLD) / MECHANICS.WEAPON.ALPHA
+     );
+     MECHANICS.WEAPON.EFFECTIVE_RANGE = Math.floor(
+     -Math.log(MECHANICS.WEAPON.EFFECTIVE_THRESHOLD) / MECHANICS.WEAPON.ALPHA
+     );
 
-     let fooShip, fooBase, rangeGraphics, boundaryGraphics;
-     let barEnemies = [], barStars = [];
+     let ship, starBase, rangeGraphics, boundaryGraphics;
+     let enemies = [], stars = [];
      let turnCount = 1;
      let isPlayerTurn = true, gameOver = false;
 
@@ -268,24 +285,24 @@
        boundaryGraphics = this.add.graphics();
        drawBoundary();
        
-       fooBase = new BaseStation(this, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
+       starBase = new BaseStation(this, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
 
-       barStars = [];
+       stars = [];
        for(let i=0; i < SYSTEM.STAR_QTY; i++) {
          let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS * 2.5);
-         barStars.push(new Star(this, p.x, p.y));
+         stars.push(new Star(this, p.x, p.y));
        }
 
-       barEnemies = [];
+       enemies = [];
        for(let i=0; i<SYSTEM.ENEMY_QTY; i++){
          let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
-         barEnemies.push(new Enemy(this, p.x, p.y));
+         enemies.push(new Enemy(this, p.x, p.y));
        }
 
        let pp = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
-       fooShip = new PlayerShip(this, pp.x, pp.y);
+       ship = new PlayerShip(this, pp.x, pp.y);
 
-       updateUI();
+       updateStatus();
        this.input.on('pointerdown', handlePointerDown, this);
      }
 
@@ -297,7 +314,7 @@
 
      function update(){
        rangeGraphics.clear();
-       [fooShip, ...barEnemies].forEach(
+       [ship, ...enemies].forEach(
          (obj, i)=>{
            if(!obj.active) return;
            
@@ -311,9 +328,9 @@
          }
        );
 
-       if (fooShip) fooShip.updateGauge();
-       if (fooBase) fooBase.updateGauge();
-       barEnemies.forEach(e => e.updateGauge());
+       if (ship) ship.updateGauge();
+       if (starBase) starBase.updateGauge();
+       enemies.forEach(e => e.updateGauge());
      }
 
      function getSafeRandPos(minDistance){
@@ -331,14 +348,14 @@
          
          safe = true;
 
-         for(let s of barStars) {
+         for(let s of stars) {
            if(s.active && Phaser.Math.Distance.Between(x, y, s.x, s.y) < minDistance) {
              safe = false; break;
            }
          }
          if(!safe) continue;
 
-         for(let e of barEnemies) {
+         for(let e of enemies) {
            if(e.active && Phaser.Math.Distance.Between(x, y, e.x, e.y) < minDistance) {
              safe = false; break;
            }
@@ -368,11 +385,18 @@
      }
 
      function isLOSBlocked(ax,ay,bx,by, base=true){
-       let obs = [...barStars];
-       if (base && fooBase.shields > 0) {
-         obs.push(fooBase);
+       let obs = [...stars];
+       if (base && starBase.shields > 0) {
+         obs.push(starBase);
        }
-       return obs.some(o => o.active && lineHitsCircle(ax,ay,bx,by,o.x,o.y,ENTITY_CONFIG.COLLISION.LOS_RADIUS));
+       return obs.some(
+         o => o.active && lineHitsCircle(
+           ax,ay,
+           bx,by,
+           o.x,o.y,
+           ENTITY_CONFIG.COLLISION.LOS_RADIUS
+         )
+       );
      }
 
      function handlePointerDown(pointer){
@@ -380,131 +404,141 @@
          return;
        }
        
-       let target = barEnemies.find(
+       let target = enemies.find(
          e => Phaser.Math.Distance.Between(
            pointer.x, pointer.y, e.x, e.y
          ) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
        );
 
-       if (!target && fooBase.shields > 0 && Phaser.Math.Distance.Between(
-         pointer.x, pointer.y, fooBase.x, fooBase.y) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
+       if (!target && starBase.shields > 0 && Phaser.Math.Distance.Between(
+         pointer.x, pointer.y, starBase.x, starBase.y) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
        ) {
          target = {type:'base'};
        }
 
        if (target?.type === 'base') {
-         if ( Phaser.Math.Distance.Between(fooShip.x, fooShip.y, fooBase.x, fooBase.y) <= ENTITY_CONFIG.BASE.DOCKING_RANGE
+         if ( Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y) <= ENTITY_CONFIG.BASE.DOCKING_RANGE
          ) {
-           fooShip.energy = Math.min(fooShip.energy + ENTITY_CONFIG.PLAYER.DOCK_RESTORE_ENERGY, ENTITY_CONFIG.PLAYER.MAX_ENERGY);
-           fooShip.shields = ENTITY_CONFIG.PLAYER.MAX_SHIELDS;
+           ship.energy = Math.min(ship.energy + ENTITY_CONFIG.PLAYER.DOCK_RESTORE_ENERGY, ENTITY_CONFIG.PLAYER.MAX_ENERGY);
+           ship.shields = ENTITY_CONFIG.PLAYER.MAX_SHIELDS;
            setLog("DOCKED: ENERGY/SHIELDS RESTORED");
            isPlayerTurn = false;
-           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY_DOCK, () => enemyTurn(this));
+           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
          } else {
            setLog("APPROACH BASE TO DOCK");
          }
 
-         updateUI();
+         updateStatus();
          return;
        }
 
        if (target && target.active) {
-         let d = Phaser.Math.Distance.Between(fooShip.x, fooShip.y, target.x, target.y);
+         // Fire
+         let d = Phaser.Math.Distance.Between(ship.x, ship.y, target.x, target.y);
 
-         if ( fooShip.energy < MECHANICS.WEAPON.PHASER_COST ) {
+         if ( ship.energy < MECHANICS.WEAPON.PHASER_COST ) {
            setLog("LOW ENERGY");
            isPlayerTurn = false;
-           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY_FIRE, () => enemyTurn(this));
+           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            return;
          }
          if (Math.exp(-MECHANICS.WEAPON.ALPHA * d) < MECHANICS.WEAPON.MAX_THRESHOLD) {
            setLog("OUT OF RANGE");
-           fooShip.energy -= MECHANICS.WEAPON.PHASER_COST;
+           ship.energy -= MECHANICS.WEAPON.PHASER_COST;
            isPlayerTurn = false;
-           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY_FIRE, () => enemyTurn(this));
-           updateUI();
+           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+           updateStatus();
            return;
          }
          
-         if (isLOSBlocked(fooShip.x, fooShip.y, target.x, target.y, false)) {
+         if (isLOSBlocked(ship.x, ship.y, target.x, target.y, false)) {
            setLog("BLOCKED");
            isPlayerTurn = false;
-           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY_FIRE, () => enemyTurn(this));
+           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            return;
          }
          
-         fooShip.energy -= MECHANICS.WEAPON.PHASER_COST;
+         ship.energy -= MECHANICS.WEAPON.PHASER_COST;
          isPlayerTurn = false;
          target.takeDamage(Math.floor(MECHANICS.WEAPON.BASE_DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * d)));
 
          const beam = this.add.graphics();
          beam.lineStyle(4, 0x00ffff, 1);
-         beam.lineBetween(fooShip.x, fooShip.y, target.x, target.y);
+         beam.lineBetween(ship.x, ship.y, target.x, target.y);
          this.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
 
          if (target.isDead) {
-           barEnemies = barEnemies.filter(e => e !== target);
+           enemies = enemies.filter(e => e !== target);
          }
-         this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY_FIRE, () => enemyTurn(this));
+         this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
 
-         updateUI();
+         updateStatus();
          return;
        }
 
        if (!target) {
-         let rawDist = Phaser.Math.Distance.Between(fooShip.x, fooShip.y, pointer.x, pointer.y);
+         let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, pointer.x, pointer.y);
          if (rawDist < 1) {
            return;
          }
 
          let moveDist = Math.min(rawDist, ENTITY_CONFIG.PLAYER.MAX_MOVE_DIST);
          let ratio = moveDist / rawDist;
-         let destX = fooShip.x + (pointer.x - fooShip.x) * ratio;
-         let destY = fooShip.y + (pointer.y - fooShip.y) * ratio;
+         let destX = ship.x + (pointer.x - ship.x) * ratio;
+         let destY = ship.y + (pointer.y - ship.y) * ratio;
 
-         if (isMoveForbidden(fooShip.x, fooShip.y, destX, destY)) {
+         if (isMoveForbidden(ship.x, ship.y, destX, destY)) {
            setLog("BLOCKED");
            isPlayerTurn = false;
-           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY_FIRE, () => enemyTurn(this));
+           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            return;
          }
 
          let cost = Math.max(1, Math.ceil(moveDist * ENTITY_CONFIG.PLAYER.MOVE_COST_RATE));
-         if (fooShip.energy < cost) {
+         if (ship.energy < cost) {
            setLog("NOT ENOUGH ENERGY");
            isPlayerTurn = false;
-           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY_FIRE, () => enemyTurn(this));
+           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            return;
          }
 
-         fooShip.energy -= cost;
+         ship.energy -= cost;
 
          isPlayerTurn = false;
          this.tweens.add(
            {
-             targets: fooShip,
+             targets: ship,
              x: destX, y: destY,
-             duration: SYSTEM.TIMING.TURN_DELAY_MOVE,
-             onComplete: () => this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY_MOVE, () => enemyTurn(this))
+             duration: SYSTEM.TIMING.TURN_DELAY,
+             onComplete: () => this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this))
            }
          );
-         updateUI();
+         updateStatus();
        }
      }
 
      function isMoveForbidden(x1, y1, x2, y2, isEnemy = false) {
-       let hitStar = barStars.some(
+       let hitStar = stars.some(
          s => {
            if (!s.active) return false;
-           if (Phaser.Math.Distance.Between(x2, y2, s.x, s.y) <= ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS) return true;
-           return lineHitsCircle(x1, y1, x2, y2, s.x, s.y, ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS);
+           if (
+             Phaser.Math.Distance.Between(x2, y2, s.x, s.y) <= ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS
+           ) {
+             return true;
+           }
+           return lineHitsCircle(
+             x1, y1,
+             x2, y2,
+             s.x, s.y,
+             ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS
+           );
          }
        );
        if (hitStar) return true;
 
-       if (isEnemy && fooBase.shields > 0 && fooBase?.active) {
-         if (Phaser.Math.Distance.Between(x2, y2, fooBase.x, fooBase.y) <= ENTITY_CONFIG.COLLISION.HIT_RADIUS) return true;
-         if (lineHitsCircle(x1, y1, x2, y2, fooBase.x, fooBase.y, ENTITY_CONFIG.COLLISION.HIT_RADIUS)) return true;
+       if (isEnemy && starBase.shields > 0 && starBase?.active) {
+         if (Phaser.Math.Distance.Between(x2, y2, starBase.x, starBase.y) <= ENTITY_CONFIG.COLLISION.HIT_RADIUS) return true;
+         if (lineHitsCircle(x1, y1, x2, y2, starBase.x, starBase.y, ENTITY_CONFIG.COLLISION.HIT_RADIUS)) return true;
        }
 
        return false;
@@ -515,52 +549,60 @@
          return;
        }
 
-       barEnemies.forEach(e => {
+       enemies.forEach(e => {
          scene.time.delayedCall(0, () => {
            if ( gameOver || !e.active ) {
              return;
            }
 
-           let dToBase = Phaser.Math.Distance.Between(e.x, e.y, fooBase.x, fooBase.y);
-           let dToShip = Phaser.Math.Distance.Between(e.x, e.y, fooShip.x, fooShip.y);
+           let dToBase = Phaser.Math.Distance.Between(e.x, e.y, starBase.x, starBase.y);
+           let dToShip = Phaser.Math.Distance.Between(e.x, e.y, ship.x, ship.y);
            
            let canAttackBase = (
-             fooBase.shields > 0 && dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(
-               e.x, e.y, fooBase.x, fooBase.y, false
+             starBase.shields > 0 && dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(
+               e.x, e.y, starBase.x, starBase.y, false
              )
            );
            
-           let canAttackShip = (dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(e.x, e.y, fooShip.x, fooShip.y));
+           let canAttackShip = (
+             dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(
+               e.x, e.y, ship.x, ship.y
+             )
+           );
 
            if (e.hp >= ENTITY_CONFIG.ENEMY.HP * 0.5 && canAttackBase) {
              const beam = scene.add.graphics();
              beam.lineStyle(4, 0xff00ff, 1);
-             beam.lineBetween(e.x, e.y, fooBase.x, fooBase.y);
+             beam.lineBetween(e.x, e.y, starBase.x, starBase.y);
              scene.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
 
-             fooBase.takeDamage(Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToBase)));
-             if (fooBase.shields <= 0 && !gameOver) {
-               updateUI();
+             starBase.takeDamage(
+               Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToBase))
+             );
+             if (starBase.shields <= 0 && !gameOver) {
+               updateStatus();
                gameOverMessage("BASE DESTROYED");
              }
            } else if (e.hp >= ENTITY_CONFIG.ENEMY.HP * 0.5 && canAttackShip) {
              const beam = scene.add.graphics();
              beam.lineStyle(4, 0xff00ff, 1);
-             beam.lineBetween(e.x, e.y, fooShip.x, fooShip.y);
+             beam.lineBetween(e.x, e.y, ship.x, ship.y);
              scene.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
 
-             fooShip.takeDamage(Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToShip)));
-             if (fooShip.shields <= 0 && !gameOver) {
-               updateUI();
+             ship.takeDamage(
+               Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToShip))
+             );
+             if (ship.shields <= 0 && !gameOver) {
+               updateStatus();
                gameOverMessage("ENTERPRISE DESTROYED");
              }
            } else {
              let angle;
              if (e.hp >= ENTITY_CONFIG.ENEMY.HP * 0.5) {
-               let target = (dToBase < dToShip) ? {x:fooBase.x, y:fooBase.y} : {x:fooShip.x, y:fooShip.y};
+               let target = dToBase < dToShip ? {x:starBase.x, y:starBase.y} : {x:ship.x, y:ship.y};
                angle = Phaser.Math.Angle.Between(e.x, e.y, target.x, target.y);
              } else {
-               angle = Phaser.Math.Angle.Between(fooShip.x, fooShip.y, e.x, e.y);
+               angle = Phaser.Math.Angle.Between(ship.x, ship.y, e.x, e.y);
              }
 
              let destX = e.x + Math.cos(angle) * ENTITY_CONFIG.ENEMY.SPEED;
@@ -593,9 +635,9 @@
                {
                  targets: e,
                  x: destX, y: destY,
-                 duration: SYSTEM.TIMING.TURN_DELAY_MOVE,
+                 duration: SYSTEM.TIMING.TURN_DELAY,
                  onComplete: () => scene.time.delayedCall(
-                   SYSTEM.TIMING.TURN_DELAY_MOVE, () => {
+                   SYSTEM.TIMING.TURN_DELAY, () => {
                      if (e.hp < ENTITY_CONFIG.ENEMY.HP * 0.5) {
                        const distFromCenter = Phaser.Math.Distance.Between(
                          e.x, e.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y
@@ -620,26 +662,48 @@
          });
        });
 
-       scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY_MOVE, () => {
-         barEnemies = barEnemies.filter(e => !e.isDead && e.active);
-         if (barEnemies.length === 0 && !gameOver) {
+       scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => {
+         enemies = enemies.filter(e => !e.isDead && e.active);
+         if (enemies.length === 0 && !gameOver) {
            gameOverMessage("MISSION ACCOMPLISHED");
          }
          else if (!gameOver) {
            turnCount++;
-           updateUI(); 
+           updateStatus(); 
            isPlayerTurn = true; setLog("COMMAND: AWAITING ORDERS");
          }
        });
      }
 
-     function updateUI() {
-       let currentEnergy = fooShip ? fooShip.energy : 0;
-       let currentShields = fooShip ? fooShip.shields : 0;
-       let currentBaseShields = fooBase ? fooBase.shields : 0;
+     function updateStatus() {
+       let shipEnergy = ship.energy > 0 ? ship.energy : 0;
+       let shipShields = ship.shields > 0 ? ship.shields : 0;
+       let baseShields = starBase.shields > 0 ? starBase.shields : 0;
 
-       document.getElementById('uiStatus').textContent = 
-         `TURN: ${turnCount} | ENERGY: ${Math.floor(currentEnergy)} | SHIELDS: ${Math.floor((currentShields/ENTITY_CONFIG.PLAYER.MAX_SHIELDS)*100)}% | BASE: ${Math.floor((currentBaseShields/ENTITY_CONFIG.BASE.MAX_SHIELDS)*100)}%`;
+       document.getElementById('statusTurn').textContent = `${turnCount}`;
+
+       color = "#0f0";
+       if ( shipEnergy < ENTITY_CONFIG.PLAYER.MAX_ENERGY * .3 ) {
+         color = "#f00";
+       }
+       document.getElementById('statusShipEnergy').style.color = color;
+       document.getElementById('statusShipEnergy').textContent = Math.floor(shipEnergy);
+
+       color = "#0f0";
+       if ( shipShields < ENTITY_CONFIG.PLAYER.MAX_SHIELDS * .3 ) {
+         color = "#f00";
+       }
+       document.getElementById('statusShipShields').style.color = color;
+       document.getElementById('statusShipShields').textContent = 
+         Math.floor((shipShields / ENTITY_CONFIG.PLAYER.MAX_SHIELDS) * 100);
+
+       color = "#0f0";
+       if ( baseShields < ENTITY_CONFIG.BASE.MAX_SHIELDS * .3 ) {
+         color = "#f00";
+       }
+       document.getElementById('statusBaseShields').style.color = color;
+       document.getElementById('statusBaseShields').textContent = 
+         Math.floor((baseShields / ENTITY_CONFIG.BASE.MAX_SHIELDS) * 100);
      }
 
      function setLog(msg) {
