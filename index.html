@@ -22,7 +22,7 @@
     </div>
     <script>
      // サイズ調整用変数（0.6 = 全体的に40%縮小）
-     const SCALE = 0.6;
+     const SCALE = 0.5;
 
      const RULES = {
        MAX_ENERGY: 3000,
@@ -54,7 +54,6 @@
        EFFECTIVE_THRESHOLD: 0.5,
        MAX_PHASER_THRESHOLD: 0.1
      };
-
      COMBAT.MAX_PHASER_RANGE = Math.floor(-Math.log(COMBAT.MAX_PHASER_THRESHOLD) / COMBAT.ALPHA);
      COMBAT.EFFECTIVE_RANGE  = Math.floor(-Math.log(COMBAT.EFFECTIVE_THRESHOLD) / COMBAT.ALPHA);
 
@@ -69,12 +68,12 @@
      };
 
      const BOUNDS = {
-       CENTER_X: 400,
-       CENTER_Y: 300,
-       RADIUS: 250,
-       PLAY_AREA_WIDTH: 800,
-       PLAY_AREA_HEIGHT: 600
+       RADIUS: 250
      };
+     BOUNDS.PLAY_AREA_WIDTH = BOUNDS.RADIUS * 2 + 100;
+     BOUNDS.PLAY_AREA_HEIGHT = BOUNDS.PLAY_AREA_WIDTH;
+     BOUNDS.CENTER_X = BOUNDS.PLAY_AREA_WIDTH / 2;
+     BOUNDS.CENTER_Y = BOUNDS.PLAY_AREA_HEIGHT / 2;
 
      let fooShip, fooBase, shipGauge, baseGauge, rangeGraphics, boundaryGraphics;
      let barEnemies = [], barStars = [];
@@ -96,15 +95,17 @@
      function preload(){
        const g = this.make.graphics({add:false});
 
-       g.fillStyle(0xdddddd);
+       g.fillStyle(0xaabbff);
        g.fillEllipse(25,15,40,30);
-       g.fillStyle(0xaaaaaa);
+       g.fillStyle(0x5588ee);
        g.fillRect(22,25,6,20);
        g.fillStyle(0x4488ff);
        g.fillRect(10,30,8,20);
        g.fillRect(32,30,8,20);
        g.generateTexture('shipImg',50,60);
+       
        g.clear();
+
        g.fillStyle(0x228822);
        g.beginPath();
        g.moveTo(25,0);
@@ -115,14 +116,23 @@
        g.lineTo(0,20);
        g.fillPath();
        g.generateTexture('enemyImg',50,50);
+
        g.clear();
-       g.fillStyle(0xffcc00);
-       g.fillCircle(25,25,20);
-       g.generateTexture('baseImg',50,50);
+
+       g.fillStyle(0x99ffff);
+       g.fillCircle(30,30,30);
+       g.fillStyle(0x006666);
+       g.fillCircle(30,30,25);
+       g.fillStyle(0x99ffff);
+       g.fillCircle(30,30,10);
+       g.generateTexture('baseImg',60,60);
+
        g.clear();
+
        g.fillStyle(0xffffff);
        g.fillCircle(25,25,16);
        g.generateTexture('starImg',50,50);
+
        g.destroy();
      }
 
@@ -134,7 +144,7 @@
        fooBase=this.add.image(BOUNDS.CENTER_X, BOUNDS.CENTER_Y, 'baseImg').setScale(SCALE);
        baseGauge = this.add.graphics(); // テキストの代わりにグラフィックスを追加
 
-       for(let i=0; i<RULES.STAR_QTY; i++) {
+       for(let i=0; i < RULES.STAR_QTY; i++) {
          let p=getSafeRandPos(COMBAT.OBSTACLE_RADIUS * 2.5);
          barStars.push({sprite:this.add.image(p.x, p.y, 'starImg').setScale(SCALE)});
        }
@@ -174,7 +184,7 @@
        const y = cy - height / 2;
        
        // 背景 (暗いグレー)
-       graphics.fillStyle(0x222222, 0.8);
+       graphics.fillStyle(0x222222, 0.9);
        graphics.fillRect(x, y, width, height);
        
        // 枠線 (黒)
@@ -196,9 +206,11 @@
            if(!obj.active) return;
            
            let color = (i===0) ? 0x4488ff : 0xff3333;
-           rangeGraphics.lineStyle(0.8, color, 0.2);
-           rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.MAX_PHASER_RANGE);
-           rangeGraphics.lineStyle(1.5, color, 0.5);
+           if ( i == 0 ) {
+             rangeGraphics.lineStyle(0.8, color, 0.3);
+             rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.MAX_PHASER_RANGE);
+           }
+           rangeGraphics.lineStyle(1.2, color, 0.5);
            rangeGraphics.strokeCircle(obj.x, obj.y, COMBAT.EFFECTIVE_RANGE);
          }
        );
