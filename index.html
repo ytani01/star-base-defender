@@ -338,7 +338,9 @@
            updateUI();
            return;
          }
-         if (isLOSBlocked(fooShip.x, fooShip.y, target.sprite.x, target.sprite.y)) {
+         
+         // 修正ポイント: 自機の攻撃時、第5引数をfalseにして基地を遮蔽物から除外
+         if (isLOSBlocked(fooShip.x, fooShip.y, target.sprite.x, target.sprite.y, false)) {
            setLog("BLOCKED");
            isPlayerTurn = false;
            this.time.delayedCall(TIMING.TURN_DELAY_FIRE, () => enemyTurn(this));
@@ -406,16 +408,25 @@
        }
      }
 
-     function isMoveForbidden(x1, y1, x2, y2) {
-       return barStars.some(
+     // 修正ポイント: 敵かどうかのフラグ(isEnemy)を追加
+     function isMoveForbidden(x1, y1, x2, y2, isEnemy = false) {
+       // 星との衝突判定 (共通)
+       let hitStar = barStars.some(
          s => {
            if (!s.sprite.active) return false;
-           // 最終目的地が星に重なっているかをチェック（追加）
            if (Phaser.Math.Distance.Between(x2, y2, s.sprite.x, s.sprite.y) <= COMBAT.OBSTACLE_RADIUS) return true;
-           // 経路（線分）上の衝突チェック
            return lineHitsCircle(x1, y1, x2, y2, s.sprite.x, s.sprite.y, COMBAT.OBSTACLE_RADIUS);
          }
        );
+       if (hitStar) return true;
+
+       // 敵の移動の場合のみ、基地との衝突判定を実施
+       if (isEnemy && baseShields > 0 && fooBase?.active) {
+         if (Phaser.Math.Distance.Between(x2, y2, fooBase.x, fooBase.y) <= COMBAT.HIT_RADIUS) return true;
+         if (lineHitsCircle(x1, y1, x2, y2, fooBase.x, fooBase.y, COMBAT.HIT_RADIUS)) return true;
+       }
+
+       return false;
      }
 
      function enemyTurn(scene) {
@@ -475,27 +486,24 @@
              let destX = e.sprite.x + Math.cos(angle) * COMBAT.ENEMY_SPEED;
              let destY = e.sprite.y + Math.sin(angle) * COMBAT.ENEMY_SPEED;
 
-             // 障害物回避ステアリング（迂回ルート探索）
-             if (isMoveForbidden(e.sprite.x, e.sprite.y, destX, destY)) {
+             // 修正ポイント: 敵の移動判定として引数にtrueを渡す
+             if (isMoveForbidden(e.sprite.x, e.sprite.y, destX, destY, true)) {
                let found = false;
                for (let offset = 15; offset <= 90; offset += 15) {
                  let rad = Phaser.Math.DegToRad(offset);
                  
-                 // 時計回りへ迂回を試行
                  let tx1 = e.sprite.x + Math.cos(angle + rad) * COMBAT.ENEMY_SPEED;
                  let ty1 = e.sprite.y + Math.sin(angle + rad) * COMBAT.ENEMY_SPEED;
-                 if (!isMoveForbidden(e.sprite.x, e.sprite.y, tx1, ty1)) {
+                 if (!isMoveForbidden(e.sprite.x, e.sprite.y, tx1, ty1, true)) {
                    destX = tx1; destY = ty1; found = true; break;
                  }
                  
-                 // 反時計回りへ迂回を試行
                  let tx2 = e.sprite.x + Math.cos(angle - rad) * COMBAT.ENEMY_SPEED;
                  let ty2 = e.sprite.y + Math.sin(angle - rad) * COMBAT.ENEMY_SPEED;
-                 if (!isMoveForbidden(e.sprite.x, e.sprite.y, tx2, ty2)) {
+                 if (!isMoveForbidden(e.sprite.x, e.sprite.y, tx2, ty2, true)) {
                    destX = tx2; destY = ty2; found = true; break;
                  }
                }
-               // すべての進行方向が塞がれている場合はその場に留まる
                if (!found) {
                  destX = e.sprite.x;
                  destY = e.sprite.y;
