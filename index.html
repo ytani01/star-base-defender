@@ -5,52 +5,164 @@
     <title>Starbase Defender</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-      body { margin:0; background:#000; padding:0; overflow:hidden; font-family: Arial, sans-serif; }
-      #gameContainer { display: flex; flex-direction: column; height: 100vh; }
-      
-      /* --- 修正: ステータスパネルの文字サイズと余白の調整 --- */
-      #statusPanel {
-        background:#111;
-        color:#0ff;
-        padding:15px;
-        flex: 0 0 auto;
-        border-bottom:2px solid #08f;
-        overflow-y:auto;
-        font-size: clamp(18px, 5vw, 28px); 
-        font-family: monospace;
-        line-height: 1.5;
-      }
-      #statusPanel div { margin: 8px 5px; }
-      
-      /* --- 追加: ゲーム画面とUIを重ねるためのラッパー --- */
-      #gameWrapper { position: relative; flex: 1; min-height: 0; }
-      #gameCanvas { width: 100%; height: 100%; }
+     body { margin:0; background:#000; padding:0; overflow:hidden; font-family: Arial, sans-serif; }
+     #gameContainer { display: flex; flex-direction: column; height: 100vh; }
+     
+     /* --- 修正: ステータスパネルの文字サイズと余白の調整 --- */
+     #statusPanel {
+       background:#111;
+       color:#0ff;
+       padding:15px;
+       flex: 0 0 auto;
+       border-bottom:2px solid #08f;
+       overflow-y:auto;
+       font-size: clamp(22px, 5vw, 40px); 
+       font-family: monospace;
+       line-height: 1.5;
+     }
+     #statusPanel div { margin: 8px 5px; }
+     
+     /* --- 追加: ゲーム画面とUIを重ねるためのラッパー --- */
+     #gameWrapper { position: relative; flex: 1; min-height: 0; }
+     #gameCanvas { width: 100%; height: 100%; }
 
-      /* --- 追加: ズームボタン用CSS --- */
-      #zoomUI {
-        position: absolute;
-        top: 10px;
-        left: 30px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        z-index: 1000;
-      }
-      #zoomUI button {
-        width: 100px;
-        height: 100px;
-        font-size: 48px;
-        background: rgba(0, 136, 255, 0.5);
-        color: #fff;
-        border: 2px solid #0ff;
-        border-radius: 8px;
-        cursor: pointer;
-        user-select: none;
-      }
-      #zoomUI button:active {
-        background: rgba(0, 255, 255, 0.8);
-        color: #000;
-      }
+     /* --- 追加: ズームボタン用CSS --- */
+     #zoomUI {
+       position: absolute;
+       top: 10px;
+       left: 30px;
+       display: flex;
+       flex-direction: column;
+       gap: 10px;
+       z-index: 1000;
+     }
+     #zoomUI button {
+       width: 100px;
+       height: 100px;
+       font-size: 48px;
+       background: rgba(0, 136, 255, 0.5);
+       color: #fff;
+       border: 2px solid #0ff;
+       border-radius: 8px;
+       cursor: pointer;
+       user-select: none;
+     }
+     #zoomUI button:active {
+       background: rgba(0, 255, 255, 0.8);
+       color: #000;
+     }
+
+     /* ===== 追加: ハイスコアオーバーレイ ===== */
+     #highScoreOverlay {
+       display: none; /* showHighScoreOverlay() で 'flex' に切り替え */
+       position: fixed;
+       inset: 0;
+       background: rgba(0, 0, 20, 0.93);
+       z-index: 9999;
+       align-items: center;
+       justify-content: center;
+       font-family: monospace;
+     }
+     #hsPanel {
+       border: 2px solid #0ff;
+       padding: 28px 32px;
+       min-width: 500px;
+       max-width: 700px;
+       width: 92%;
+       background: #080820;
+       box-shadow: 0 0 40px rgba(0,255,255,0.3);
+     }
+     #hsResultMsg {
+       text-align: center;
+       font-size: clamp(24px, 5vw, 40px);
+       letter-spacing: 3px;
+       margin: 0 0 6px 0;
+     }
+     #hsFinalMsg {
+       color: #8df;
+       text-align: center;
+       font-size: clamp(24px, 2.5vw, 40px);
+       margin: 0 0 16px 0;
+       padding-bottom: 14px;
+       border-bottom: 1px solid rgba(0,255,255,0.25);
+     }
+     .hs-heading {
+       color: #0ff;
+       font-size: clamp(24px, 2.2vw, 40px);
+       letter-spacing: 2px;
+       margin-bottom: 8px;
+     }
+     #hsTableWrap {
+       overflow-x: auto;
+     }
+     #hsTable {
+       width: 100%;
+       border-collapse: collapse;
+       font-size: clamp(20px, 2.2vw, 40px);
+       color: #9cf;
+       min-width: 260px;
+     }
+     #hsTable th {
+       color: #0ff;
+       text-align: left;
+       padding: 4px 6px;
+       border-bottom: 1px solid rgba(0,255,255,0.3);
+       letter-spacing: 1px;
+       white-space: nowrap;
+     }
+     #hsTable td {
+       padding: 6px 6px; white-space: nowrap;
+     }
+     #hsTable tbody tr.hs-new td {color: #ff0;}
+     #hsNoRecord {
+       color: #444;
+       text-align: center;
+       padding: 14px;
+       font-size: clamp(24px, 2.2vw, 40px);
+     }
+     #hsBtns {
+       display: flex;
+       gap: 12px;
+       justify-content: center;
+       margin-top: 20px;
+       flex-wrap: wrap;
+     }
+     .hs-btn {
+       padding: 11px 20px;
+       font-size: clamp(24px, 2.8vw, 40px);
+       font-family: monospace;
+       background: rgba(0, 100, 200, 0.3);
+       color: #0ff;
+       border: 2px solid #0ff;
+       border-radius: 4px;
+       cursor: pointer;
+       letter-spacing: 1px;
+       transition: background 0.15s, color 0.15s;
+     }
+     .hs-btn:hover, .hs-btn:active {
+       background: #0ff;
+       color: #000;
+     }
+
+     /* ステータスパネルのハイスコアボタン */
+     #viewScoresBtn {
+       font-family: monospace;
+       font-size: clamp(22px, 2vw, 40px);
+       background: transparent;
+       color: #0ff;
+       border: 1px solid #0ff;
+       padding: 3px 8px;
+       border-radius: 3px;
+       cursor: pointer;
+       margin-left: 10px;
+       vertical-align: middle;
+       transition: background 0.12s, color 0.12s;
+     }
+     #viewScoresBtn:hover {
+       background: #0ff;
+       color: #000;
+     }
+     /* ========================================= */
     </style>
   </head>
   <body>
@@ -59,6 +171,7 @@
         <div id="turn">
           TURN: <span id="statusTurn">1</span>,
           SCORE: <span id="statusScore">100</span>
+          <button id="viewScoresBtn">▶ SCORES</button>
         </div>
         <div id="statusShip">
           Ship:
@@ -80,13 +193,44 @@
         </div>
       </div>
     </div>
+
+    <!-- ===== 追加: ハイスコアオーバーレイ ===== -->
+    <div id="highScoreOverlay">
+      <div id="hsPanel">
+        <h2 id="hsResultMsg"></h2>
+        <p id="hsFinalMsg"></p>
+        <div class="hs-heading">▶ HIGH SCORES ◀</div>
+        <div id="hsTableWrap">
+          <table id="hsTable">
+            <thead>
+              <tr>
+                <th>RANK</th>
+                <th>SCORE</th>
+                <th>TURNS</th>
+                <th>DATE</th>
+              </tr>
+            </thead>
+            <tbody id="hsTableBody"></tbody>
+          </table>
+          <div id="hsNoRecord">--- NO RECORDS YET ---</div>
+        </div>
+        <div id="hsBtns">
+          <button class="hs-btn" id="hsRestartBtn">▶ RESTART</button>
+          <button class="hs-btn" id="hsCloseBtn">✕ CLOSE</button>
+        </div>
+      </div>
+    </div>
+    <!-- ========================================= -->
     
     <script>
      // ---------------------------------------------------------
      // 設定・定数の定義
      // ---------------------------------------------------------
      const SYSTEM = {
-       SCORE_INIT: 100,
+       SCORE: {
+         INIT: 300,
+         DESTROY_PENALTY: 50,
+       },
        NEW_ENEMY_INTERVAL: 50,
        SCALE: 0.4,
        STAR_QTY: 6,
@@ -153,12 +297,20 @@
         -Math.log(MECHANICS.WEAPON.EFFECTIVE_THRESHOLD) / MECHANICS.WEAPON.ALPHA
      );
 
+     // ===== 追加: ハイスコア定数 =====
+     const HIGHSCORE = {
+       MAX_ENTRIES: 5,
+       STORAGE_KEY: 'starbaseDefenderScores'
+     };
+     // ================================
+
      let ship, starBase, rangeGraphics, boundaryGraphics;
      let enemies = stars = [];
      let turnCount = 1;
-     let Score = 100;
+     let Score = SYSTEM.SCORE.INIT;
      let isPlayerTurn = true;
      let gameOver = false;
+     let flagClear = false;
 
      // ---------------------------------------------------------
      // クラス定義
@@ -183,7 +335,7 @@
 
      class GameObject {
        constructor(scene, x, y, texture, scale=SYSTEM.SCALE) {
-         console.log(`texture=${texture}`);
+         // console.log(`texture=${texture}`);
          this.scene = scene;
          this.scale = scale;
          this.sprite = scene.add.image(x, y, texture).setScale(scale);
@@ -256,7 +408,7 @@
        takeDamage(amount) {
          this.shield -= amount;
          if (this.shield <= 0) {
-           Score -= 10;
+           Score -= SYSTEM.SCORE.DESTROY_PENALTY;
            this.die();
          }
        }       
@@ -298,7 +450,6 @@
 
      class BaseStation extends ObjWithShield {
        constructor(scene, x, y) {
-         // ゲージの色を正しく黄色系(0xffcc00)に修正
          super(scene, x, y, 'baseImg', 35, 30, 4, ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc00);
        }
      }
@@ -561,6 +712,7 @@
            Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y)
            <= ENTITY_CONFIG.BASE.DOCKING_RANGE
          ) {
+           // 基地にドッキング、補給
            ship.energy = Math.min(
              ship.energy + ENTITY_CONFIG.PLAYER.DOCK_RESTORE_ENERGY, ENTITY_CONFIG.PLAYER.ENERGY_MAX
            );
@@ -571,6 +723,42 @@
          } else {
            setLog("APPROACH BASE TO DOCK");
            // ### ToDo: Move to base
+           // 修正: 移動先の計算も worldX / worldY に準拠
+           let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, pointer.worldX, pointer.worldY);
+           if (rawDist < 1) return;
+
+           let moveDist = Math.min(rawDist, ENTITY_CONFIG.PLAYER.MAX_MOVE_DIST);
+           let ratio = moveDist / rawDist;
+           let destX = ship.x + (pointer.worldX - ship.x) * ratio;
+           let destY = ship.y + (pointer.worldY - ship.y) * ratio;
+
+           if (isMoveForbidden(ship.x, ship.y, destX, destY)) {
+             // 障害物により移動不可
+             setLog("BLOCKED");
+             // isPlayerTurn = false;
+             // this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+             return;
+           }
+
+           let cost = Math.max(1, Math.ceil(moveDist * ENTITY_CONFIG.PLAYER.MOVE_COST_RATE));
+           if (ship.energy < cost) {
+             // エネルギー不足
+             setLog("NOT ENOUGH ENERGY");
+             isPlayerTurn = false;
+             this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+             return;
+           }
+
+           // 移動実行
+           ship.energy -= cost;
+           isPlayerTurn = false;
+           this.tweens.add({
+             targets: ship,
+             x: destX, y: destY,
+             duration: SYSTEM.TIMING.TURN_DELAY,
+             onComplete: () => this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this))
+           });
+           updateStatus();
          }
 
          updateStatus();
@@ -578,16 +766,19 @@
        }
 
        if (target && target.active) {
-         // Fire
+         // フェーザー砲発射
          let d = Phaser.Math.Distance.Between(ship.x, ship.y, target.x, target.y);
 
          if ( ship.energy < MECHANICS.WEAPON.PHASER_COST ) {
+           // エネルギー不足
            setLog("LOW ENERGY");
            isPlayerTurn = false;
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            return;
          }
+
          if (Math.exp(-MECHANICS.WEAPON.ALPHA * d) < MECHANICS.WEAPON.MAX_THRESHOLD) {
+           // 射程外
            setLog("OUT OF RANGE");
            ship.energy -= MECHANICS.WEAPON.PHASER_COST;
            isPlayerTurn = false;
@@ -597,12 +788,14 @@
          }
          
          if (isLOSBlocked(ship.x, ship.y, target.x, target.y, false)) {
+           // 障害物によりブロック
            setLog("BLOCKED");
            isPlayerTurn = false;
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            return;
          }
          
+         // 攻撃命中
          ship.energy -= MECHANICS.WEAPON.PHASER_COST;
          isPlayerTurn = false;
          target.takeDamage(
@@ -633,20 +826,23 @@
          let destY = ship.y + (pointer.worldY - ship.y) * ratio;
 
          if (isMoveForbidden(ship.x, ship.y, destX, destY)) {
+           // 障害物により移動不可
            setLog("BLOCKED");
-           isPlayerTurn = false;
-           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+           // isPlayerTurn = false;
+           // this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            return;
          }
 
          let cost = Math.max(1, Math.ceil(moveDist * ENTITY_CONFIG.PLAYER.MOVE_COST_RATE));
          if (ship.energy < cost) {
+           // エネルギー不足
            setLog("NOT ENOUGH ENERGY");
            isPlayerTurn = false;
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            return;
          }
 
+         // 移動実行
          ship.energy -= cost;
          isPlayerTurn = false;
          this.tweens.add({
@@ -795,7 +991,7 @@
        scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => {
          enemies = enemies.filter(e => e.active);
          if (enemies.length === 0 && !gameOver) {
-           gameOverMessage("MISSION ACCOMPLISHED");
+           gameOverMessage("MISSION ACCOMPLISHED", true);
          }
          else if (!gameOver) {
            turnCount++;
@@ -849,11 +1045,124 @@
        document.getElementById('logStatus').textContent = msg;
      }
 
-     function gameOverMessage(msg) {
-       gameOver=true;
-       isPlayerTurn=false;
+     // ===== 修正: ハイスコア表示を追加 =====
+     function gameOverMessage(msg, clear=false) {
+       gameOver = true;
+       flagClear = clear;
+       isPlayerTurn = false;
        setLog(msg);
+       // 少し間を置いてオーバーレイを表示
+       setTimeout(() => showHighScoreOverlay(msg, true), 800);
      }
+
+     // ---------------------------------------------------------
+     // ハイスコア機能
+     // ---------------------------------------------------------
+
+     function loadHighScores() {
+       try {
+         const raw = localStorage.getItem(HIGHSCORE.STORAGE_KEY);
+         return raw ? JSON.parse(raw) : [];
+       } catch (e) {
+         return [];
+       }
+     }
+
+     // スコアを保存し、更新済みリストと新エントリの順位インデックスを返す
+     function saveHighScore(score, turns, result) {
+       let list = loadHighScores();
+       const now = new Date();
+       const dateStr = [
+         now.getFullYear(),
+         String(now.getMonth() + 1).padStart(2, '0'),
+         String(now.getDate()).padStart(2, '0')
+       ].join('/');
+       // _new フラグで今回のエントリを識別
+       if ( flagClear ) {
+         list.push({ score, turns, result, date: dateStr, _new: true });
+       }
+       list.sort((a, b) => b.score - a.score);
+       const newIdx = list.findIndex(s => s._new);
+       list = list.slice(0, HIGHSCORE.MAX_ENTRIES);
+       const madeIt = list.some(s => s._new);
+       // _new フラグを除いて保存
+       localStorage.setItem(
+         HIGHSCORE.STORAGE_KEY,
+         JSON.stringify(list.map(({ _new, ...rest }) => rest))
+       );
+       return { list, newIdx: madeIt ? newIdx : -1 };
+     }
+
+     function renderHSTable(list, newIdx) {
+       const tbody  = document.getElementById('hsTableBody');
+       const noRec  = document.getElementById('hsNoRecord');
+       tbody.innerHTML = '';
+       if (!list || list.length === 0) {
+         noRec.style.display = 'block';
+         return;
+       }
+       noRec.style.display = 'none';
+       const rankLabels = ['1ST', '2ND', '3RD', '4TH', '5TH'];
+       list.forEach((s, i) => {
+         const tr = document.createElement('tr');
+         const isNew = (i === newIdx);
+         if (isNew) tr.className = 'hs-new';
+         const rank   = rankLabels[i] || `${i + 1}TH`;
+         const prefix = isNew ? '★' : '';
+         tr.innerHTML = `
+           <td>${prefix}${rank}</td>
+           <td>${s.score}</td>
+           <td>${s.turns}</td>
+           <td>${s.date}</td>
+         `;
+         tbody.appendChild(tr);
+       });
+     }
+
+     // isGameEnd=true  : スコア保存 → 結果表示、CLOSEボタン非表示
+     // isGameEnd=false : 現在のスコアを参照表示のみ、CLOSEボタン表示
+     function showHighScoreOverlay(resultMsg, isGameEnd) {
+       const overlay    = document.getElementById('highScoreOverlay');
+       const resultEl   = document.getElementById('hsResultMsg');
+       const finalEl    = document.getElementById('hsFinalMsg');
+       const closeBtn   = document.getElementById('hsCloseBtn');
+       const restartBtn = document.getElementById('hsRestartBtn');
+
+       if (isGameEnd) {
+         resultEl.style.color = '#ff0';
+         resultEl.textContent = resultMsg;
+         if ( flagClear ) {
+           finalEl.textContent  = `FINAL SCORE: ${Score}   TURNS: ${turnCount}`;
+         } else {
+           finalEl.textContent = `MISSION FAILED: SCORE: ${Score}   TURNS: ${turnCount}`;
+         }
+         const { list, newIdx } = saveHighScore(Score, turnCount, resultMsg);
+         renderHSTable(list, newIdx);
+         closeBtn.style.display   = 'none';
+         restartBtn.style.display = 'inline-block';
+       } else {
+         resultEl.style.color = '#0ff';
+         resultEl.textContent = '▶ HIGH SCORES ◀';
+         finalEl.textContent  = `NOW — SCORE: ${Score}   TURN: ${turnCount}`;
+         renderHSTable(loadHighScores(), -1);
+         closeBtn.style.display   = 'inline-block';
+         restartBtn.style.display = 'inline-block';
+       }
+       overlay.style.display = 'flex';
+     }
+
+     // ===== ハイスコアオーバーレイのイベントリスナー =====
+     document.getElementById('viewScoresBtn').addEventListener('click', () => {
+       showHighScoreOverlay(null, false);
+     });
+     document.getElementById('hsRestartBtn').addEventListener('click', () => {
+       location.reload();
+     });
+     document.getElementById('hsCloseBtn').addEventListener('click', () => {
+       document.getElementById('highScoreOverlay').style.display = 'none';
+     });
+     // =====================================================
+
     </script>
   </body>
 </html>
