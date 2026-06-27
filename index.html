@@ -29,8 +29,8 @@
       /* --- 追加: ズームボタン用CSS --- */
       #zoomUI {
         position: absolute;
-        top: 20px;
-        right: 20px;
+        top: 10px;
+        left: 30px;
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -57,7 +57,8 @@
     <div id="gameContainer">
       <div id="statusPanel">
         <div id="turn">
-          TURN: <span id="statusTurn">1</span>
+          TURN: <span id="statusTurn">1</span>,
+          SCORE: <span id="statusScore">100</span>
         </div>
         <div id="statusShip">
           Ship:
@@ -85,7 +86,9 @@
      // 設定・定数の定義
      // ---------------------------------------------------------
      const SYSTEM = {
-       SCALE: 0.5,
+       SCORE_INIT: 100,
+       NEW_ENEMY_INTERVAL: 50,
+       SCALE: 0.4,
        STAR_QTY: 6,
        ENEMY_QTY: 4,
        BOUNDS_RADIUS: 300,
@@ -101,11 +104,11 @@
 
      // --- 追加: カメラ設定 ---
      const CAMERA = {
-       MIN_ZOOM: 1.0,
-       MAX_ZOOM: 2.4,
-       STEP: 0.2
+       ZOOM_MIN: 1.0,
+       ZOOM_MAX: 4.0,
+       STEP: 2.0
      };
-     let currentZoom = 1.0;
+     let CurZoom = 1.0;
 
      const ENTITY_CONFIG = {
        PLAYER: {
@@ -151,9 +154,11 @@
      );
 
      let ship, starBase, rangeGraphics, boundaryGraphics;
-     let enemies = [], stars = [];
+     let enemies = stars = [];
      let turnCount = 1;
-     let isPlayerTurn = true, gameOver = false;
+     let Score = 100;
+     let isPlayerTurn = true;
+     let gameOver = false;
 
      // ---------------------------------------------------------
      // クラス定義
@@ -178,6 +183,7 @@
 
      class GameObject {
        constructor(scene, x, y, texture, scale=SYSTEM.SCALE) {
+         console.log(`texture=${texture}`);
          this.scene = scene;
          this.scale = scale;
          this.sprite = scene.add.image(x, y, texture).setScale(scale);
@@ -207,8 +213,8 @@
      class ObjWithShield extends GameObject {
        constructor(
          scene, x, y, texture,
-         shield_max,
-         gauge_color, gauge_y, gauge_w=30, gauge_h=6,
+         gauge_y, gauge_w, gauge_h,
+         shield_max, gauge_color,
          scale=SYSTEM.SCALE
        ) {
          super(scene, x, y, texture, scale);
@@ -222,17 +228,20 @@
        }
 
        updateGauge() {
-         if (this.active && this.shield > 0) {
-           drawGauge(
-             this.gauge,
-             this.x, this.y + (this.gauge_y * this.scale),
-             this.gauge_w, this.gauge_h,
-             this.shield / this.shield_max,
-             this.gauge_color
-           );
-         } else if (this.gauge) {
-           this.gauge.clear();
+         if (! this.active || this.shield <= 0) {
+           if (this.guage) {
+             this.gauge.clear();
+           }
+           return;
          }
+
+         drawGauge(
+           this.gauge,
+           this.x, this.y + (this.gauge_y * this.scale),
+           this.gauge_w, this.gauge_h,
+           this.shield / this.shield_max,
+           this.gauge_color
+         );
        }
 
        die() {
@@ -247,6 +256,7 @@
        takeDamage(amount) {
          this.shield -= amount;
          if (this.shield <= 0) {
+           Score -= 10;
            this.die();
          }
        }       
@@ -255,14 +265,28 @@
      class ObjWithEnergy extends ObjWithShield {
        constructor(
          scene, x, y, texture,
-         energy_max,
-         shield_max,
-         gauge_color, gauge_y, gauge_w=30, gauge_h=6,
+         gauge_y, gauge_w, gauge_h,
+         shield_max, gauge_color,
+         energy_max, e_gauge_color,
          scale=SYSTEM.SCALE
        ) {
-         super(scene, x, y, texture, shield_max, gauge_color, gauge_y, gauge_w, gauge_h, scale);
+         super(scene, x, y, texture, gauge_y, gauge_w, gauge_h, shield_max, gauge_color, scale);
          this.energy_max = energy_max;
+         this.e_gauge_color = e_gauge_color;
+
          this.energy = this.energy_max;
+         this.e_gauge = this.scene.add.graphics();
+       }
+
+       updateGauge() {
+         super.updateGauge();
+         drawGauge(
+           this.e_gauge,
+           this.x, this.y + (this.gauge_y * this.scale) + this.gauge_h + 1,
+           this.gauge_w, this.gauge_h,
+           this.energy / this.energy_max,
+           this.e_gauge_color
+         );         
        }
      }
 
@@ -275,21 +299,23 @@
      class BaseStation extends ObjWithShield {
        constructor(scene, x, y) {
          // ゲージの色を正しく黄色系(0xffcc00)に修正
-         super(scene, x, y, 'baseImg', ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc00, 35);
+         super(scene, x, y, 'baseImg', 35, 30, 4, ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc00);
        }
      }
 
      class Enemy extends ObjWithShield {
        constructor(scene, x, y) {
-         super(scene, x, y, 'enemyImg', ENTITY_CONFIG.ENEMY.SHIELD_MAX, 0xff3333, 30);
+         super(scene, x, y, 'enemyImg', 25, 30, 4, ENTITY_CONFIG.ENEMY.SHIELD_MAX, 0xff3333);
        }
      }
 
      class PlayerShip extends ObjWithEnergy {
        constructor(scene, x, y) {
          super(
-           scene, x, y, 'shipImg', ENTITY_CONFIG.PLAYER.ENERGY_MAX,
-           ENTITY_CONFIG.PLAYER.SHIELD_MAX, 0x4488ff, 30
+           scene, x, y, 'shipImg',
+           29, 30, 4, 
+           ENTITY_CONFIG.PLAYER.SHIELD_MAX, 0xff00ff,
+           ENTITY_CONFIG.PLAYER.ENERGY_MAX, 0x8888ff,
          );
        }
      }
@@ -316,13 +342,13 @@
      function preload(){
        const g = this.make.graphics({add:false});
 
-       g.fillStyle(0xaabbff);
-       g.fillEllipse(25,15,40,30);
        g.fillStyle(0x5588ee);
        g.fillRect(22,25,6,20);
        g.fillStyle(0x4488ff);
        g.fillRect(10,30,8,20);
        g.fillRect(32,30,8,20);
+       g.fillStyle(0xaabbff);
+       g.fillEllipse(25,15,40,30);
        g.generateTexture('shipImg',50,60);
        
        g.clear();
@@ -386,7 +412,6 @@
        updateStatus();
        this.input.on('pointerdown', handlePointerDown, this);
 
-       // --- 追加: ズーム関連のイベントリスナー ---
        document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
        document.getElementById('zoomOut').onclick = () => changeZoom(this, -CAMERA.STEP);
 
@@ -398,13 +423,18 @@
 
      // --- 追加: ズーム変更関数 ---
      function changeZoom(scene, amount) {
-       let nextZoom = currentZoom + amount;
-
-       currentZoom = Phaser.Math.Clamp(nextZoom, CAMERA.MIN_ZOOM, CAMERA.MAX_ZOOM);
+       let nextZoom = 1.0;
+       if ( amount > 0 ) {
+         nextZoom = CurZoom * amount;
+       }
+       if ( amount < 0 ) {
+         nextZoom = CurZoom / -amount;
+       }
+       CurZoom = Phaser.Math.Clamp(nextZoom, CAMERA.ZOOM_MIN, CAMERA.ZOOM_MAX);
        
        scene.tweens.add({
          targets: scene.cameras.main,
-         zoom: currentZoom,
+         zoom: CurZoom,
          duration: 150,
          ease: 'Sine.easeInOut'
        });
@@ -418,6 +448,8 @@
 
      function update(){
        rangeGraphics.clear();
+
+       // 射程距離の描画
        [ship, ...enemies].forEach(
          (obj, i)=>{
            if(!obj.active) return;
@@ -431,10 +463,11 @@
          }
        );
 
+       // ゲージ描画
        if (ship) ship.updateGauge();
        if (starBase) starBase.updateGauge();
        enemies.forEach(e => e.updateGauge());
-     }
+     } // update()
 
      function getSafeRandPos(minDistance){
        let x, y, distToCenter;
@@ -513,12 +546,12 @@
        
        let target = enemies.find(
          e => Phaser.Math.Distance.Between(
-           pointer.x, pointer.y, e.x, e.y
+           pointer.worldX, pointer.worldY, e.x, e.y
          ) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
        );
 
        if (!target && starBase.shield > 0 && Phaser.Math.Distance.Between(
-         pointer.x, pointer.y, starBase.x, starBase.y) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
+         pointer.worldX, pointer.worldY, starBase.x, starBase.y) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
        ) {
          target = {type:'base'};
        }
@@ -581,7 +614,7 @@
          beam.lineBetween(ship.x, ship.y, target.x, target.y);
          this.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
 
-         if (target.isDead) {
+         if (!target.active) {
            enemies = enemies.filter(e => e !== target);
          }
          this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
@@ -656,12 +689,12 @@
            let canAttackBase = (
              starBase.shield > 0 && dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(e.x, e.y, starBase.x, starBase.y, false)
            );
-           
            let canAttackShip = (
              dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(e.x, e.y, ship.x, ship.y)
            );
 
            if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
+             // 基地への攻撃
              const beam = scene.add.graphics();
              beam.lineStyle(4, 0xff00ff, 1);
              beam.lineBetween(e.x, e.y, starBase.x, starBase.y);
@@ -675,6 +708,7 @@
                gameOverMessage("BASE DESTROYED");
              }
            } else if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackShip) {
+             // プレイヤーへの攻撃
              const beam = scene.add.graphics();
              beam.lineStyle(4, 0xff00ff, 1);
              beam.lineBetween(e.x, e.y, ship.x, ship.y);
@@ -688,6 +722,7 @@
                gameOverMessage("ENTERPRISE DESTROYED");
              }
            } else {
+             // 移動
              let angle;
              if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5) {
                let target = dToBase < dToShip ? {x:starBase.x, y:starBase.y} : {x:ship.x, y:ship.y};
@@ -713,7 +748,9 @@
                  let tx2 = e.x + Math.cos(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
                  let ty2 = e.y + Math.sin(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
                  if (!isMoveForbidden(e.x, e.y, tx2, ty2, true)) {
-                   destX = tx2; destY = ty2; found = true; break;
+                   destX = tx2; destY = ty2;
+                   found = true;
+                   break;
                  }
                }
                if (!found) {
@@ -741,12 +778,13 @@
                    }
                  ) // delayedCall()
                }
-             ); // add()
+             ); // scene.tweens.add()
 
              e.x = Math.floor(e.x);
              e.y = Math.floor(e.y);
            }
 
+           // シールド回復
            e.shield = Math.min(
              ENTITY_CONFIG.ENEMY.SHIELD_MAX,
              e.shield + (ENTITY_CONFIG.ENEMY.SHIELD_MAX * ENTITY_CONFIG.ENEMY.REGEN)
@@ -755,16 +793,24 @@
        });
 
        scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => {
-         enemies = enemies.filter(e => !e.isDead && e.active);
+         enemies = enemies.filter(e => e.active);
          if (enemies.length === 0 && !gameOver) {
            gameOverMessage("MISSION ACCOMPLISHED");
          }
          else if (!gameOver) {
            turnCount++;
+           Score--;
+
+           if ( turnCount % SYSTEM.NEW_ENEMY_INTERVAL == 0 ) {
+             let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
+             enemies.push(new Enemy(scene, p.x, p.y));
+           }
+
            updateStatus(); 
            isPlayerTurn = true; setLog("COMMAND: AWAITING ORDERS");
          }
        });
+
      }
 
      function updateStatus() {
@@ -773,8 +819,8 @@
        let baseShield = starBase.shield > 0 ? starBase.shield : 0;
 
        document.getElementById('statusTurn').textContent = `${turnCount}`;
+       document.getElementById('statusScore').textContent = `${Score}`;
 
-       // 修正: 意図せぬグローバル変数化を防ぐため let を付与
        let color = "#0f0";
        if ( shipEnergy < ENTITY_CONFIG.PLAYER.ENERGY_MAX * .3 ) {
          color = "#f00";
