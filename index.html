@@ -5,24 +5,52 @@
     <title>Starbase Defender</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-     body { margin:0; background:#000; padding:0; overflow:hidden; font-family: Arial, sans-serif; }
-     #gameContainer { display: flex; flex-direction: column; height: 100vh; }
-     #statusPanel {
-       background:#111;
-       color:#0ff;
-       padding:15px;
-       /* height:100px; を削除し、中身に合わせて伸縮させる */
-       flex: 0 0 auto;
-       border-bottom:2px solid #08f;
-       overflow-y:auto;
-       /* 画面幅(vw)を基準にしつつ、最小14px・最大20pxの範囲で自動スケール */
-       font-size: clamp(30px, 6vw, 45px); 
-       font-family: monospace;
-       line-height: 1.4; /* 文字が読みやすいように行間を確保 */
-     }
-     /* マイナスマージンを廃止し、文字が大きくても行が重ならないよう余白を取る */
-     #statusPanel div { margin: 4px 5px; }
-     #gameCanvas { flex:1; }
+      body { margin:0; background:#000; padding:0; overflow:hidden; font-family: Arial, sans-serif; }
+      #gameContainer { display: flex; flex-direction: column; height: 100vh; }
+      
+      /* --- 修正: ステータスパネルの文字サイズと余白の調整 --- */
+      #statusPanel {
+        background:#111;
+        color:#0ff;
+        padding:15px;
+        flex: 0 0 auto;
+        border-bottom:2px solid #08f;
+        overflow-y:auto;
+        font-size: clamp(18px, 5vw, 28px); 
+        font-family: monospace;
+        line-height: 1.5;
+      }
+      #statusPanel div { margin: 8px 5px; }
+      
+      /* --- 追加: ゲーム画面とUIを重ねるためのラッパー --- */
+      #gameWrapper { position: relative; flex: 1; min-height: 0; }
+      #gameCanvas { width: 100%; height: 100%; }
+
+      /* --- 追加: ズームボタン用CSS --- */
+      #zoomUI {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 1000;
+      }
+      #zoomUI button {
+        width: 100px;
+        height: 100px;
+        font-size: 48px;
+        background: rgba(0, 136, 255, 0.5);
+        color: #fff;
+        border: 2px solid #0ff;
+        border-radius: 8px;
+        cursor: pointer;
+        user-select: none;
+      }
+      #zoomUI button:active {
+        background: rgba(0, 255, 255, 0.8);
+        color: #000;
+      }
     </style>
   </head>
   <body>
@@ -42,13 +70,20 @@
         </div>
         <div id="logStatus">COMMAND: AWAITING ORDERS</div>
       </div>
-      <div id="gameCanvas"></div>
+      
+      <div id="gameWrapper">
+        <div id="gameCanvas"></div>
+        <div id="zoomUI">
+          <button id="zoomIn">＋</button>
+          <button id="zoomOut">－</button>
+        </div>
+      </div>
     </div>
+    
     <script>
      // ---------------------------------------------------------
-     // 設定・定数の再分類
+     // 設定・定数の定義
      // ---------------------------------------------------------
-     
      const SYSTEM = {
        SCALE: 0.5,
        STAR_QTY: 6,
@@ -63,6 +98,14 @@
      SYSTEM.PLAY_AREA_HEIGHT = SYSTEM.PLAY_AREA_WIDTH;
      SYSTEM.CENTER_X = SYSTEM.PLAY_AREA_WIDTH / 2;
      SYSTEM.CENTER_Y = SYSTEM.PLAY_AREA_HEIGHT / 2;
+
+     // --- 追加: カメラ設定 ---
+     const CAMERA = {
+       MIN_ZOOM: 1.0,
+       MAX_ZOOM: 2.4,
+       STEP: 0.2
+     };
+     let currentZoom = 1.0;
 
      const ENTITY_CONFIG = {
        PLAYER: {
@@ -86,7 +129,8 @@
        COLLISION: {
          HIT_RADIUS: 30 * SYSTEM.SCALE,
          OBSTACLE_RADIUS: 24 * SYSTEM.SCALE,
-         LOS_RADIUS: 16 * SYSTEM.SCALE
+         LOS_RADIUS: 16 * SYSTEM.SCALE,
+         TOUCH_TOLERANCE: 80 * SYSTEM.SCALE // 追加: タップ判定の緩和
        }
      };
 
@@ -100,10 +144,10 @@
        }
      };
      MECHANICS.WEAPON.MAX_RANGE = Math.floor(
-     -Math.log(MECHANICS.WEAPON.MAX_THRESHOLD) / MECHANICS.WEAPON.ALPHA
+        -Math.log(MECHANICS.WEAPON.MAX_THRESHOLD) / MECHANICS.WEAPON.ALPHA
      );
      MECHANICS.WEAPON.EFFECTIVE_RANGE = Math.floor(
-     -Math.log(MECHANICS.WEAPON.EFFECTIVE_THRESHOLD) / MECHANICS.WEAPON.ALPHA
+        -Math.log(MECHANICS.WEAPON.EFFECTIVE_THRESHOLD) / MECHANICS.WEAPON.ALPHA
      );
 
      let ship, starBase, rangeGraphics, boundaryGraphics;
@@ -114,9 +158,11 @@
      // ---------------------------------------------------------
      // クラス定義
      // ---------------------------------------------------------
-     
      function drawGauge(graphics, cx, cy, width, height, ratio, color) {
        graphics.clear();
+       // 万が一 cy が NaN などの不正値になった場合のフェイルセーフ
+       if (!isFinite(cy)) return;
+
        const x = cx - width / 2;
        const y = cy - height / 2;
        
@@ -228,7 +274,8 @@
 
      class BaseStation extends ObjWithShield {
        constructor(scene, x, y) {
-         super(scene, x, y, 'baseImg', ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc0, 35);
+         // ゲージの色を正しく黄色系(0xffcc00)に修正
+         super(scene, x, y, 'baseImg', ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc00, 35);
        }
      }
 
@@ -332,8 +379,35 @@
        let pp = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
        ship = new PlayerShip(this, pp.x, pp.y);
 
+       // --- 追加: カメラの追従と表示範囲の制限 ---
+       this.cameras.main.setBounds(0, 0, SYSTEM.PLAY_AREA_WIDTH, SYSTEM.PLAY_AREA_HEIGHT);
+       this.cameras.main.startFollow(ship.sprite, true, 0.08, 0.08);
+
        updateStatus();
        this.input.on('pointerdown', handlePointerDown, this);
+
+       // --- 追加: ズーム関連のイベントリスナー ---
+       document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
+       document.getElementById('zoomOut').onclick = () => changeZoom(this, -CAMERA.STEP);
+
+       this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
+         let zoomAmount = deltaY > 0 ? -CAMERA.STEP : CAMERA.STEP;
+         changeZoom(this, zoomAmount);
+       });
+     }
+
+     // --- 追加: ズーム変更関数 ---
+     function changeZoom(scene, amount) {
+       let nextZoom = currentZoom + amount;
+
+       currentZoom = Phaser.Math.Clamp(nextZoom, CAMERA.MIN_ZOOM, CAMERA.MAX_ZOOM);
+       
+       scene.tweens.add({
+         targets: scene.cameras.main,
+         zoom: currentZoom,
+         duration: 150,
+         ease: 'Sine.easeInOut'
+       });
      }
 
      function drawBoundary(){
@@ -347,7 +421,6 @@
        [ship, ...enemies].forEach(
          (obj, i)=>{
            if(!obj.active) return;
-           
            let color = (i===0) ? 0x4488ff : 0xff3333;
            if ( i == 0 ) {
              rangeGraphics.lineStyle(0.8, color, 0.3);
@@ -512,21 +585,19 @@
            enemies = enemies.filter(e => e !== target);
          }
          this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
-
          updateStatus();
          return;
        }
 
        if (!target) {
-         let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, pointer.x, pointer.y);
-         if (rawDist < 1) {
-           return;
-         }
+         // 修正: 移動先の計算も worldX / worldY に準拠
+         let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, pointer.worldX, pointer.worldY);
+         if (rawDist < 1) return;
 
          let moveDist = Math.min(rawDist, ENTITY_CONFIG.PLAYER.MAX_MOVE_DIST);
          let ratio = moveDist / rawDist;
-         let destX = ship.x + (pointer.x - ship.x) * ratio;
-         let destY = ship.y + (pointer.y - ship.y) * ratio;
+         let destX = ship.x + (pointer.worldX - ship.x) * ratio;
+         let destY = ship.y + (pointer.worldY - ship.y) * ratio;
 
          if (isMoveForbidden(ship.x, ship.y, destX, destY)) {
            setLog("BLOCKED");
@@ -544,16 +615,13 @@
          }
 
          ship.energy -= cost;
-
          isPlayerTurn = false;
-         this.tweens.add(
-           {
-             targets: ship,
-             x: destX, y: destY,
-             duration: SYSTEM.TIMING.TURN_DELAY,
-             onComplete: () => this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this))
-           }
-         );
+         this.tweens.add({
+           targets: ship,
+           x: destX, y: destY,
+           duration: SYSTEM.TIMING.TURN_DELAY,
+           onComplete: () => this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this))
+         });
          updateStatus();
        }
      }
@@ -562,62 +630,35 @@
        let hitStar = stars.some(
          s => {
            if (!s.active) return false;
-           if (
-             Phaser.Math.Distance.Between(x2, y2, s.x, s.y) <= ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS
-           ) {
-             return true;
-           }
-           return lineHitsCircle(
-             x1, y1,
-             x2, y2,
-             s.x, s.y,
-             ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS
-           );
+           if (Phaser.Math.Distance.Between(x2, y2, s.x, s.y) <= ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS) return true;
+           return lineHitsCircle(x1, y1, x2, y2, s.x, s.y, ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS);
          }
        );
        if (hitStar) return true;
 
        if (isEnemy && starBase.shield > 0 && starBase?.active) {
-         if (
-           Phaser.Math.Distance.Between(x2, y2, starBase.x, starBase.y)
-           <= ENTITY_CONFIG.COLLISION.HIT_RADIUS
-         ) {
-           return true;
-         }
-         if (
-           lineHitsCircle(x1, y1, x2, y2, starBase.x, starBase.y, ENTITY_CONFIG.COLLISION.HIT_RADIUS)
-         ) {
-           return true;
-         }
+         if (Phaser.Math.Distance.Between(x2, y2, starBase.x, starBase.y) <= ENTITY_CONFIG.COLLISION.HIT_RADIUS) return true;
+         if (lineHitsCircle(x1, y1, x2, y2, starBase.x, starBase.y, ENTITY_CONFIG.COLLISION.HIT_RADIUS)) return true;
        }
-
        return false;
      }
 
      function enemyTurn(scene) {
-       if (gameOver) {
-         return;
-       }
+       if (gameOver) return;
 
        enemies.forEach(e => {
          scene.time.delayedCall(0, () => {
-           if ( gameOver || !e.active ) {
-             return;
-           }
+           if ( gameOver || !e.active ) return;
 
            let dToBase = Phaser.Math.Distance.Between(e.x, e.y, starBase.x, starBase.y);
            let dToShip = Phaser.Math.Distance.Between(e.x, e.y, ship.x, ship.y);
            
            let canAttackBase = (
-             starBase.shield > 0 && dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(
-               e.x, e.y, starBase.x, starBase.y, false
-             )
+             starBase.shield > 0 && dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(e.x, e.y, starBase.x, starBase.y, false)
            );
            
            let canAttackShip = (
-             dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(
-               e.x, e.y, ship.x, ship.y
-             )
+             dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(e.x, e.y, ship.x, ship.y)
            );
 
            if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
@@ -733,7 +774,8 @@
 
        document.getElementById('statusTurn').textContent = `${turnCount}`;
 
-       color = "#0f0";
+       // 修正: 意図せぬグローバル変数化を防ぐため let を付与
+       let color = "#0f0";
        if ( shipEnergy < ENTITY_CONFIG.PLAYER.ENERGY_MAX * .3 ) {
          color = "#f00";
        }
