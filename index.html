@@ -11,28 +11,34 @@
        background:#111;
        color:#0ff;
        padding:15px;
-       height:100px;
+       /* height:100px; を削除し、中身に合わせて伸縮させる */
+       flex: 0 0 auto;
        border-bottom:2px solid #08f;
        overflow-y:auto;
-       font-size:14px;
+       /* 画面幅(vw)を基準にしつつ、最小14px・最大20pxの範囲で自動スケール */
+       font-size: clamp(30px, 6vw, 45px); 
        font-family: monospace;
+       line-height: 1.4; /* 文字が読みやすいように行間を確保 */
      }
-     #statusPanel div { margin:5px 0; }
+     /* マイナスマージンを廃止し、文字が大きくても行が重ならないよう余白を取る */
+     #statusPanel div { margin: 4px 5px; }
      #gameCanvas { flex:1; }
     </style>
   </head>
   <body>
     <div id="gameContainer">
       <div id="statusPanel">
-        TURN: <span id="statusTurn">1</span>
+        <div id="turn">
+          TURN: <span id="statusTurn">1</span>
+        </div>
         <div id="statusShip">
-          My Ship:
+          Ship:
+          Shield: <span id="statusShipShield">0</span>%
           Energy: <span id="statusShipEnergy">0</span>,
-          Shields: <span id="statusShipShields">0</span>%
         </div>
         <div id="statusBase">
-          Star Base:
-          Shields: <span id="statusBaseShields">0</span>%
+          Base:
+          Shield: <span id="statusBaseShield">0</span>%
         </div>
         <div id="logStatus">COMMAND: AWAITING ORDERS</div>
       </div>
@@ -49,29 +55,29 @@
        ENEMY_QTY: 4,
        BOUNDS_RADIUS: 300,
        TIMING: {
-         BEAM_DUR: 300,
-         TURN_DELAY: 300,
+         BEAM_DUR: 500,
+         TURN_DELAY: 500,
        }
      };
-     SYSTEM.PLAY_AREA_WIDTH = SYSTEM.BOUNDS_RADIUS * 2 + 30;
+     SYSTEM.PLAY_AREA_WIDTH = SYSTEM.BOUNDS_RADIUS * 2 + 20;
      SYSTEM.PLAY_AREA_HEIGHT = SYSTEM.PLAY_AREA_WIDTH;
      SYSTEM.CENTER_X = SYSTEM.PLAY_AREA_WIDTH / 2;
      SYSTEM.CENTER_Y = SYSTEM.PLAY_AREA_HEIGHT / 2;
 
      const ENTITY_CONFIG = {
        PLAYER: {
-         MAX_ENERGY: 3000,
-         MAX_SHIELDS: 1000,
+         ENERGY_MAX: 3000,
+         SHIELD_MAX: 1000,
          DOCK_RESTORE_ENERGY: 1500,
-         MAX_MOVE_DIST: 130 * SYSTEM.SCALE,
+         MAX_MOVE_DIST: 120 * SYSTEM.SCALE,
          MOVE_COST_RATE: 0.2 / SYSTEM.SCALE
        },
        BASE: {
-         MAX_SHIELDS: 1000,
+         SHIELD_MAX: 1000,
          DOCKING_RANGE: 60 * SYSTEM.SCALE
        },
        ENEMY: {
-         HP: 300,
+         SHIELD_MAX: 300,
          DAMAGE: 70,
          SPEED: 30 * SYSTEM.SCALE,
          STOP_DIST: 30 * SYSTEM.SCALE,
@@ -114,11 +120,8 @@
        const x = cx - width / 2;
        const y = cy - height / 2;
        
-       graphics.fillStyle(0x222222, 0.9);
+       graphics.fillStyle(0x555555, 1);
        graphics.fillRect(x, y, width, height);
-       
-       graphics.lineStyle(1, 0x000000, 1);
-       graphics.strokeRect(x, y, width, height);
        
        const r = Math.max(0, Math.min(1, ratio));
        if (r > 0) {
@@ -128,96 +131,119 @@
      }
 
      class GameObject {
-       constructor(scene, x, y, texture, scale) {
+       constructor(scene, x, y, texture, scale=SYSTEM.SCALE) {
          this.scene = scene;
+         this.scale = scale;
          this.sprite = scene.add.image(x, y, texture).setScale(scale);
          this.active = true;
        }
-       get x() { return this.sprite.x; }
-       set x(val) { this.sprite.x = val; }
-       get y() { return this.sprite.y; }
-       set y(val) { this.sprite.y = val; }
+
+       get x() {
+         return this.sprite.x;
+       }
+       set x(val) {
+         this.sprite.x = val;
+       }
+
+       get y() {
+         return this.sprite.y;
+       }
+       set y(val) {
+         this.sprite.y = val;
+       }
+
        destroy() {
          this.sprite.destroy();
          this.active = false;
        }
      }
 
-     class Star extends GameObject {
-       constructor(scene, x, y) {
-         super(scene, x, y, 'starImg', SYSTEM.SCALE);
+     class ObjWithShield extends GameObject {
+       constructor(
+         scene, x, y, texture,
+         shield_max,
+         gauge_color, gauge_y, gauge_w=30, gauge_h=6,
+         scale=SYSTEM.SCALE
+       ) {
+         super(scene, x, y, texture, scale);
+         this.shield_max = shield_max;
+         this.shield = this.shield_max;
+         this.gauge_color = gauge_color;
+         this.gauge_y = gauge_y;
+         this.gauge_w = gauge_w;
+         this.gauge_h = gauge_h;
+         this.gauge = this.scene.add.graphics();
        }
-     }
 
-     class BaseStation extends GameObject {
-       constructor(scene, x, y) {
-         super(scene, x, y, 'baseImg', SYSTEM.SCALE);
-         this.shields = ENTITY_CONFIG.BASE.MAX_SHIELDS;
-         this.gauge = scene.add.graphics();
-       }
        updateGauge() {
-         if (this.active && this.shields > 0) {
-           drawGauge(this.gauge, this.x, this.y + (35 * SYSTEM.SCALE), 40, 6, this.shields / ENTITY_CONFIG.BASE.MAX_SHIELDS, 0xffcc00);
+         if (this.active && this.shield > 0) {
+           drawGauge(
+             this.gauge,
+             this.x, this.y + (this.gauge_y * this.scale),
+             this.gauge_w, this.gauge_h,
+             this.shield / this.shield_max,
+             this.gauge_color
+           );
          } else if (this.gauge) {
            this.gauge.clear();
          }
        }
-       takeDamage(amount) {
-         this.shields -= amount;
-         if (this.shields <= 0) {
-           this.destroy();
-           if (this.gauge) this.gauge.destroy();
-         }
-       }
-     }
 
-     class PlayerShip extends GameObject {
-       constructor(scene, x, y) {
-         super(scene, x, y, 'shipImg', SYSTEM.SCALE);
-         this.energy = ENTITY_CONFIG.PLAYER.MAX_ENERGY;
-         this.shields = ENTITY_CONFIG.PLAYER.MAX_SHIELDS;
-         this.gauge = scene.add.graphics();
-       }
-       updateGauge() {
-         if (this.active && this.shields > 0) {
-           drawGauge(this.gauge, this.x, this.y + (35 * SYSTEM.SCALE), 40, 6, this.shields / ENTITY_CONFIG.PLAYER.MAX_SHIELDS, 0x4488ff);
-         } else if (this.gauge) {
-           this.gauge.clear();
+       die() {
+         this.shield = 0;
+         this.active = false;
+         if ( this.gauge ) {
+           this.gauge.destroy();
          }
+         this.destroy();
        }
-       takeDamage(amount) {
-         this.shields -= amount;
-         if (this.shields <= 0) {
-           this.destroy();
-           if (this.gauge) this.gauge.destroy();
-         }
-       }
-     }
 
-     class Enemy extends GameObject {
-       constructor(scene, x, y) {
-         super(scene, x, y, 'enemyImg', SYSTEM.SCALE);
-         this.hp = ENTITY_CONFIG.ENEMY.HP;
-         this.gauge = scene.add.graphics();
-         this.isDead = false;
-       }
-       updateGauge() {
-         if (this.active && !this.isDead) {
-           drawGauge(this.gauge, this.x, this.y + (30 * SYSTEM.SCALE), 40, 6, this.hp / ENTITY_CONFIG.ENEMY.HP, 0xff3333);
-         } else {
-           this.gauge.clear();
-         }
-       }
        takeDamage(amount) {
-         this.hp -= amount;
-         if (this.hp <= 0) {
+         this.shield -= amount;
+         if (this.shield <= 0) {
            this.die();
          }
+       }       
+     }
+     
+     class ObjWithEnergy extends ObjWithShield {
+       constructor(
+         scene, x, y, texture,
+         energy_max,
+         shield_max,
+         gauge_color, gauge_y, gauge_w=30, gauge_h=6,
+         scale=SYSTEM.SCALE
+       ) {
+         super(scene, x, y, texture, shield_max, gauge_color, gauge_y, gauge_w, gauge_h, scale);
+         this.energy_max = energy_max;
+         this.energy = this.energy_max;
        }
-       die() {
-         this.destroy();
-         if (this.gauge) this.gauge.destroy();
-         this.isDead = true;
+     }
+
+     class Star extends GameObject {
+       constructor(scene, x, y) {
+         super(scene, x, y, 'starImg');
+       }
+     }
+
+     class BaseStation extends ObjWithShield {
+       constructor(scene, x, y) {
+         super(scene, x, y, 'baseImg', ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc0, 35);
+       }
+     }
+
+     class Enemy extends ObjWithShield {
+       constructor(scene, x, y) {
+         super(scene, x, y, 'enemyImg', ENTITY_CONFIG.ENEMY.SHIELD_MAX, 0xff3333, 30);
+       }
+     }
+
+     class PlayerShip extends ObjWithEnergy {
+       constructor(scene, x, y) {
+         super(
+           scene, x, y, 'shipImg', ENTITY_CONFIG.PLAYER.ENERGY_MAX,
+           ENTITY_CONFIG.PLAYER.SHIELD_MAX, 0x4488ff, 30
+         );
        }
      }
 
@@ -227,10 +253,14 @@
 
      const config = {
        type: Phaser.AUTO,
-       width: SYSTEM.PLAY_AREA_WIDTH,
-       height: SYSTEM.PLAY_AREA_HEIGHT,
        backgroundColor: '#0a0a2a',
        parent: 'gameCanvas',
+       scale: {
+         mode: Phaser.Scale.FIT,
+         autoCenter: Phaser.Scale.CENTER_BOTH,
+         width: SYSTEM.PLAY_AREA_WIDTH,
+         height: SYSTEM.PLAY_AREA_HEIGHT
+       },
        scene: { preload, create, update }
      };
 
@@ -308,7 +338,7 @@
 
      function drawBoundary(){
        boundaryGraphics.clear();
-       boundaryGraphics.lineStyle(2, 0x0088ff, 0.5);
+       boundaryGraphics.lineStyle(2, 0x0088ff, 1);
        boundaryGraphics.strokeCircle(SYSTEM.CENTER_X, SYSTEM.CENTER_Y, SYSTEM.BOUNDS_RADIUS);
      }
 
@@ -339,8 +369,12 @@
        let attempts = 0;
        
        while(!safe && attempts < 100) {
-         x = Phaser.Math.Between(SYSTEM.CENTER_X - SYSTEM.BOUNDS_RADIUS, SYSTEM.CENTER_X + SYSTEM.BOUNDS_RADIUS);
-         y = Phaser.Math.Between(SYSTEM.CENTER_Y - SYSTEM.BOUNDS_RADIUS, SYSTEM.CENTER_Y + SYSTEM.BOUNDS_RADIUS);
+         x = Phaser.Math.Between(
+           SYSTEM.CENTER_X - SYSTEM.BOUNDS_RADIUS, SYSTEM.CENTER_X + SYSTEM.BOUNDS_RADIUS
+         );
+         y = Phaser.Math.Between(
+           SYSTEM.CENTER_Y - SYSTEM.BOUNDS_RADIUS, SYSTEM.CENTER_Y + SYSTEM.BOUNDS_RADIUS
+         );
          distToCenter = Phaser.Math.Distance.Between(x, y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
          
          if(distToCenter > SYSTEM.BOUNDS_RADIUS) continue;
@@ -386,7 +420,7 @@
 
      function isLOSBlocked(ax,ay,bx,by, base=true){
        let obs = [...stars];
-       if (base && starBase.shields > 0) {
+       if (base && starBase.shield > 0) {
          obs.push(starBase);
        }
        return obs.some(
@@ -410,22 +444,27 @@
          ) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
        );
 
-       if (!target && starBase.shields > 0 && Phaser.Math.Distance.Between(
+       if (!target && starBase.shield > 0 && Phaser.Math.Distance.Between(
          pointer.x, pointer.y, starBase.x, starBase.y) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
        ) {
          target = {type:'base'};
        }
 
        if (target?.type === 'base') {
-         if ( Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y) <= ENTITY_CONFIG.BASE.DOCKING_RANGE
+         if (
+           Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y)
+           <= ENTITY_CONFIG.BASE.DOCKING_RANGE
          ) {
-           ship.energy = Math.min(ship.energy + ENTITY_CONFIG.PLAYER.DOCK_RESTORE_ENERGY, ENTITY_CONFIG.PLAYER.MAX_ENERGY);
-           ship.shields = ENTITY_CONFIG.PLAYER.MAX_SHIELDS;
-           setLog("DOCKED: ENERGY/SHIELDS RESTORED");
+           ship.energy = Math.min(
+             ship.energy + ENTITY_CONFIG.PLAYER.DOCK_RESTORE_ENERGY, ENTITY_CONFIG.PLAYER.ENERGY_MAX
+           );
+           ship.shield = ENTITY_CONFIG.PLAYER.SHIELD_MAX;
+           setLog("DOCKED: ENERGY/SHIELD RESTORED");
            isPlayerTurn = false;
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
          } else {
            setLog("APPROACH BASE TO DOCK");
+           // ### ToDo: Move to base
          }
 
          updateStatus();
@@ -460,7 +499,9 @@
          
          ship.energy -= MECHANICS.WEAPON.PHASER_COST;
          isPlayerTurn = false;
-         target.takeDamage(Math.floor(MECHANICS.WEAPON.BASE_DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * d)));
+         target.takeDamage(
+           Math.floor(MECHANICS.WEAPON.BASE_DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * d))
+         );
 
          const beam = this.add.graphics();
          beam.lineStyle(4, 0x00ffff, 1);
@@ -536,9 +577,18 @@
        );
        if (hitStar) return true;
 
-       if (isEnemy && starBase.shields > 0 && starBase?.active) {
-         if (Phaser.Math.Distance.Between(x2, y2, starBase.x, starBase.y) <= ENTITY_CONFIG.COLLISION.HIT_RADIUS) return true;
-         if (lineHitsCircle(x1, y1, x2, y2, starBase.x, starBase.y, ENTITY_CONFIG.COLLISION.HIT_RADIUS)) return true;
+       if (isEnemy && starBase.shield > 0 && starBase?.active) {
+         if (
+           Phaser.Math.Distance.Between(x2, y2, starBase.x, starBase.y)
+           <= ENTITY_CONFIG.COLLISION.HIT_RADIUS
+         ) {
+           return true;
+         }
+         if (
+           lineHitsCircle(x1, y1, x2, y2, starBase.x, starBase.y, ENTITY_CONFIG.COLLISION.HIT_RADIUS)
+         ) {
+           return true;
+         }
        }
 
        return false;
@@ -559,7 +609,7 @@
            let dToShip = Phaser.Math.Distance.Between(e.x, e.y, ship.x, ship.y);
            
            let canAttackBase = (
-             starBase.shields > 0 && dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(
+             starBase.shield > 0 && dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(
                e.x, e.y, starBase.x, starBase.y, false
              )
            );
@@ -570,7 +620,7 @@
              )
            );
 
-           if (e.hp >= ENTITY_CONFIG.ENEMY.HP * 0.5 && canAttackBase) {
+           if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
              const beam = scene.add.graphics();
              beam.lineStyle(4, 0xff00ff, 1);
              beam.lineBetween(e.x, e.y, starBase.x, starBase.y);
@@ -579,11 +629,11 @@
              starBase.takeDamage(
                Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToBase))
              );
-             if (starBase.shields <= 0 && !gameOver) {
+             if (starBase.shield <= 0 && !gameOver) {
                updateStatus();
                gameOverMessage("BASE DESTROYED");
              }
-           } else if (e.hp >= ENTITY_CONFIG.ENEMY.HP * 0.5 && canAttackShip) {
+           } else if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackShip) {
              const beam = scene.add.graphics();
              beam.lineStyle(4, 0xff00ff, 1);
              beam.lineBetween(e.x, e.y, ship.x, ship.y);
@@ -592,13 +642,13 @@
              ship.takeDamage(
                Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToShip))
              );
-             if (ship.shields <= 0 && !gameOver) {
+             if (ship.shield <= 0 && !gameOver) {
                updateStatus();
                gameOverMessage("ENTERPRISE DESTROYED");
              }
            } else {
              let angle;
-             if (e.hp >= ENTITY_CONFIG.ENEMY.HP * 0.5) {
+             if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5) {
                let target = dToBase < dToShip ? {x:starBase.x, y:starBase.y} : {x:ship.x, y:ship.y};
                angle = Phaser.Math.Angle.Between(e.x, e.y, target.x, target.y);
              } else {
@@ -638,26 +688,27 @@
                  duration: SYSTEM.TIMING.TURN_DELAY,
                  onComplete: () => scene.time.delayedCall(
                    SYSTEM.TIMING.TURN_DELAY, () => {
-                     if (e.hp < ENTITY_CONFIG.ENEMY.HP * 0.5) {
+                     if (e.shield < ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5) {
                        const distFromCenter = Phaser.Math.Distance.Between(
                          e.x, e.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y
                        );
+
                        if (distFromCenter > SYSTEM.BOUNDS_RADIUS) {
                          e.die();
-                       }
-                     }
+                       } // if
+                     } // if
                    }
-                 )
+                 ) // delayedCall()
                }
-             );
+             ); // add()
 
              e.x = Math.floor(e.x);
              e.y = Math.floor(e.y);
            }
 
-           e.hp = Math.min(
-             ENTITY_CONFIG.ENEMY.HP,
-             e.hp + (ENTITY_CONFIG.ENEMY.HP * ENTITY_CONFIG.ENEMY.REGEN)
+           e.shield = Math.min(
+             ENTITY_CONFIG.ENEMY.SHIELD_MAX,
+             e.shield + (ENTITY_CONFIG.ENEMY.SHIELD_MAX * ENTITY_CONFIG.ENEMY.REGEN)
            );
          });
        });
@@ -677,33 +728,33 @@
 
      function updateStatus() {
        let shipEnergy = ship.energy > 0 ? ship.energy : 0;
-       let shipShields = ship.shields > 0 ? ship.shields : 0;
-       let baseShields = starBase.shields > 0 ? starBase.shields : 0;
+       let shipShield = ship.shield > 0 ? ship.shield : 0;
+       let baseShield = starBase.shield > 0 ? starBase.shield : 0;
 
        document.getElementById('statusTurn').textContent = `${turnCount}`;
 
        color = "#0f0";
-       if ( shipEnergy < ENTITY_CONFIG.PLAYER.MAX_ENERGY * .3 ) {
+       if ( shipEnergy < ENTITY_CONFIG.PLAYER.ENERGY_MAX * .3 ) {
          color = "#f00";
        }
        document.getElementById('statusShipEnergy').style.color = color;
        document.getElementById('statusShipEnergy').textContent = Math.floor(shipEnergy);
 
        color = "#0f0";
-       if ( shipShields < ENTITY_CONFIG.PLAYER.MAX_SHIELDS * .3 ) {
+       if ( shipShield < ENTITY_CONFIG.PLAYER.SHIELD_MAX * .3 ) {
          color = "#f00";
        }
-       document.getElementById('statusShipShields').style.color = color;
-       document.getElementById('statusShipShields').textContent = 
-         Math.floor((shipShields / ENTITY_CONFIG.PLAYER.MAX_SHIELDS) * 100);
+       document.getElementById('statusShipShield').style.color = color;
+       document.getElementById('statusShipShield').textContent = 
+         Math.floor((shipShield / ENTITY_CONFIG.PLAYER.SHIELD_MAX) * 100);
 
        color = "#0f0";
-       if ( baseShields < ENTITY_CONFIG.BASE.MAX_SHIELDS * .3 ) {
+       if ( baseShield < ENTITY_CONFIG.BASE.SHIELD_MAX * .3 ) {
          color = "#f00";
        }
-       document.getElementById('statusBaseShields').style.color = color;
-       document.getElementById('statusBaseShields').textContent = 
-         Math.floor((baseShields / ENTITY_CONFIG.BASE.MAX_SHIELDS) * 100);
+       document.getElementById('statusBaseShield').style.color = color;
+       document.getElementById('statusBaseShield').textContent = 
+         Math.floor((baseShield / ENTITY_CONFIG.BASE.SHIELD_MAX) * 100);
      }
 
      function setLog(msg) {
