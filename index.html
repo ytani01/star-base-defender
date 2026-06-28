@@ -8,7 +8,6 @@
      body { margin:0; background:#000; padding:0; overflow:hidden; font-family: Arial, sans-serif; }
      #gameContainer { display: flex; flex-direction: column; height: 100vh; }
      
-     /* --- 修正: ステータスパネルの文字サイズと余白の調整 --- */
      #statusPanel {
        background:#111;
        color:#0ff;
@@ -22,11 +21,9 @@
      }
      #statusPanel div { margin: 8px 5px; }
      
-     /* --- 追加: ゲーム画面とUIを重ねるためのラッパー --- */
      #gameWrapper { position: relative; flex: 1; min-height: 0; }
      #gameCanvas { width: 100%; height: 100%; }
 
-     /* --- 追加: ズームボタン用CSS --- */
      #zoomUI {
        position: absolute;
        top: 10px;
@@ -52,9 +49,8 @@
        color: #000;
      }
 
-     /* ===== 追加: ハイスコアオーバーレイ ===== */
      #highScoreOverlay {
-       display: none; /* showHighScoreOverlay() で 'flex' に切り替え */
+       display: none;
        position: fixed;
        inset: 0;
        background: rgba(0, 0, 20, 0.93);
@@ -67,7 +63,7 @@
        border: 2px solid #0ff;
        padding: 28px 32px;
        min-width: 500px;
-       max-width: 700px;
+       max-width: 800px;
        width: 92%;
        background: #080820;
        box-shadow: 0 0 40px rgba(0,255,255,0.3);
@@ -144,7 +140,6 @@
        color: #000;
      }
 
-     /* ステータスパネルのハイスコアボタン */
      #viewScoresBtn {
        font-family: monospace;
        font-size: clamp(22px, 2vw, 40px);
@@ -162,7 +157,6 @@
        background: #0ff;
        color: #000;
      }
-     /* ========================================= */
     </style>
   </head>
   <body>
@@ -195,7 +189,6 @@
       </div>
     </div>
 
-    <!-- ===== 追加: ハイスコアオーバーレイ ===== -->
     <div id="highScoreOverlay">
       <div id="hsPanel">
         <h2 id="hsResultMsg"></h2>
@@ -222,881 +215,824 @@
         </div>
       </div>
     </div>
-    <!-- ========================================= -->
     
     <script>
-      // ---------------------------------------------------------
-      // 設定・定数の定義
-      // ---------------------------------------------------------
-      const SYSTEM = {
-      SCORE: {
-      INIT: 300,
-      DESTROY_PENALTY: 50,
-      },
-      STAR_QTY: 10,
-      ENEMY_QTY: 3,
-      NEW_ENEMY_INTERVAL: 30,
-      SCALE: 0.4,
-      BOUNDS_RADIUS: 300,
-      GUAGE: {
-      W: 30,
-      H: 4
-      },
-      TIMING: {
-      BEAM_DUR: 500,
-      TURN_DELAY: 500,
-      }
-      };
-      SYSTEM.PLAY_AREA_WIDTH = SYSTEM.BOUNDS_RADIUS * 2 + 20;
-      SYSTEM.PLAY_AREA_HEIGHT = SYSTEM.PLAY_AREA_WIDTH;
-      SYSTEM.CENTER_X = SYSTEM.PLAY_AREA_WIDTH / 2;
-      SYSTEM.CENTER_Y = SYSTEM.PLAY_AREA_HEIGHT / 2;
+     // ---------------------------------------------------------
+     // 設定・定数の定義
+     // ---------------------------------------------------------
+     const SYSTEM = {
+       SCORE: {
+         INIT: 300,
+         DESTROY_PENALTY: 50,
+       },
+       STAR_QTY: 10,
+       ENEMY_QTY: 3,
+       NEW_ENEMY_INTERVAL: 30,
+       SCALE: 0.4,
+       BOUNDS_RADIUS: 300,
+       GUAGE: {
+         W: 30,
+         H: 4
+       },
+       TIMING: {
+         BEAM_DUR: 500,
+         TURN_DELAY: 500,
+       }
+     };
+     SYSTEM.PLAY_AREA_WIDTH = SYSTEM.BOUNDS_RADIUS * 2 + 20;
+     SYSTEM.PLAY_AREA_HEIGHT = SYSTEM.PLAY_AREA_WIDTH;
+     SYSTEM.CENTER_X = SYSTEM.PLAY_AREA_WIDTH / 2;
+     SYSTEM.CENTER_Y = SYSTEM.PLAY_AREA_HEIGHT / 2;
 
-      // --- 追加: カメラ設定 ---
-      const CAMERA = {
-      ZOOM_MIN: 1.0,
-      ZOOM_MAX: 4.0,
-      STEP: 2.0
-      };
-      let CurZoom = 1.0;
+     const CAMERA = {
+       ZOOM_MIN: 1.0,
+       ZOOM_MAX: 4.0,
+       STEP: 2.0
+     };
+     let CurZoom = 1.0;
 
-      const ENTITY_CONFIG = {
-      PLAYER: {
-      ENERGY_MAX: 3000,
-      SHIELD_MAX: 1000,
-      DOCK_RESTORE_ENERGY: 1500,
-      MAX_MOVE_DIST: 120 * SYSTEM.SCALE,
-      MOVE_COST_RATE: 0.2 / SYSTEM.SCALE
-      },
-      BASE: {
-      SHIELD_MAX: 1000,
-      DOCKING_RANGE: 60 * SYSTEM.SCALE
-      },
-      ENEMY: {
-      SHIELD_MAX: 300,
-      DAMAGE: 70,
-      SPEED: 30 * SYSTEM.SCALE,
-      STOP_DIST: 30 * SYSTEM.SCALE,
-      REGEN: 0.03
-      },
-      COLLISION: {
-      HIT_RADIUS: 30 * SYSTEM.SCALE,
-      OBSTACLE_RADIUS: 24 * SYSTEM.SCALE,
-      LOS_RADIUS: 16 * SYSTEM.SCALE,
-      TOUCH_TOLERANCE: 80 * SYSTEM.SCALE // 追加: タップ判定の緩和
-      }
-      };
+     const ENTITY_CONFIG = {
+       PLAYER: {
+         ENERGY_MAX: 3000,
+         SHIELD_MAX: 1000,
+         DOCK_RESTORE_ENERGY: 1500,
+         MAX_MOVE_DIST: 120 * SYSTEM.SCALE,
+         MOVE_COST_RATE: 0.2 / SYSTEM.SCALE
+       },
+       BASE: {
+         SHIELD_MAX: 1000,
+         DOCKING_RANGE: 60 * SYSTEM.SCALE
+       },
+       ENEMY: {
+         SHIELD_MAX: 300,
+         DAMAGE: 70,
+         SPEED: 30 * SYSTEM.SCALE,
+         STOP_DIST: 30 * SYSTEM.SCALE,
+         REGEN: 0.03
+       },
+       COLLISION: {
+         HIT_RADIUS: 30 * SYSTEM.SCALE,
+         OBSTACLE_RADIUS: 24 * SYSTEM.SCALE,
+         LOS_RADIUS: 16 * SYSTEM.SCALE,
+         TOUCH_TOLERANCE: 80 * SYSTEM.SCALE
+       }
+     };
 
-      const MECHANICS = {
-      WEAPON: {
-      PHASER_COST: 100,
-      BASE_DAMAGE: 100,
-      ALPHA: 0.0075 / SYSTEM.SCALE,
-      EFFECTIVE_THRESHOLD: 0.5,
-      MAX_THRESHOLD: 0.1
-      }
-      };
-      MECHANICS.WEAPON.MAX_RANGE = Math.floor(
+     const MECHANICS = {
+       WEAPON: {
+         PHASER_COST: 100,
+         BASE_DAMAGE: 100,
+         ALPHA: 0.0075 / SYSTEM.SCALE,
+         EFFECTIVE_THRESHOLD: 0.5,
+         MAX_THRESHOLD: 0.1
+       }
+     };
+     MECHANICS.WEAPON.MAX_RANGE = Math.floor(
       -Math.log(MECHANICS.WEAPON.MAX_THRESHOLD) / MECHANICS.WEAPON.ALPHA
-      );
-      MECHANICS.WEAPON.EFFECTIVE_RANGE = Math.floor(
+     );
+     MECHANICS.WEAPON.EFFECTIVE_RANGE = Math.floor(
       -Math.log(MECHANICS.WEAPON.EFFECTIVE_THRESHOLD) / MECHANICS.WEAPON.ALPHA
-      );
-
-      const HIGHSCORE = {
-      MAX_ENTRIES: 5,
-      STORAGE_KEY: 'starbaseDefenderScores'
-      };
-
-      let ship, starBase, rangeGraphics, boundaryGraphics;
-      let enemies = stars = [];
-      let turnCount = 1;
-      let currentStage = 1; // 現在のステージ番号
-      let Score = SYSTEM.SCORE.INIT;
-      let isPlayerTurn = true;
-      let gameOver = false;
-      let flagClear = false;
-
-      // ---------------------------------------------------------
-      // クラス定義
-      // ---------------------------------------------------------
-      function drawGauge(graphics, cx, cy, width, height, ratio, color) {
-      graphics.clear();
-      // 万が一 cy が NaN などの不正値になった場合のフェイルセーフ
-      if (!isFinite(cy)) return;
-
-      const x = cx - width / 2;
-      const y = cy - height / 2;
-      
-      graphics.fillStyle(0x555555, 1);
-      graphics.fillRect(x, y, width, height);
-      
-      const r = Math.max(0, Math.min(1, ratio));
-      if (r > 0) {
-      graphics.fillStyle(color, 1);
-      graphics.fillRect(x, y, width * r, height);
-      }
-      }
-
-      class GameObject {
-      constructor(scene, x, y, texture, scale=SYSTEM.SCALE) {
-      // console.log(`texture=${texture}`);
-      this.scene = scene;
-      this.scale = scale;
-      this.sprite = scene.add.image(x, y, texture).setScale(scale);
-      this.active = true;
-      }
-
-      get x() {
-      return this.sprite.x;
-      }
-      set x(val) {
-      this.sprite.x = val;
-      }
-
-      get y() {
-      return this.sprite.y;
-      }
-      set y(val) {
-      this.sprite.y = val;
-      }
-
-      destroy() {
-      this.sprite.destroy();
-      this.active = false;
-      }
-      }
-
-      class ObjWithShield extends GameObject {
-      constructor(
-      scene, x, y, texture,
-      gauge_y, gauge_w, gauge_h,
-      shield_max, gauge_color,
-      scale=SYSTEM.SCALE
-      ) {
-      super(scene, x, y, texture, scale);
-      this.shield_max = shield_max;
-      this.shield = this.shield_max;
-      this.gauge_color = gauge_color;
-      this.gauge_y = gauge_y;
-      this.gauge_w = gauge_w;
-      this.gauge_h = gauge_h;
-      this.gauge = this.scene.add.graphics();
-      }
-
-      updateGauge() {
-      if (! this.active || this.shield <= 0) {
-      if (this.guage) {
-      this.gauge.clear();
-      }
-      return;
-      }
-
-      drawGauge(
-      this.gauge,
-      this.x, this.y + (this.gauge_y * this.scale),
-      this.gauge_w, this.gauge_h,
-      this.shield / this.shield_max,
-      this.gauge_color
-      );
-      }
-
-      die() {
-      this.shield = 0;
-      this.active = false;
-      if ( this.gauge ) {
-      this.gauge.destroy();
-      }
-      this.destroy();
-      }
-
-      takeDamage(amount) {
-      this.shield -= amount;
-      if (this.shield <= 0) {
-      Score -= SYSTEM.SCORE.DESTROY_PENALTY;
-      this.die();
-      }
-      }       
-      }
-      
-      class ObjWithEnergy extends ObjWithShield {
-      constructor(
-      scene, x, y, texture,
-      gauge_y, gauge_w, gauge_h,
-      shield_max, gauge_color,
-      energy_max, e_gauge_color,
-      scale=SYSTEM.SCALE
-      ) {
-      super(scene, x, y, texture, gauge_y, gauge_w, gauge_h, shield_max, gauge_color, scale);
-      this.energy_max = energy_max;
-      this.e_gauge_color = e_gauge_color;
-
-      this.energy = this.energy_max;
-      this.e_gauge = this.scene.add.graphics();
-      }
-
-      updateGauge() {
-      super.updateGauge();
-      drawGauge(
-      this.e_gauge,
-      this.x, this.y + (this.gauge_y * this.scale) + this.gauge_h + 1,
-      this.gauge_w, this.gauge_h,
-      this.energy / this.energy_max,
-      this.e_gauge_color
-      );         
-      }
-      }
-
-      class Star extends GameObject {
-      constructor(scene, x, y) {
-      super(scene, x, y, 'starImg');
-      }
-      }
-
-      class BaseStation extends ObjWithShield {
-      constructor(scene, x, y) {
-      super(
-      scene, x, y, 'baseImg', 36,  SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
-      ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc00
-      );
-      }
-      }
-
-      class Enemy extends ObjWithShield {
-      constructor(scene, x, y) {
-      super(
-      scene, x, y, 'enemyImg', 31, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
-      ENTITY_CONFIG.ENEMY.SHIELD_MAX, 0xff3333
-      );
-      }
-      }
-
-      class PlayerShip extends ObjWithEnergy {
-      constructor(scene, x, y) {
-      super(
-      scene, x, y, 'shipImg',
-      29, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H, 
-      ENTITY_CONFIG.PLAYER.SHIELD_MAX, 0xff00ff,
-      ENTITY_CONFIG.PLAYER.ENERGY_MAX, 0x8888ff,
-      );
-      }
-      }
-
-      // ---------------------------------------------------------
-      // ゲーム初期化・ループ
-      // ---------------------------------------------------------
-
-      const config = {
-      type: Phaser.AUTO,
-      backgroundColor: '#0a0a2a',
-      parent: 'gameCanvas',
-      scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
-      width: SYSTEM.PLAY_AREA_WIDTH,
-      height: SYSTEM.PLAY_AREA_HEIGHT
-      },
-      scene: { preload, create, update }
-      };
-
-      new Phaser.Game(config);
-
-      function preload(){
-      const g = this.make.graphics({add:false});
-
-      g.lineStyle(3, 0xff0000, 0.3);
-      g.strokeCircle(25, 30, ENTITY_CONFIG.COLLISION.HIT_RADIUS*2);
-
-      g.fillStyle(0x5588ee);
-      g.fillRect(22,25,6,20);
-      
-      g.fillStyle(0x4488ff);
-      g.fillRect(10,30,8,20);
-      g.fillRect(32,30,8,20);
-      
-      g.fillStyle(0xaabbff);
-      g.fillEllipse(25,15,35,30);
-      g.generateTexture('shipImg',50,60);
-      
-      g.clear();
-
-      g.lineStyle(3, 0xff0000, 0.5);
-      g.strokeCircle(25, 25, ENTITY_CONFIG.COLLISION.HIT_RADIUS*2);
-
-      g.fillStyle(0x228822);
-      g.beginPath();
-      g.moveTo(25,50);
-      g.lineTo(50,35);
-      g.lineTo(50,15);
-      g.lineTo(25,35);
-      g.lineTo(0,15);
-      g.lineTo(0,35);
-      g.fillPath();
-
-      g.fillRect(21,5,8,35)
-      g.fillEllipse(25,10,20,18);
-
-      g.generateTexture('enemyImg',50,50);
-
-      g.clear();
-
-      g.fillStyle(0x99ffff);
-      g.fillEllipse(30,30,30,55)
-      g.lineStyle(6,0x99ffff,1);
-      g.strokeEllipse(30,30,55,25)
-      g.generateTexture('baseImg',60,60);
-
-      g.clear();
-
-      g.fillStyle(0x504040);
-      g.fillCircle(25,25,16);
-      g.generateTexture('starImg',50,50);
-
-      g.destroy();
-      }
-
-      function create(){
-      rangeGraphics = this.add.graphics();
-      boundaryGraphics = this.add.graphics();
-      drawBoundary();
-      
-      starBase = new BaseStation(this, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
-
-      stars = [];
-      for(let i=0; i < SYSTEM.STAR_QTY; i++) {
-      let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS * 2.5);
-      stars.push(new Star(this, p.x, p.y));
-      }
-
-      enemies = [];
-      for(let i=0; i<SYSTEM.ENEMY_QTY; i++){
-                                       let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
-                                       enemies.push(new Enemy(this, p.x, p.y));
-                                       }
-
-                                       let pp = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
-                                       ship = new PlayerShip(this, pp.x, pp.y);
-
-                                       // --- カメラの追従と表示範囲の制限 ---
-                                       this.cameras.main.setBounds(0, 0, SYSTEM.PLAY_AREA_WIDTH, SYSTEM.PLAY_AREA_HEIGHT);
-                                       this.cameras.main.startFollow(ship.sprite, true, 0.08, 0.08);
-
-                                       updateStatus();
-
-                                       // 入力コールバックなどの設定
-                                       this.input.on('pointerdown', handlePointerDown, this);
-
-                                       document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
-      document.getElementById('zoomOut').onclick = () => changeZoom(this, -CAMERA.STEP);
-
-      this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
-      let zoomAmount = deltaY > 0 ? -CAMERA.STEP : CAMERA.STEP;
-      changeZoom(this, zoomAmount);
-      });
-      }
-
-      // --- ズーム変更関数 ---
-      function changeZoom(scene, amount) {
-      let nextZoom = 1.0;
-      if ( amount > 0 ) {
-      nextZoom = CurZoom * amount;
-      }
-      if ( amount < 0 ) {
-      nextZoom = CurZoom / -amount;
-      }
-      CurZoom = Phaser.Math.Clamp(nextZoom, CAMERA.ZOOM_MIN, CAMERA.ZOOM_MAX);
-      
-      scene.tweens.add({
-      targets: scene.cameras.main,
-      zoom: CurZoom,
-      duration: 150,
-      ease: 'Sine.easeInOut'
-      });
-      }
-
-      function drawBoundary(){
-      boundaryGraphics.clear();
-      boundaryGraphics.lineStyle(2, 0x0088ff, 1);
-      boundaryGraphics.strokeCircle(SYSTEM.CENTER_X, SYSTEM.CENTER_Y, SYSTEM.BOUNDS_RADIUS);
-      }
-
-      function update(){
-      rangeGraphics.clear();
-
-      // 射程距離の描画
-      [ship, ...enemies].forEach(
-      (obj, i)=>{
-      if(!obj.active) return;
-      let color = (i===0) ? 0x4488ff : 0xff3333;
-      if ( i == 0 ) {
-      rangeGraphics.lineStyle(0.8, color, 0.3);
-      rangeGraphics.strokeCircle(obj.x, obj.y, MECHANICS.WEAPON.MAX_RANGE);
-      }
-      rangeGraphics.lineStyle(1.2, color, 0.5);
-      rangeGraphics.strokeCircle(obj.x, obj.y, MECHANICS.WEAPON.EFFECTIVE_RANGE);
-      }
-      );
-
-      // ゲージ描画
-      if (ship) ship.updateGauge();
-      if (starBase) starBase.updateGauge();
-      enemies.forEach(e => e.updateGauge());
-      } // update()
-
-      function getSafeRandPos(minDistance){
-      let x, y, distToCenter;
-      let safe = false;
-      let attempts = 0;
-      
-      while(!safe && attempts < 100) {
-      x = Phaser.Math.Between(
-      SYSTEM.CENTER_X - SYSTEM.BOUNDS_RADIUS, SYSTEM.CENTER_X + SYSTEM.BOUNDS_RADIUS
-      );
-      y = Phaser.Math.Between(
-      SYSTEM.CENTER_Y - SYSTEM.BOUNDS_RADIUS, SYSTEM.CENTER_Y + SYSTEM.BOUNDS_RADIUS
-      );
-      distToCenter = Phaser.Math.Distance.Between(x, y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
-      
-      if(distToCenter > SYSTEM.BOUNDS_RADIUS) continue;
-      if(distToCenter < ENTITY_CONFIG.BASE.DOCKING_RANGE) continue;
-      
-      safe = true;
-
-      for(let s of stars) {
-      if(s.active && Phaser.Math.Distance.Between(x, y, s.x, s.y) < minDistance) {
-      safe = false; break;
-      }
-      }
-      if(!safe) continue;
-
-      for(let e of enemies) {
-      if(e.active && Phaser.Math.Distance.Between(x, y, e.x, e.y) < minDistance) {
-      safe = false; break;
-      }
-      }
-      attempts++;
-      }
-      return { x, y };
-      }
-
-      function lineHitsCircle(ax,ay,bx,by,cx,cy,r) {
-      const dx = bx - ax, dy = by - ay;
-      const a = dx * dx + dy * dy;
-      if (a < 0.001) {
-      return false;
-      }
-      const fx = ax - cx, fy = ay - cy;
-      const b = 2*(fx * dx + fy * dy);
-      const c = fx*fx + fy*fy - r*r;
-      const disc = b*b-4*a*c;
-      if ( disc < 0 ) {
-      return false;
-      }
-      const t1 = (-b-Math.sqrt(disc)) / (2*a);
-      const t2 = (-b+Math.sqrt(disc)) / (2*a);
-
-      return (t1 > 0.05 && t1 < 0.95) || (t2 > 0.05 && t2 < 0.95);
-      }
-
-      function isLOSBlocked(ax,ay,bx,by, base=true){
-      let obs = [...stars];
-      if (base && starBase.shield > 0) {
-      obs.push(starBase);
-      }
-      return obs.some(
-      o => o.active && lineHitsCircle(
-      ax,ay,
-      bx,by,
-      o.x,o.y,
-      ENTITY_CONFIG.COLLISION.LOS_RADIUS
-      )
-      );
-      }
-
-      function handlePointerDown(pointer){
-      if(gameOver || !isPlayerTurn) {
-      return;
-      }
-      
-      let target = enemies.find(
-      e => Phaser.Math.Distance.Between(
-      pointer.worldX, pointer.worldY, e.x, e.y
-      ) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
-      );
-
-      if (!target && starBase.shield > 0 && Phaser.Math.Distance.Between(
-      pointer.worldX, pointer.worldY, starBase.x, starBase.y) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
-      ) {
-      target = {type:'base'};
-      }
-
-      if (target?.type === 'base') {
-      if (
-      Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y)
-      <= ENTITY_CONFIG.BASE.DOCKING_RANGE
-      ) {
-      // 基地にドッキング、補給
-      ship.energy = Math.min(
-      ship.energy + ENTITY_CONFIG.PLAYER.DOCK_RESTORE_ENERGY, ENTITY_CONFIG.PLAYER.ENERGY_MAX
-      );
-      ship.shield = ENTITY_CONFIG.PLAYER.SHIELD_MAX;
-      setLog("DOCKED: ENERGY/SHIELD RESTORED");
-      isPlayerTurn = false;
-      this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
-      return;
-      } else {
-      setLog("APPROACH BASE TO DOCK");
-      attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
-      return;
-      }
-      }
-
-      if (target && target.active) {
-      // フェーザー砲発射
-      let d = Phaser.Math.Distance.Between(ship.x, ship.y, target.x, target.y);
-
-      if ( ship.energy < MECHANICS.WEAPON.PHASER_COST ) {
-      // エネルギー不足
-      setLog("LOW ENERGY");
-      isPlayerTurn = false;
-      this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
-      updateStatus();
-      return;
-      }
-
-      if (Math.exp(-MECHANICS.WEAPON.ALPHA * d) < MECHANICS.WEAPON.MAX_THRESHOLD) {
-      // 射程外
-      setLog("OUT OF RANGE");
-      ship.energy -= MECHANICS.WEAPON.PHASER_COST;
-      isPlayerTurn = false;
-      fireBeam(this, ship.x, ship.y, target.x, target.y, 0x444444);
-      this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
-      updateStatus();
-      return;
-      }
-      
-      if (isLOSBlocked(ship.x, ship.y, target.x, target.y, false)) {
-      // 障害物によりブロック
-      setLog("BLOCKED");
-      isPlayerTurn = false;
-      fireBeam(this, ship.x, ship.y, target.x, target.y, 0x444444);
-      this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
-      updateStatus();
-      return;
-      }
-      
-      // 攻撃命中
-      ship.energy -= MECHANICS.WEAPON.PHASER_COST;
-      isPlayerTurn = false;
-      target.takeDamage(
-      Math.floor(MECHANICS.WEAPON.BASE_DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * d))
-      );
-
-      fireBeam(this, ship.x, ship.y, target.x, target.y, 0x00ffff);
-
-      if (!target.active) {
-        // 【撃墜】
-        // 復讐に燃えた敵が現れる。
-        // つまり、撃墜しても敵機数は減らない。
-        enemies = enemies.filter(e => e !== target);
-
-        const rp = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
-        enemies.push(new Enemy(this, rp.x, rp.y));
-        setLog("⚠ ENEMY SHOT DOWN — REINFORCEMENT INCOMING!");
-      }
-        this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
-      updateStatus();
-      return;
-      }
-
-      if (!target) {
-      attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
-      }
-      }
-
-      function isMoveForbidden(x1, y1, x2, y2, isEnemy = false) {
-      let hitStar = stars.some(
-      s => {
-      if (!s.active) return false;
-      if (Phaser.Math.Distance.Between(x2, y2, s.x, s.y) <= ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS) return true;
-      return lineHitsCircle(x1, y1, x2, y2, s.x, s.y, ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS);
-      }
-      );
-      if (hitStar) return true;
-
-      if (isEnemy && starBase.shield > 0 && starBase?.active) {
-      if (Phaser.Math.Distance.Between(x2, y2, starBase.x, starBase.y) <= ENTITY_CONFIG.COLLISION.HIT_RADIUS) return true;
-      if (lineHitsCircle(x1, y1, x2, y2, starBase.x, starBase.y, ENTITY_CONFIG.COLLISION.HIT_RADIUS)) return true;
-      }
-      return false;
-      }
-
-      /**
-      * プレイヤーの移動処理を行います。
-      * 移動可否の判定、エネルギー消費の計算、およびアニメーションを実行します。
-      * @param {Phaser.Scene} scene - 現在のシーン
-      * @param {number} targetX - 移動目標のX座標
-      * @param {number} targetY - 移動目標のY座標
-      * @param {number} delayBeforeEnemyTurn - 移動完了後、敵のターン開始までの遅延時間(ms)
-      */
-      function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
-      let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, targetX, targetY);
-      if (rawDist < 1) return;
-
-      let moveDist = Math.min(rawDist, ENTITY_CONFIG.PLAYER.MAX_MOVE_DIST);
-      let ratio = moveDist / rawDist;
-      let destX = ship.x + (targetX - ship.x) * ratio;
-      let destY = ship.y + (targetY - ship.y) * ratio;
-
-      if (isMoveForbidden(ship.x, ship.y, destX, destY)) {
-      // 障害物により移動不可
-      setLog("BLOCKED");
-      return;
-      }
-
-      let cost = Math.max(1, Math.ceil(moveDist * ENTITY_CONFIG.PLAYER.MOVE_COST_RATE));
-      if (ship.energy < cost) {
-      // エネルギー不足
-      setLog("NOT ENOUGH ENERGY");
-      return;
-      }
-
-      // 移動実行
-      ship.energy -= cost;
-      isPlayerTurn = false;
-      scene.tweens.add({
-      targets: ship,
-      x: destX, y: destY,
-      duration: SYSTEM.TIMING.TURN_DELAY,
-      onComplete: () => scene.time.delayedCall(delayBeforeEnemyTurn, () => enemyTurn(scene))
-      });
-      updateStatus();
-      }
-
-      /**
-      * 敵の移動先を計算します。
-      * 直線上に障害物がある場合は、15度ずつ角度をずらして迂回ルートを探します。
-      * @param {Enemy} e - 移動する敵オブジェクト
-      * @param {number} angle - 進行方向の角度（ラジアン）
-      * @returns {{x: number, y: number}} - 計算された移動先の座標
-      */
-      function calculateEnemyAvoidanceDest(e, angle) {
-      let destX = e.x + Math.cos(angle) * ENTITY_CONFIG.ENEMY.SPEED;
-      let destY = e.y + Math.sin(angle) * ENTITY_CONFIG.ENEMY.SPEED;
-
-      if (!isMoveForbidden(e.x, e.y, destX, destY, true)) {
-      return { x: destX, y: destY };
-      }
-
-      for (let offset = 15; offset <= 90; offset += 15) {
-      let rad = Phaser.Math.DegToRad(offset);
-      
-      let tx1 = e.x + Math.cos(angle + rad) * ENTITY_CONFIG.ENEMY.SPEED;
-      let ty1 = e.y + Math.sin(angle + rad) * ENTITY_CONFIG.ENEMY.SPEED;
-      if (!isMoveForbidden(e.x, e.y, tx1, ty1, true)) return { x: tx1, y: ty1 };
-      
-      let tx2 = e.x + Math.cos(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
-      let ty2 = e.y + Math.sin(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
-      if (!isMoveForbidden(e.x, e.y, tx2, ty2, true)) return { x: tx2, y: ty2 };
-      }
-      return { x: e.x, y: e.y };
-      }
-
-      /**
-      * 攻撃時のレーザービームを描画します。
-      * @param {Phaser.Scene} scene - 現在のシーン
-      * @param {number} srcX - 発射元のX座標
-      * @param {number} srcY - 発射元のY座標
-      * @param {number} dstX - 目標のX座標
-      * @param {number} dstY - 目標のY座標
-      * @param {number} color - ビームの色 (例: 0xff00ff)
-      */
-      function fireBeam(scene, srcX, srcY, dstX, dstY, color) {
-      const beam = scene.add.graphics();
-      beam.lineStyle(4, color, 1);
-      beam.lineBetween(srcX, srcY, dstX, dstY);
-      scene.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
-      }
-
-      function enemyTurn(scene) {
-      if (gameOver) return;
-
-      enemies.forEach(e => {
-      scene.time.delayedCall(0, () => {
-      if ( gameOver || !e.active ) return;
-
-      let dToBase = Phaser.Math.Distance.Between(e.x, e.y, starBase.x, starBase.y);
-      let dToShip = Phaser.Math.Distance.Between(e.x, e.y, ship.x, ship.y);
-      
-      let canAttackBase = (
-      starBase.shield > 0 && dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(e.x, e.y, starBase.x, starBase.y, false)
-      );
-      let canAttackShip = (
-      dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(e.x, e.y, ship.x, ship.y)
-      );
-
-      if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
-      // 基地への攻撃
-      fireBeam(scene, e.x, e.y, starBase.x, starBase.y, 0xff00ff);
-
-      starBase.takeDamage(
-      Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToBase))
-      );
-      if (starBase.shield <= 0 && !gameOver) {
-      updateStatus();
-      gameOverMessage("BASE DESTROYED");
-      }
-      } else if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackShip) {
-      // プレイヤーへの攻撃
-      fireBeam(scene, e.x, e.y, ship.x, ship.y, 0xff00ff);
-
-      ship.takeDamage(
-      Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToShip))
-      );
-      if (ship.shield <= 0 && !gameOver) {
-      updateStatus();
-      gameOverMessage("ENTERPRISE DESTROYED");
-      }
-      } else {
-      // 移動
-      let angle;
-      if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5) {
-      let target = dToBase < dToShip ? {x:starBase.x, y:starBase.y} : {x:ship.x, y:ship.y};
-      angle = Phaser.Math.Angle.Between(e.x, e.y, target.x, target.y);
-      } else {
-      angle = Phaser.Math.Angle.Between(ship.x, ship.y, e.x, e.y);
-      }
-      let dest = calculateEnemyAvoidanceDest(e, angle);
-
-      scene.tweens.add(
-      {
-      targets: e,
-      x: dest.x, y: dest.y,
-      duration: SYSTEM.TIMING.TURN_DELAY,
-      onComplete: () => scene.time.delayedCall(
-      SYSTEM.TIMING.TURN_DELAY, () => {
-      if (e.shield < ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5) {
-      const distFromCenter = Phaser.Math.Distance.Between(
-      e.x, e.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y
-      );
-
-      if (distFromCenter > SYSTEM.BOUNDS_RADIUS) {
-      e.die();
-      } // if
-      } // if
-      }
-      ) // delayedCall()
-      }
-      ); // scene.tweens.add()
-
-      e.x = Math.floor(e.x);
-      e.y = Math.floor(e.y);
-      }
-
-      // シールド回復
-      e.shield = Math.min(
-      ENTITY_CONFIG.ENEMY.SHIELD_MAX,
-      e.shield + (ENTITY_CONFIG.ENEMY.SHIELD_MAX * ENTITY_CONFIG.ENEMY.REGEN)
-      );
-      });
-      });
-
-      scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => {
-      enemies = enemies.filter(e => e.active);
-      if (enemies.length === 0 && !gameOver) {
-      nextStage(scene);
-      }
-      else if (!gameOver) {
-      turnCount++;
-      Score--;
-
-      if ( turnCount % SYSTEM.NEW_ENEMY_INTERVAL == 0 ) {
-      let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
-      enemies.push(new Enemy(scene, p.x, p.y));
-      }
-
-      updateStatus(); 
-      isPlayerTurn = true; setLog("COMMAND: AWAITING ORDERS");
-      }
-      });
-
-      }
-
-      function updateStatus() {
-      let shipEnergy = ship.energy > 0 ? ship.energy : 0;
-      let shipShield = ship.shield > 0 ? ship.shield : 0;
-      let baseShield = starBase.shield > 0 ? starBase.shield : 0;
-
-      document.getElementById('statusTurn').textContent = `${turnCount}`;
-      document.getElementById('statusStage').textContent = `${currentStage}`;
-      document.getElementById('statusScore').textContent = `${Score}`;
-
-      let color = "#0f0";
-      if ( shipEnergy < ENTITY_CONFIG.PLAYER.ENERGY_MAX * .3 ) {
-      color = "#f00";
-      }
-      document.getElementById('statusShipEnergy').style.color = color;
-      document.getElementById('statusShipEnergy').textContent = Math.floor(shipEnergy);
-
-      color = "#0f0";
-      if ( shipShield < ENTITY_CONFIG.PLAYER.SHIELD_MAX * .3 ) {
-      color = "#f00";
-      }
-      document.getElementById('statusShipShield').style.color = color;
-      document.getElementById('statusShipShield').textContent = 
-      Math.floor((shipShield / ENTITY_CONFIG.PLAYER.SHIELD_MAX) * 100);
-
-      color = "#0f0";
-      if ( baseShield < ENTITY_CONFIG.BASE.SHIELD_MAX * .3 ) {
-      color = "#f00";
-      }
-      document.getElementById('statusBaseShield').style.color = color;
-      document.getElementById('statusBaseShield').textContent = 
-      Math.floor((baseShield / ENTITY_CONFIG.BASE.SHIELD_MAX) * 100);
-      }
-
-      function setLog(msg) {
-      document.getElementById('logStatus').textContent = msg;
-      }
-
-      /**
-      * ミッションクリア時、次のステージに進む処理を行います。
-      * @param {Phaser.Scene} scene - 現在のシーン
-      */
-      function nextStage(scene) {
-      // ボーナスポイントとして (ステージ番号 * 100) を加算
-      Score += currentStage * 100 * 2;
-
-      // ミッションクリアのスコアを強制的にハイスコアへ保存
-      saveHighScore(Score, turnCount, currentStage, "MISSION CLEARED", true);
-
-      // ステージを進め、敵の初期出現数を1つ増やす
-      currentStage++;
-      SYSTEM.ENEMY_QTY++;
-
-      // 状態をリセットし、次のステージへ
-      isPlayerTurn = true;
-      setLog(`STAGE ${currentStage} START!`);
-      updateStatus();
-
-      turnCount = 1;
-
-      scene.scene.restart();
-      }
-
-      // ===== 修正: ハイスコア表示を追加 =====
-      function gameOverMessage(msg, clear=false) {
+     );
+
+     const HIGHSCORE = {
+       MAX_ENTRIES: 5,
+       STORAGE_KEY: 'starbaseDefenderScores'
+     };
+
+     let ship, starBase, rangeGraphics, boundaryGraphics;
+     let enemies = stars = [];
+     let turnCount = 1;
+     let currentStage = 1;
+     let Score = SYSTEM.SCORE.INIT;
+     let isPlayerTurn = true;
+     let gameOver = false;
+     let flagClear = false;
+     let _pendingScene = null; // ステージクリア後に次ステージへ進むためのシーン参照
+
+     // ---------------------------------------------------------
+     // クラス定義
+     // ---------------------------------------------------------
+     function drawGauge(graphics, cx, cy, width, height, ratio, color) {
+       graphics.clear();
+       if (!isFinite(cy)) return;
+
+       const x = cx - width / 2;
+       const y = cy - height / 2;
+       
+       graphics.fillStyle(0x555555, 1);
+       graphics.fillRect(x, y, width, height);
+       
+       const r = Math.max(0, Math.min(1, ratio));
+       if (r > 0) {
+         graphics.fillStyle(color, 1);
+         graphics.fillRect(x, y, width * r, height);
+       }
+     }
+
+     class GameObject {
+       constructor(scene, x, y, texture, scale=SYSTEM.SCALE) {
+         this.scene = scene;
+         this.scale = scale;
+         this.sprite = scene.add.image(x, y, texture).setScale(scale);
+         this.active = true;
+       }
+
+       get x() {
+         return this.sprite.x;
+       }
+       set x(val) {
+         this.sprite.x = val;
+       }
+
+       get y() {
+         return this.sprite.y;
+       }
+       set y(val) {
+         this.sprite.y = val;
+       }
+
+       destroy() {
+         this.sprite.destroy();
+         this.active = false;
+       }
+     }
+
+     class ObjWithShield extends GameObject {
+       constructor(
+         scene, x, y, texture,
+         gauge_y, gauge_w, gauge_h,
+         shield_max, gauge_color,
+         scale=SYSTEM.SCALE
+       ) {
+         super(scene, x, y, texture, scale);
+         this.shield_max = shield_max;
+         this.shield = this.shield_max;
+         this.gauge_color = gauge_color;
+         this.gauge_y = gauge_y;
+         this.gauge_w = gauge_w;
+         this.gauge_h = gauge_h;
+         this.gauge = this.scene.add.graphics();
+       }
+
+       updateGauge() {
+         if (! this.active || this.shield <= 0) {
+           if (this.guage) {
+             this.gauge.clear();
+           }
+           return;
+         }
+
+         drawGauge(
+           this.gauge,
+           this.x, this.y + (this.gauge_y * this.scale),
+           this.gauge_w, this.gauge_h,
+           this.shield / this.shield_max,
+           this.gauge_color
+         );
+       }
+
+       die() {
+         this.shield = 0;
+         this.active = false;
+         if ( this.gauge ) {
+           this.gauge.destroy();
+         }
+         this.destroy();
+       }
+
+       takeDamage(amount) {
+         this.shield -= amount;
+         if (this.shield <= 0) {
+           Score -= SYSTEM.SCORE.DESTROY_PENALTY;
+           this.die();
+         }
+       }       
+     }
+     
+     class ObjWithEnergy extends ObjWithShield {
+       constructor(
+         scene, x, y, texture,
+         gauge_y, gauge_w, gauge_h,
+         shield_max, gauge_color,
+         energy_max, e_gauge_color,
+         scale=SYSTEM.SCALE
+       ) {
+         super(scene, x, y, texture, gauge_y, gauge_w, gauge_h, shield_max, gauge_color, scale);
+         this.energy_max = energy_max;
+         this.e_gauge_color = e_gauge_color;
+
+         this.energy = this.energy_max;
+         this.e_gauge = this.scene.add.graphics();
+       }
+
+       updateGauge() {
+         super.updateGauge();
+         drawGauge(
+           this.e_gauge,
+           this.x, this.y + (this.gauge_y * this.scale) + this.gauge_h + 1,
+           this.gauge_w, this.gauge_h,
+           this.energy / this.energy_max,
+           this.e_gauge_color
+         );         
+       }
+     }
+
+     class Star extends GameObject {
+       constructor(scene, x, y) {
+         super(scene, x, y, 'starImg');
+       }
+     }
+
+     class BaseStation extends ObjWithShield {
+       constructor(scene, x, y) {
+         super(
+           scene, x, y, 'baseImg', 36,  SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
+           ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc00
+         );
+       }
+     }
+
+     class Enemy extends ObjWithShield {
+       constructor(scene, x, y) {
+         super(
+           scene, x, y, 'enemyImg', 31, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
+           ENTITY_CONFIG.ENEMY.SHIELD_MAX, 0xff3333
+         );
+       }
+     }
+
+     class PlayerShip extends ObjWithEnergy {
+       constructor(scene, x, y) {
+         super(
+           scene, x, y, 'shipImg',
+           29, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H, 
+           ENTITY_CONFIG.PLAYER.SHIELD_MAX, 0xff00ff,
+           ENTITY_CONFIG.PLAYER.ENERGY_MAX, 0x8888ff,
+         );
+       }
+     }
+
+     // ---------------------------------------------------------
+     // ゲーム初期化・ループ
+     // ---------------------------------------------------------
+
+     const config = {
+       type: Phaser.AUTO,
+       backgroundColor: '#0a0a2a',
+       parent: 'gameCanvas',
+       scale: {
+         mode: Phaser.Scale.FIT,
+         autoCenter: Phaser.Scale.CENTER_BOTH,
+         width: SYSTEM.PLAY_AREA_WIDTH,
+         height: SYSTEM.PLAY_AREA_HEIGHT
+       },
+       scene: { preload, create, update }
+     };
+
+     new Phaser.Game(config);
+
+     function preload(){
+       const g = this.make.graphics({add:false});
+
+       g.lineStyle(3, 0xff0000, 0.3);
+       g.strokeCircle(25, 30, ENTITY_CONFIG.COLLISION.HIT_RADIUS*2);
+
+       g.fillStyle(0x5588ee);
+       g.fillRect(22,25,6,20);
+       
+       g.fillStyle(0x4488ff);
+       g.fillRect(10,30,8,20);
+       g.fillRect(32,30,8,20);
+       
+       g.fillStyle(0xaabbff);
+       g.fillEllipse(25,15,35,30);
+       g.generateTexture('shipImg',50,60);
+       
+       g.clear();
+
+       g.lineStyle(3, 0xff0000, 0.5);
+       g.strokeCircle(25, 25, ENTITY_CONFIG.COLLISION.HIT_RADIUS*2);
+
+       g.fillStyle(0x228822);
+       g.beginPath();
+       g.moveTo(25,50);
+       g.lineTo(50,35);
+       g.lineTo(50,15);
+       g.lineTo(25,35);
+       g.lineTo(0,15);
+       g.lineTo(0,35);
+       g.fillPath();
+
+       g.fillRect(21,5,8,35)
+       g.fillEllipse(25,10,20,18);
+
+       g.generateTexture('enemyImg',50,50);
+
+       g.clear();
+
+       g.fillStyle(0x99ffff);
+       g.fillEllipse(30,30,30,55)
+       g.lineStyle(6,0x99ffff,1);
+       g.strokeEllipse(30,30,55,25)
+       g.generateTexture('baseImg',60,60);
+
+       g.clear();
+
+       g.fillStyle(0x504040);
+       g.fillCircle(25,25,16);
+       g.generateTexture('starImg',50,50);
+
+       g.destroy();
+     }
+
+     function create(){
+       rangeGraphics = this.add.graphics();
+       boundaryGraphics = this.add.graphics();
+       drawBoundary();
+       
+       starBase = new BaseStation(this, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
+
+       stars = [];
+       for(let i=0; i < SYSTEM.STAR_QTY; i++) {
+         let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS * 2.5);
+         stars.push(new Star(this, p.x, p.y));
+       }
+
+       enemies = [];
+       for(let i=0; i<SYSTEM.ENEMY_QTY; i++){
+         let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
+         enemies.push(new Enemy(this, p.x, p.y));
+       }
+
+       let pp = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
+       ship = new PlayerShip(this, pp.x, pp.y);
+
+       this.cameras.main.setBounds(0, 0, SYSTEM.PLAY_AREA_WIDTH, SYSTEM.PLAY_AREA_HEIGHT);
+       this.cameras.main.startFollow(ship.sprite, true, 0.08, 0.08);
+
+       updateStatus();
+
+       this.input.on('pointerdown', handlePointerDown, this);
+
+       document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
+       document.getElementById('zoomOut').onclick = () => changeZoom(this, -CAMERA.STEP);
+
+       this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
+         let zoomAmount = deltaY > 0 ? -CAMERA.STEP : CAMERA.STEP;
+         changeZoom(this, zoomAmount);
+       });
+     }
+
+     function changeZoom(scene, amount) {
+       let nextZoom = 1.0;
+       if ( amount > 0 ) {
+         nextZoom = CurZoom * amount;
+       }
+       if ( amount < 0 ) {
+         nextZoom = CurZoom / -amount;
+       }
+       CurZoom = Phaser.Math.Clamp(nextZoom, CAMERA.ZOOM_MIN, CAMERA.ZOOM_MAX);
+       
+       scene.tweens.add({
+         targets: scene.cameras.main,
+         zoom: CurZoom,
+         duration: 150,
+         ease: 'Sine.easeInOut'
+       });
+     }
+
+     function drawBoundary(){
+       boundaryGraphics.clear();
+       boundaryGraphics.lineStyle(2, 0x0088ff, 1);
+       boundaryGraphics.strokeCircle(SYSTEM.CENTER_X, SYSTEM.CENTER_Y, SYSTEM.BOUNDS_RADIUS);
+     }
+
+     function update(){
+       rangeGraphics.clear();
+
+       [ship, ...enemies].forEach(
+         (obj, i)=>{
+           if(!obj.active) return;
+           let color = (i===0) ? 0x4488ff : 0xff3333;
+           if ( i == 0 ) {
+             rangeGraphics.lineStyle(0.8, color, 0.3);
+             rangeGraphics.strokeCircle(obj.x, obj.y, MECHANICS.WEAPON.MAX_RANGE);
+           }
+           rangeGraphics.lineStyle(1.2, color, 0.5);
+           rangeGraphics.strokeCircle(obj.x, obj.y, MECHANICS.WEAPON.EFFECTIVE_RANGE);
+         }
+       );
+
+       if (ship) ship.updateGauge();
+       if (starBase) starBase.updateGauge();
+       enemies.forEach(e => e.updateGauge());
+     }
+
+     function getSafeRandPos(minDistance){
+       let x, y, distToCenter;
+       let safe = false;
+       let attempts = 0;
+       
+       while(!safe && attempts < 100) {
+         x = Phaser.Math.Between(
+           SYSTEM.CENTER_X - SYSTEM.BOUNDS_RADIUS, SYSTEM.CENTER_X + SYSTEM.BOUNDS_RADIUS
+         );
+         y = Phaser.Math.Between(
+           SYSTEM.CENTER_Y - SYSTEM.BOUNDS_RADIUS, SYSTEM.CENTER_Y + SYSTEM.BOUNDS_RADIUS
+         );
+         distToCenter = Phaser.Math.Distance.Between(x, y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
+         
+         if(distToCenter > SYSTEM.BOUNDS_RADIUS) continue;
+         if(distToCenter < ENTITY_CONFIG.BASE.DOCKING_RANGE) continue;
+         
+         safe = true;
+
+         for(let s of stars) {
+           if(s.active && Phaser.Math.Distance.Between(x, y, s.x, s.y) < minDistance) {
+             safe = false; break;
+           }
+         }
+         if(!safe) continue;
+
+         for(let e of enemies) {
+           if(e.active && Phaser.Math.Distance.Between(x, y, e.x, e.y) < minDistance) {
+             safe = false; break;
+           }
+         }
+         attempts++;
+       }
+       return { x, y };
+     }
+
+     function lineHitsCircle(ax,ay,bx,by,cx,cy,r) {
+       const dx = bx - ax, dy = by - ay;
+       const a = dx * dx + dy * dy;
+       if (a < 0.001) {
+         return false;
+       }
+       const fx = ax - cx, fy = ay - cy;
+       const b = 2*(fx * dx + fy * dy);
+       const c = fx*fx + fy*fy - r*r;
+       const disc = b*b-4*a*c;
+       if ( disc < 0 ) {
+         return false;
+       }
+       const t1 = (-b-Math.sqrt(disc)) / (2*a);
+       const t2 = (-b+Math.sqrt(disc)) / (2*a);
+
+       return (t1 > 0.05 && t1 < 0.95) || (t2 > 0.05 && t2 < 0.95);
+     }
+
+     function isLOSBlocked(ax,ay,bx,by, base=true){
+       let obs = [...stars];
+       if (base && starBase.shield > 0) {
+         obs.push(starBase);
+       }
+       return obs.some(
+         o => o.active && lineHitsCircle(
+           ax,ay,
+           bx,by,
+           o.x,o.y,
+           ENTITY_CONFIG.COLLISION.LOS_RADIUS
+         )
+       );
+     }
+
+     function handlePointerDown(pointer){
+       if(gameOver || !isPlayerTurn) {
+         return;
+       }
+       
+       let target = enemies.find(
+         e => Phaser.Math.Distance.Between(
+           pointer.worldX, pointer.worldY, e.x, e.y
+         ) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
+       );
+
+       if (!target && starBase.shield > 0 && Phaser.Math.Distance.Between(
+         pointer.worldX, pointer.worldY, starBase.x, starBase.y) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
+       ) {
+         target = {type:'base'};
+       }
+
+       if (target?.type === 'base') {
+         if (
+           Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y)
+           <= ENTITY_CONFIG.BASE.DOCKING_RANGE
+         ) {
+           ship.energy = Math.min(
+             ship.energy + ENTITY_CONFIG.PLAYER.DOCK_RESTORE_ENERGY, ENTITY_CONFIG.PLAYER.ENERGY_MAX
+           );
+           ship.shield = ENTITY_CONFIG.PLAYER.SHIELD_MAX;
+           setLog("DOCKED: ENERGY/SHIELD RESTORED");
+           isPlayerTurn = false;
+           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+           return;
+         } else {
+           setLog("APPROACH BASE TO DOCK");
+           attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
+           return;
+         }
+       }
+
+       if (target && target.active) {
+         let d = Phaser.Math.Distance.Between(ship.x, ship.y, target.x, target.y);
+
+         if ( ship.energy < MECHANICS.WEAPON.PHASER_COST ) {
+           setLog("LOW ENERGY");
+           isPlayerTurn = false;
+           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+           updateStatus();
+           return;
+         }
+
+         if (Math.exp(-MECHANICS.WEAPON.ALPHA * d) < MECHANICS.WEAPON.MAX_THRESHOLD) {
+           setLog("OUT OF RANGE");
+           ship.energy -= MECHANICS.WEAPON.PHASER_COST;
+           isPlayerTurn = false;
+           fireBeam(this, ship.x, ship.y, target.x, target.y, 0x444444);
+           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+           updateStatus();
+           return;
+         }
+         
+         if (isLOSBlocked(ship.x, ship.y, target.x, target.y, false)) {
+           setLog("BLOCKED");
+           isPlayerTurn = false;
+           fireBeam(this, ship.x, ship.y, target.x, target.y, 0x444444);
+           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+           updateStatus();
+           return;
+         }
+         
+         // 攻撃命中
+         ship.energy -= MECHANICS.WEAPON.PHASER_COST;
+         isPlayerTurn = false;
+         target.takeDamage(
+           Math.floor(MECHANICS.WEAPON.BASE_DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * d))
+         );
+
+         fireBeam(this, ship.x, ship.y, target.x, target.y, 0x00ffff);
+
+         if (!target.active) {
+           // 撃墜確定: 敵リストから除外
+           enemies = enemies.filter(e => e !== target);
+           // ===== 追加: 怒りに燃えた増援が1機即時出現 =====
+           const rp = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
+           enemies.push(new Enemy(this, rp.x, rp.y));
+           setLog("⚠ ENEMY SHOT DOWN — REINFORCEMENT INCOMING!");
+           // ===============================================
+         }
+         this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+         updateStatus();
+         return;
+       }
+
+       if (!target) {
+         attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
+       }
+     }
+
+     function isMoveForbidden(x1, y1, x2, y2, isEnemy = false) {
+       let hitStar = stars.some(
+         s => {
+           if (!s.active) return false;
+           if (Phaser.Math.Distance.Between(x2, y2, s.x, s.y) <= ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS) return true;
+           return lineHitsCircle(x1, y1, x2, y2, s.x, s.y, ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS);
+         }
+       );
+       if (hitStar) return true;
+
+       if (isEnemy && starBase.shield > 0 && starBase?.active) {
+         if (Phaser.Math.Distance.Between(x2, y2, starBase.x, starBase.y) <= ENTITY_CONFIG.COLLISION.HIT_RADIUS) return true;
+         if (lineHitsCircle(x1, y1, x2, y2, starBase.x, starBase.y, ENTITY_CONFIG.COLLISION.HIT_RADIUS)) return true;
+       }
+       return false;
+     }
+
+     function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
+       let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, targetX, targetY);
+       if (rawDist < 1) return;
+
+       let moveDist = Math.min(rawDist, ENTITY_CONFIG.PLAYER.MAX_MOVE_DIST);
+       let ratio = moveDist / rawDist;
+       let destX = ship.x + (targetX - ship.x) * ratio;
+       let destY = ship.y + (targetY - ship.y) * ratio;
+
+       if (isMoveForbidden(ship.x, ship.y, destX, destY)) {
+         setLog("BLOCKED");
+         return;
+       }
+
+       let cost = Math.max(1, Math.ceil(moveDist * ENTITY_CONFIG.PLAYER.MOVE_COST_RATE));
+       if (ship.energy < cost) {
+         setLog("NOT ENOUGH ENERGY");
+         return;
+       }
+
+       ship.energy -= cost;
+       isPlayerTurn = false;
+       scene.tweens.add({
+         targets: ship,
+         x: destX, y: destY,
+         duration: SYSTEM.TIMING.TURN_DELAY,
+         onComplete: () => scene.time.delayedCall(delayBeforeEnemyTurn, () => enemyTurn(scene))
+       });
+       updateStatus();
+     }
+
+     function calculateEnemyAvoidanceDest(e, angle) {
+       let destX = e.x + Math.cos(angle) * ENTITY_CONFIG.ENEMY.SPEED;
+       let destY = e.y + Math.sin(angle) * ENTITY_CONFIG.ENEMY.SPEED;
+
+       if (!isMoveForbidden(e.x, e.y, destX, destY, true)) {
+         return { x: destX, y: destY };
+       }
+
+       for (let offset = 15; offset <= 90; offset += 15) {
+         let rad = Phaser.Math.DegToRad(offset);
+         
+         let tx1 = e.x + Math.cos(angle + rad) * ENTITY_CONFIG.ENEMY.SPEED;
+         let ty1 = e.y + Math.sin(angle + rad) * ENTITY_CONFIG.ENEMY.SPEED;
+         if (!isMoveForbidden(e.x, e.y, tx1, ty1, true)) return { x: tx1, y: ty1 };
+         
+         let tx2 = e.x + Math.cos(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
+         let ty2 = e.y + Math.sin(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
+         if (!isMoveForbidden(e.x, e.y, tx2, ty2, true)) return { x: tx2, y: ty2 };
+       }
+       return { x: e.x, y: e.y };
+     }
+
+     function fireBeam(scene, srcX, srcY, dstX, dstY, color) {
+       const beam = scene.add.graphics();
+       beam.lineStyle(4, color, 1);
+       beam.lineBetween(srcX, srcY, dstX, dstY);
+       scene.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
+     }
+
+     function enemyTurn(scene) {
+       if (gameOver) return;
+
+       enemies.forEach(e => {
+         scene.time.delayedCall(0, () => {
+           if ( gameOver || !e.active ) return;
+
+           let dToBase = Phaser.Math.Distance.Between(e.x, e.y, starBase.x, starBase.y);
+           let dToShip = Phaser.Math.Distance.Between(e.x, e.y, ship.x, ship.y);
+           
+           let canAttackBase = (
+             starBase.shield > 0 && dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(e.x, e.y, starBase.x, starBase.y, false)
+           );
+           let canAttackShip = (
+             dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(e.x, e.y, ship.x, ship.y)
+           );
+
+           if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
+             fireBeam(scene, e.x, e.y, starBase.x, starBase.y, 0xff00ff);
+
+             starBase.takeDamage(
+               Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToBase))
+             );
+             if (starBase.shield <= 0 && !gameOver) {
+               updateStatus();
+               gameOverMessage("BASE DESTROYED");
+             }
+           } else if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackShip) {
+             fireBeam(scene, e.x, e.y, ship.x, ship.y, 0xff00ff);
+
+             ship.takeDamage(
+               Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToShip))
+             );
+             if (ship.shield <= 0 && !gameOver) {
+               updateStatus();
+               gameOverMessage("ENTERPRISE DESTROYED");
+             }
+           } else {
+             let angle;
+             if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5) {
+               let target = dToBase < dToShip ? {x:starBase.x, y:starBase.y} : {x:ship.x, y:ship.y};
+               angle = Phaser.Math.Angle.Between(e.x, e.y, target.x, target.y);
+             } else {
+               angle = Phaser.Math.Angle.Between(ship.x, ship.y, e.x, e.y);
+             }
+             let dest = calculateEnemyAvoidanceDest(e, angle);
+
+             scene.tweens.add(
+               {
+                 targets: e,
+                 x: dest.x, y: dest.y,
+                 duration: SYSTEM.TIMING.TURN_DELAY,
+                 onComplete: () => scene.time.delayedCall(
+                   SYSTEM.TIMING.TURN_DELAY, () => {
+                     if (e.shield < ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5) {
+                       const distFromCenter = Phaser.Math.Distance.Between(
+                         e.x, e.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y
+                       );
+
+                       if (distFromCenter > SYSTEM.BOUNDS_RADIUS) {
+                         e.die();
+                       }
+                     }
+                   }
+                 )
+               }
+             );
+
+             e.x = Math.floor(e.x);
+             e.y = Math.floor(e.y);
+           }
+
+           e.shield = Math.min(
+             ENTITY_CONFIG.ENEMY.SHIELD_MAX,
+             e.shield + (ENTITY_CONFIG.ENEMY.SHIELD_MAX * ENTITY_CONFIG.ENEMY.REGEN)
+           );
+         });
+       });
+
+       scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => {
+         enemies = enemies.filter(e => e.active);
+         if (enemies.length === 0 && !gameOver) {
+           nextStage(scene);
+         }
+         else if (!gameOver) {
+           turnCount++;
+           Score--;
+
+           if ( turnCount % SYSTEM.NEW_ENEMY_INTERVAL == 0 ) {
+             let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
+             enemies.push(new Enemy(scene, p.x, p.y));
+           }
+
+           updateStatus(); 
+           isPlayerTurn = true; setLog("COMMAND: AWAITING ORDERS");
+         }
+       });
+
+     }
+
+     function updateStatus() {
+       let shipEnergy = ship.energy > 0 ? ship.energy : 0;
+       let shipShield = ship.shield > 0 ? ship.shield : 0;
+       let baseShield = starBase.shield > 0 ? starBase.shield : 0;
+
+       document.getElementById('statusTurn').textContent = `${turnCount}`;
+       document.getElementById('statusStage').textContent = `${currentStage}`;
+       document.getElementById('statusScore').textContent = `${Score}`;
+
+       let color = "#0f0";
+       if ( shipEnergy < ENTITY_CONFIG.PLAYER.ENERGY_MAX * .3 ) {
+         color = "#f00";
+       }
+       document.getElementById('statusShipEnergy').style.color = color;
+       document.getElementById('statusShipEnergy').textContent = Math.floor(shipEnergy);
+
+       color = "#0f0";
+       if ( shipShield < ENTITY_CONFIG.PLAYER.SHIELD_MAX * .3 ) {
+         color = "#f00";
+       }
+       document.getElementById('statusShipShield').style.color = color;
+       document.getElementById('statusShipShield').textContent = 
+         Math.floor((shipShield / ENTITY_CONFIG.PLAYER.SHIELD_MAX) * 100);
+
+       color = "#0f0";
+       if ( baseShield < ENTITY_CONFIG.BASE.SHIELD_MAX * .3 ) {
+         color = "#f00";
+       }
+       document.getElementById('statusBaseShield').style.color = color;
+       document.getElementById('statusBaseShield').textContent = 
+         Math.floor((baseShield / ENTITY_CONFIG.BASE.SHIELD_MAX) * 100);
+     }
+
+     function setLog(msg) {
+       document.getElementById('logStatus').textContent = msg;
+     }
+
+     function nextStage(scene) {
+       const clearedStage = currentStage;
+       const bonus = currentStage * 100 * 2;
+       Score += bonus;
+
+       // ハイスコアを保存し、順位結果を受け取る
+       const { list, newIdx } = saveHighScore(Score, turnCount, clearedStage, `STAGE ${clearedStage} CLEARED`, true);
+
+       currentStage++;
+       SYSTEM.ENEMY_QTY++;
+       isPlayerTurn = false;
+
+       // ボタン押下時に scene.restart() を呼ぶために参照を保持
+       _pendingScene = scene;
+
+       setLog(`STAGE ${clearedStage} CLEARED!`);
+       showHighScoreOverlay('stageclear', { clearedStage, bonus, list, newIdx });
+     }
+
+     function gameOverMessage(msg, clear=false) {
        gameOver = true;
        flagClear = clear;
        isPlayerTurn = false;
        setLog(msg);
-       // 少し間を置いてオーバーレイを表示
-       setTimeout(() => showHighScoreOverlay(msg, true), 800);
+       setTimeout(() => showHighScoreOverlay('gameover', { msg }), 800);
      }
-
-     // ---------------------------------------------------------
-     // ハイスコア機能
-     // ---------------------------------------------------------
 
      function loadHighScores() {
        try {
@@ -1107,7 +1043,6 @@
        }
      }
 
-     // スコアを保存し、更新済みリストと新エントリの順位インデックスを返す
      function saveHighScore(score, turns, stage, result, forceSave = false) {
        let list = loadHighScores();
        const now = new Date();
@@ -1116,7 +1051,6 @@
          String(now.getMonth() + 1).padStart(2, '0'),
          String(now.getDate()).padStart(2, '0')
        ].join('/');
-       // _new フラグで今回のエントリを識別
        if ( flagClear || forceSave ) {
          list.push({ score, turns, stage, result, date: dateStr, _new: true });
        }
@@ -1124,7 +1058,6 @@
        const newIdx = list.findIndex(s => s._new);
        list = list.slice(0, HIGHSCORE.MAX_ENTRIES);
        const madeIt = list.some(s => s._new);
-       // _new フラグを除いて保存
        localStorage.setItem(
          HIGHSCORE.STORAGE_KEY,
          JSON.stringify(list.map(({ _new, ...rest }) => rest))
@@ -1148,7 +1081,7 @@
          if (isNew) tr.className = 'hs-new';
          const rank   = rankLabels[i] || `${i + 1}TH`;
          const prefix = isNew ? '★' : '';
-         const displayStage = s.stage !== undefined ? s.stage : '-'; // 古いレコード対応
+         const displayStage = s.stage !== undefined ? s.stage : '-';
          tr.innerHTML = `
            <td>${prefix}${rank}</td>
            <td>${s.score}</td>
@@ -1160,49 +1093,67 @@
        });
      }
 
-     // isGameEnd=true  : スコア保存 → 結果表示、CLOSEボタン非表示
-     // isGameEnd=false : 現在のスコアを参照表示のみ、CLOSEボタン表示
-     function showHighScoreOverlay(resultMsg, isGameEnd) {
+     // mode: 'stageclear' | 'gameover' | 'view'
+     function showHighScoreOverlay(mode, data = {}) {
        const overlay    = document.getElementById('highScoreOverlay');
        const resultEl   = document.getElementById('hsResultMsg');
        const finalEl    = document.getElementById('hsFinalMsg');
        const closeBtn   = document.getElementById('hsCloseBtn');
        const restartBtn = document.getElementById('hsRestartBtn');
 
-       if (isGameEnd) {
-         resultEl.style.color = '#ff0';
-         resultEl.textContent = resultMsg;
-          if ( flagClear ) {
-            finalEl.textContent  = `FINAL SCORE: ${Score}   STAGE: ${currentStage}   TURNS: ${turnCount}`;
-          } else {
-            finalEl.textContent = `MISSION FAILED: SCORE: ${Score}   STAGE: ${currentStage}   TURNS: ${turnCount}`;
-          }
-          const { list, newIdx } = saveHighScore(Score, turnCount, currentStage, resultMsg);
+       if (mode === 'stageclear') {
+         const { clearedStage, bonus, list, newIdx } = data;
+         resultEl.style.color     = '#0f0';
+         resultEl.textContent     = `✓ STAGE ${clearedStage} CLEARED!`;
+         finalEl.textContent      = `SCORE: ${Score}   TURNS: ${turnCount}   STAGE BONUS: +${bonus}`;
          renderHSTable(list, newIdx);
          closeBtn.style.display   = 'none';
+         restartBtn.textContent   = '▶ NEXT STAGE';
          restartBtn.style.display = 'inline-block';
+
+       } else if (mode === 'gameover') {
+         const { msg } = data;
+         resultEl.style.color     = '#ff0';
+         resultEl.textContent     = msg;
+         finalEl.textContent      = `MISSION FAILED: SCORE: ${Score}   STAGE: ${currentStage}   TURNS: ${turnCount}`;
+         renderHSTable(loadHighScores(), -1);
+         closeBtn.style.display   = 'none';
+         restartBtn.textContent   = '▶ RESTART';
+         restartBtn.style.display = 'inline-block';
+
        } else {
-         resultEl.style.color = '#0ff';
-         resultEl.textContent = '▶ HIGH SCORES ◀';
-          finalEl.textContent  = `NOW — SCORE: ${Score}   STAGE: ${currentStage}   TURN: ${turnCount}`;
+         // 'view' モード: 閲覧のみ
+         resultEl.style.color     = '#0ff';
+         resultEl.textContent     = '▶ HIGH SCORES ◀';
+         finalEl.textContent      = `NOW — SCORE: ${Score}   STAGE: ${currentStage}   TURN: ${turnCount}`;
          renderHSTable(loadHighScores(), -1);
          closeBtn.style.display   = 'inline-block';
+         restartBtn.textContent   = '▶ RESTART';
          restartBtn.style.display = 'inline-block';
        }
        overlay.style.display = 'flex';
      }
 
-     // ===== ハイスコアオーバーレイのイベントリスナー =====
      document.getElementById('viewScoresBtn').addEventListener('click', () => {
-       showHighScoreOverlay(null, false);
+       showHighScoreOverlay('view');
      });
      document.getElementById('hsRestartBtn').addEventListener('click', () => {
-       location.reload();
+       if (_pendingScene) {
+         // ステージクリア後: 次のステージへ進む
+         document.getElementById('highScoreOverlay').style.display = 'none';
+         turnCount = 1;
+         const s = _pendingScene;
+         _pendingScene = null;
+         isPlayerTurn = true;
+         s.scene.restart();
+       } else {
+         // ゲームオーバー後: 最初からやり直し
+         location.reload();
+       }
      });
      document.getElementById('hsCloseBtn').addEventListener('click', () => {
        document.getElementById('highScoreOverlay').style.display = 'none';
      });
-     // =====================================================
 
     </script>
   </body>
