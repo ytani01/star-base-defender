@@ -1060,6 +1060,9 @@
       // ボーナスポイントとして (ステージ番号 * 100) を加算
       Score += currentStage * 100 * 2;
 
+      // ミッションクリアのスコアを強制的にハイスコアへ保存
+      saveHighScore(Score, turnCount, currentStage, "MISSION CLEARED", true);
+
       // ステージを進め、敵の初期出現数を1つ増やす
       currentStage++;
       SYSTEM.ENEMY_QTY++;
@@ -1098,7 +1101,7 @@
      }
 
      // スコアを保存し、更新済みリストと新エントリの順位インデックスを返す
-     function saveHighScore(score, turns, stage, result) {
+     function saveHighScore(score, turns, stage, result, forceSave = false) {
        let list = loadHighScores();
        const now = new Date();
        const dateStr = [
@@ -1107,7 +1110,7 @@
          String(now.getDate()).padStart(2, '0')
        ].join('/');
        // _new フラグで今回のエントリを識別
-       if ( flagClear ) {
+       if ( flagClear || forceSave ) {
          list.push({ score, turns, stage, result, date: dateStr, _new: true });
        }
        list.sort((a, b) => b.score - a.score);
