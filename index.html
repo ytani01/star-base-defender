@@ -169,14 +169,15 @@
     <div id="gameContainer">
       <div id="statusPanel">
         <div id="turn">
+          STAGE: <span id="statusStage">1</span>,
           TURN: <span id="statusTurn">1</span>,
           SCORE: <span id="statusScore">100</span>
           <button id="viewScoresBtn">▶ SCORES</button>
         </div>
         <div id="statusShip">
           Ship:
-          Shield: <span id="statusShipShield">0</span>%
-          Energy: <span id="statusShipEnergy">0</span>,
+          Shield: <span id="statusShipShield">0</span>%,
+          Energy: <span id="statusShipEnergy">0</span>
         </div>
         <div id="statusBase">
           Base:
@@ -231,11 +232,15 @@
          INIT: 300,
          DESTROY_PENALTY: 50,
        },
-       STAR_QTY: 6,
+       STAR_QTY: 10,
        ENEMY_QTY: 3,
        NEW_ENEMY_INTERVAL: 30,
        SCALE: 0.4,
        BOUNDS_RADIUS: 300,
+       GUAGE: {
+         W: 30,
+         H: 4
+       },
        TIMING: {
          BEAM_DUR: 500,
          TURN_DELAY: 500,
@@ -297,12 +302,10 @@
         -Math.log(MECHANICS.WEAPON.EFFECTIVE_THRESHOLD) / MECHANICS.WEAPON.ALPHA
      );
 
-     // ===== 追加: ハイスコア定数 =====
      const HIGHSCORE = {
        MAX_ENTRIES: 5,
        STORAGE_KEY: 'starbaseDefenderScores'
      };
-     // ================================
 
      let ship, starBase, rangeGraphics, boundaryGraphics;
      let enemies = stars = [];
@@ -450,13 +453,19 @@
 
      class BaseStation extends ObjWithShield {
        constructor(scene, x, y) {
-         super(scene, x, y, 'baseImg', 35, 30, 4, ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc00);
+         super(
+           scene, x, y, 'baseImg', 36,  SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
+           ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc00
+         );
        }
      }
 
      class Enemy extends ObjWithShield {
        constructor(scene, x, y) {
-         super(scene, x, y, 'enemyImg', 25, 30, 4, ENTITY_CONFIG.ENEMY.SHIELD_MAX, 0xff3333);
+         super(
+           scene, x, y, 'enemyImg', 31, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
+           ENTITY_CONFIG.ENEMY.SHIELD_MAX, 0xff3333
+         );
        }
      }
 
@@ -464,7 +473,7 @@
        constructor(scene, x, y) {
          super(
            scene, x, y, 'shipImg',
-           29, 30, 4, 
+           29, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H, 
            ENTITY_CONFIG.PLAYER.SHIELD_MAX, 0xff00ff,
            ENTITY_CONFIG.PLAYER.ENERGY_MAX, 0x8888ff,
          );
@@ -493,41 +502,51 @@
      function preload(){
        const g = this.make.graphics({add:false});
 
+       g.lineStyle(3, 0xff0000, 0.3);
+       g.strokeCircle(25, 30, ENTITY_CONFIG.COLLISION.HIT_RADIUS*2);
+
        g.fillStyle(0x5588ee);
        g.fillRect(22,25,6,20);
+       
        g.fillStyle(0x4488ff);
        g.fillRect(10,30,8,20);
        g.fillRect(32,30,8,20);
+       
        g.fillStyle(0xaabbff);
-       g.fillEllipse(25,15,40,30);
+       g.fillEllipse(25,15,35,30);
        g.generateTexture('shipImg',50,60);
        
        g.clear();
 
+       g.lineStyle(3, 0xff0000, 0.5);
+       g.strokeCircle(25, 25, ENTITY_CONFIG.COLLISION.HIT_RADIUS*2);
+
        g.fillStyle(0x228822);
        g.beginPath();
-       g.moveTo(25,0);
-       g.lineTo(50,20);
-       g.lineTo(40,40);
-       g.lineTo(25,30);
-       g.lineTo(10,40);
-       g.lineTo(0,20);
+       g.moveTo(25,50);
+       g.lineTo(50,35);
+       g.lineTo(50,15);
+       g.lineTo(25,35);
+       g.lineTo(0,15);
+       g.lineTo(0,35);
        g.fillPath();
+
+       g.fillRect(21,5,8,35)
+       g.fillEllipse(25,10,20,18);
+
        g.generateTexture('enemyImg',50,50);
 
        g.clear();
 
        g.fillStyle(0x99ffff);
-       g.fillCircle(30,30,30);
-       g.fillStyle(0x006666);
-       g.fillCircle(30,30,25);
-       g.fillStyle(0x99ffff);
-       g.fillCircle(30,30,10);
+       g.fillEllipse(30,30,30,55)
+       g.lineStyle(6,0x99ffff,1);
+       g.strokeEllipse(30,30,55,25)
        g.generateTexture('baseImg',60,60);
 
        g.clear();
 
-       g.fillStyle(0xffffff);
+       g.fillStyle(0x504040);
        g.fillCircle(25,25,16);
        g.generateTexture('starImg',50,50);
 
@@ -556,11 +575,13 @@
        let pp = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
        ship = new PlayerShip(this, pp.x, pp.y);
 
-       // --- 追加: カメラの追従と表示範囲の制限 ---
+       // --- カメラの追従と表示範囲の制限 ---
        this.cameras.main.setBounds(0, 0, SYSTEM.PLAY_AREA_WIDTH, SYSTEM.PLAY_AREA_HEIGHT);
        this.cameras.main.startFollow(ship.sprite, true, 0.08, 0.08);
 
        updateStatus();
+
+       // 入力コールバックなどの設定
        this.input.on('pointerdown', handlePointerDown, this);
 
        document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
@@ -572,7 +593,7 @@
        });
      }
 
-     // --- 追加: ズーム変更関数 ---
+     // --- ズーム変更関数 ---
      function changeZoom(scene, amount) {
        let nextZoom = 1.0;
        if ( amount > 0 ) {
@@ -657,14 +678,14 @@
      }
 
      function lineHitsCircle(ax,ay,bx,by,cx,cy,r) {
-       const dx = bx-ax, dy = by-ay;
-       const a = dx*dx+dy*dy;
-       if (a<0.001) {
+       const dx = bx - ax, dy = by - ay;
+       const a = dx * dx + dy * dy;
+       if (a < 0.001) {
          return false;
        }
-       const fx = ax-cx, fy=ay-cy;
-       const b = 2*(fx*dx+fy*dy);
-       const c = fx*fx+fy*fy-r*r;
+       const fx = ax - cx, fy = ay - cy;
+       const b = 2*(fx * dx + fy * dy);
+       const c = fx*fx + fy*fy - r*r;
        const disc = b*b-4*a*c;
        if ( disc < 0 ) {
          return false;
@@ -720,10 +741,10 @@
            setLog("DOCKED: ENERGY/SHIELD RESTORED");
            isPlayerTurn = false;
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+           return;
          } else {
            setLog("APPROACH BASE TO DOCK");
-           // ### ToDo: Move to base
-           // 修正: 移動先の計算も worldX / worldY に準拠
+           // ### Move to base
            let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, pointer.worldX, pointer.worldY);
            if (rawDist < 1) return;
 
@@ -744,8 +765,8 @@
            if (ship.energy < cost) {
              // エネルギー不足
              setLog("NOT ENOUGH ENERGY");
-             isPlayerTurn = false;
-             this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+             // isPlayerTurn = false;
+             // this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
              return;
            }
 
@@ -756,7 +777,8 @@
              targets: ship,
              x: destX, y: destY,
              duration: SYSTEM.TIMING.TURN_DELAY,
-             onComplete: () => this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this))
+             //onComplete: () => this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this))
+             onComplete: () => this.time.delayedCall(0.1, () => enemyTurn(this))
            });
            updateStatus();
          }
@@ -774,6 +796,7 @@
            setLog("LOW ENERGY");
            isPlayerTurn = false;
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+           updateStatus();
            return;
          }
 
@@ -792,6 +815,7 @@
            setLog("BLOCKED");
            isPlayerTurn = false;
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+           updateStatus();
            return;
          }
          
