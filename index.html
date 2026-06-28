@@ -310,6 +310,7 @@
      let ship, starBase, rangeGraphics, boundaryGraphics;
      let enemies = stars = [];
      let turnCount = 1;
+     let currentStage = 1; // 現在のステージ番号
      let Score = SYSTEM.SCORE.INIT;
      let isPlayerTurn = true;
      let gameOver = false;
@@ -503,12 +504,15 @@
        const g = this.make.graphics({add:false});
 
        g.lineStyle(3, 0xff0000, 0.3);
-       g.strokeCircle(25, 30, ENTITY_CONFIG.COLLISION.HIT_RADIUS*
+       g.strokeCircle(25, 30, ENTITY_CONFIG.COLLISION.HIT_RADIUS*2);
+
        g.fillStyle(0x5588ee);
        g.fillRect(22,25,6,20);
+       
        g.fillStyle(0x4488ff);
        g.fillRect(10,30,8,20);
        g.fillRect(32,30,8,20);
+       
        g.fillStyle(0xaabbff);
        g.fillEllipse(25,15,35,30);
        g.generateTexture('shipImg',50,60);
@@ -989,12 +993,12 @@
          });
        });
 
-       scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => {
-         enemies = enemies.filter(e => e.active);
-         if (enemies.length === 0 && !gameOver) {
-           gameOverMessage("MISSION ACCOMPLISHED", true);
-         }
-         else if (!gameOver) {
+        scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => {
+          enemies = enemies.filter(e => e.active);
+          if (enemies.length === 0 && !gameOver) {
+            nextStage(scene);
+          }
+          else if (!gameOver) {
            turnCount++;
            Score--;
 
@@ -1010,13 +1014,14 @@
 
      }
 
-     function updateStatus() {
-       let shipEnergy = ship.energy > 0 ? ship.energy : 0;
-       let shipShield = ship.shield > 0 ? ship.shield : 0;
-       let baseShield = starBase.shield > 0 ? starBase.shield : 0;
+      function updateStatus() {
+        let shipEnergy = ship.energy > 0 ? ship.energy : 0;
+        let shipShield = ship.shield > 0 ? ship.shield : 0;
+        let baseShield = starBase.shield > 0 ? starBase.shield : 0;
 
-       document.getElementById('statusTurn').textContent = `${turnCount}`;
-       document.getElementById('statusScore').textContent = `${Score}`;
+        document.getElementById('statusTurn').textContent = `${turnCount}`;
+        document.getElementById('statusStage').textContent = `${currentStage}`;
+        document.getElementById('statusScore').textContent = `${Score}`;
 
        let color = "#0f0";
        if ( shipEnergy < ENTITY_CONFIG.PLAYER.ENERGY_MAX * .3 ) {
@@ -1042,12 +1047,32 @@
          Math.floor((baseShield / ENTITY_CONFIG.BASE.SHIELD_MAX) * 100);
      }
 
-     function setLog(msg) {
-       document.getElementById('logStatus').textContent = msg;
-     }
+      function setLog(msg) {
+        document.getElementById('logStatus').textContent = msg;
+      }
 
-     // ===== 修正: ハイスコア表示を追加 =====
-     function gameOverMessage(msg, clear=false) {
+      /**
+       * ミッションクリア時、次のステージに進む処理を行います。
+       * @param {Phaser.Scene} scene - 現在のシーン
+       */
+      function nextStage(scene) {
+        // ボーナスポイントとして (ステージ番号 * 100) を加算
+        Score += currentStage * 100;
+
+        // ステージを進め、敵の初期出現数を1つ増やす
+        currentStage++;
+        SYSTEM.ENEMY_QTY++;
+
+        // 状態をリセットし、次のステージへ
+        isPlayerTurn = true;
+        setLog(`STAGE ${currentStage} START!`);
+        updateStatus();
+
+        scene.scene.restart();
+      }
+
+      // ===== 修正: ハイスコア表示を追加 =====
+      function gameOverMessage(msg, clear=false) {
        gameOver = true;
        flagClear = clear;
        isPlayerTurn = false;
