@@ -503,15 +503,12 @@
        const g = this.make.graphics({add:false});
 
        g.lineStyle(3, 0xff0000, 0.3);
-       g.strokeCircle(25, 30, ENTITY_CONFIG.COLLISION.HIT_RADIUS*2);
-
+       g.strokeCircle(25, 30, ENTITY_CONFIG.COLLISION.HIT_RADIUS*
        g.fillStyle(0x5588ee);
        g.fillRect(22,25,6,20);
-       
        g.fillStyle(0x4488ff);
        g.fillRect(10,30,8,20);
        g.fillRect(32,30,8,20);
-       
        g.fillStyle(0xaabbff);
        g.fillEllipse(25,15,35,30);
        g.generateTexture('shipImg',50,60);
@@ -744,47 +741,9 @@
            return;
          } else {
            setLog("APPROACH BASE TO DOCK");
-           // ### Move to base
-           let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, pointer.worldX, pointer.worldY);
-           if (rawDist < 1) return;
-
-           let moveDist = Math.min(rawDist, ENTITY_CONFIG.PLAYER.MAX_MOVE_DIST);
-           let ratio = moveDist / rawDist;
-           let destX = ship.x + (pointer.worldX - ship.x) * ratio;
-           let destY = ship.y + (pointer.worldY - ship.y) * ratio;
-
-           if (isMoveForbidden(ship.x, ship.y, destX, destY)) {
-             // 障害物により移動不可
-             setLog("BLOCKED");
-             // isPlayerTurn = false;
-             // this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
-             return;
-           }
-
-           let cost = Math.max(1, Math.ceil(moveDist * ENTITY_CONFIG.PLAYER.MOVE_COST_RATE));
-           if (ship.energy < cost) {
-             // エネルギー不足
-             setLog("NOT ENOUGH ENERGY");
-             // isPlayerTurn = false;
-             // this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
-             return;
-           }
-
-           // 移動実行
-           ship.energy -= cost;
-           isPlayerTurn = false;
-           this.tweens.add({
-             targets: ship,
-             x: destX, y: destY,
-             duration: SYSTEM.TIMING.TURN_DELAY,
-             //onComplete: () => this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this))
-             onComplete: () => this.time.delayedCall(0.1, () => enemyTurn(this))
-           });
-           updateStatus();
+           attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
+           return;
          }
-
-         updateStatus();
-         return;
        }
 
        if (target && target.active) {
@@ -805,6 +764,7 @@
            setLog("OUT OF RANGE");
            ship.energy -= MECHANICS.WEAPON.PHASER_COST;
            isPlayerTurn = false;
+           fireBeam(this, ship.x, ship.y, target.x, target.y, 0x444444);
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            updateStatus();
            return;
@@ -814,6 +774,7 @@
            // 障害物によりブロック
            setLog("BLOCKED");
            isPlayerTurn = false;
+           fireBeam(this, ship.x, ship.y, target.x, target.y, 0x444444);
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            updateStatus();
            return;
@@ -826,10 +787,7 @@
            Math.floor(MECHANICS.WEAPON.BASE_DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * d))
          );
 
-         const beam = this.add.graphics();
-         beam.lineStyle(4, 0x00ffff, 1);
-         beam.lineBetween(ship.x, ship.y, target.x, target.y);
-         this.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
+         fireBeam(this, ship.x, ship.y, target.x, target.y, 0x00ffff);
 
          if (!target.active) {
            enemies = enemies.filter(e => e !== target);
@@ -840,42 +798,7 @@
        }
 
        if (!target) {
-         // 修正: 移動先の計算も worldX / worldY に準拠
-         let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, pointer.worldX, pointer.worldY);
-         if (rawDist < 1) return;
-
-         let moveDist = Math.min(rawDist, ENTITY_CONFIG.PLAYER.MAX_MOVE_DIST);
-         let ratio = moveDist / rawDist;
-         let destX = ship.x + (pointer.worldX - ship.x) * ratio;
-         let destY = ship.y + (pointer.worldY - ship.y) * ratio;
-
-         if (isMoveForbidden(ship.x, ship.y, destX, destY)) {
-           // 障害物により移動不可
-           setLog("BLOCKED");
-           // isPlayerTurn = false;
-           // this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
-           return;
-         }
-
-         let cost = Math.max(1, Math.ceil(moveDist * ENTITY_CONFIG.PLAYER.MOVE_COST_RATE));
-         if (ship.energy < cost) {
-           // エネルギー不足
-           setLog("NOT ENOUGH ENERGY");
-           isPlayerTurn = false;
-           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
-           return;
-         }
-
-         // 移動実行
-         ship.energy -= cost;
-         isPlayerTurn = false;
-         this.tweens.add({
-           targets: ship,
-           x: destX, y: destY,
-           duration: SYSTEM.TIMING.TURN_DELAY,
-           onComplete: () => this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this))
-         });
-         updateStatus();
+         attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
        }
      }
 
@@ -894,6 +817,93 @@
          if (lineHitsCircle(x1, y1, x2, y2, starBase.x, starBase.y, ENTITY_CONFIG.COLLISION.HIT_RADIUS)) return true;
        }
        return false;
+     }
+
+     /**
+      * プレイヤーの移動処理を行います。
+      * 移動可否の判定、エネルギー消費の計算、およびアニメーションを実行します。
+      * @param {Phaser.Scene} scene - 現在のシーン
+      * @param {number} targetX - 移動目標のX座標
+      * @param {number} targetY - 移動目標のY座標
+      * @param {number} delayBeforeEnemyTurn - 移動完了後、敵のターン開始までの遅延時間(ms)
+      */
+     function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
+       let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, targetX, targetY);
+       if (rawDist < 1) return;
+
+       let moveDist = Math.min(rawDist, ENTITY_CONFIG.PLAYER.MAX_MOVE_DIST);
+       let ratio = moveDist / rawDist;
+       let destX = ship.x + (targetX - ship.x) * ratio;
+       let destY = ship.y + (targetY - ship.y) * ratio;
+
+       if (isMoveForbidden(ship.x, ship.y, destX, destY)) {
+         // 障害物により移動不可
+         setLog("BLOCKED");
+         return;
+       }
+
+       let cost = Math.max(1, Math.ceil(moveDist * ENTITY_CONFIG.PLAYER.MOVE_COST_RATE));
+       if (ship.energy < cost) {
+         // エネルギー不足
+         setLog("NOT ENOUGH ENERGY");
+         return;
+       }
+
+       // 移動実行
+       ship.energy -= cost;
+       isPlayerTurn = false;
+       scene.tweens.add({
+         targets: ship,
+         x: destX, y: destY,
+         duration: SYSTEM.TIMING.TURN_DELAY,
+         onComplete: () => scene.time.delayedCall(delayBeforeEnemyTurn, () => enemyTurn(scene))
+       });
+       updateStatus();
+     }
+
+     /**
+      * 敵の移動先を計算します。
+      * 直線上に障害物がある場合は、15度ずつ角度をずらして迂回ルートを探します。
+      * @param {Enemy} e - 移動する敵オブジェクト
+      * @param {number} angle - 進行方向の角度（ラジアン）
+      * @returns {{x: number, y: number}} - 計算された移動先の座標
+      */
+     function calculateEnemyAvoidanceDest(e, angle) {
+       let destX = e.x + Math.cos(angle) * ENTITY_CONFIG.ENEMY.SPEED;
+       let destY = e.y + Math.sin(angle) * ENTITY_CONFIG.ENEMY.SPEED;
+
+       if (!isMoveForbidden(e.x, e.y, destX, destY, true)) {
+         return { x: destX, y: destY };
+       }
+
+       for (let offset = 15; offset <= 90; offset += 15) {
+         let rad = Phaser.Math.DegToRad(offset);
+         
+         let tx1 = e.x + Math.cos(angle + rad) * ENTITY_CONFIG.ENEMY.SPEED;
+         let ty1 = e.y + Math.sin(angle + rad) * ENTITY_CONFIG.ENEMY.SPEED;
+         if (!isMoveForbidden(e.x, e.y, tx1, ty1, true)) return { x: tx1, y: ty1 };
+         
+         let tx2 = e.x + Math.cos(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
+         let ty2 = e.y + Math.sin(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
+         if (!isMoveForbidden(e.x, e.y, tx2, ty2, true)) return { x: tx2, y: ty2 };
+       }
+       return { x: e.x, y: e.y };
+     }
+
+     /**
+      * 攻撃時のレーザービームを描画します。
+      * @param {Phaser.Scene} scene - 現在のシーン
+      * @param {number} srcX - 発射元のX座標
+      * @param {number} srcY - 発射元のY座標
+      * @param {number} dstX - 目標のX座標
+      * @param {number} dstY - 目標のY座標
+      * @param {number} color - ビームの色 (例: 0xff00ff)
+      */
+     function fireBeam(scene, srcX, srcY, dstX, dstY, color) {
+       const beam = scene.add.graphics();
+       beam.lineStyle(4, color, 1);
+       beam.lineBetween(srcX, srcY, dstX, dstY);
+       scene.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
      }
 
      function enemyTurn(scene) {
@@ -915,10 +925,7 @@
 
            if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
              // 基地への攻撃
-             const beam = scene.add.graphics();
-             beam.lineStyle(4, 0xff00ff, 1);
-             beam.lineBetween(e.x, e.y, starBase.x, starBase.y);
-             scene.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
+             fireBeam(scene, e.x, e.y, starBase.x, starBase.y, 0xff00ff);
 
              starBase.takeDamage(
                Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToBase))
@@ -929,10 +936,7 @@
              }
            } else if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackShip) {
              // プレイヤーへの攻撃
-             const beam = scene.add.graphics();
-             beam.lineStyle(4, 0xff00ff, 1);
-             beam.lineBetween(e.x, e.y, ship.x, ship.y);
-             scene.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
+             fireBeam(scene, e.x, e.y, ship.x, ship.y, 0xff00ff);
 
              ship.takeDamage(
                Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToShip))
@@ -950,39 +954,12 @@
              } else {
                angle = Phaser.Math.Angle.Between(ship.x, ship.y, e.x, e.y);
              }
-
-             let destX = e.x + Math.cos(angle) * ENTITY_CONFIG.ENEMY.SPEED;
-             let destY = e.y + Math.sin(angle) * ENTITY_CONFIG.ENEMY.SPEED;
-
-             if (isMoveForbidden(e.x, e.y, destX, destY, true)) {
-               let found = false;
-               for (let offset = 15; offset <= 90; offset += 15) {
-                 let rad = Phaser.Math.DegToRad(offset);
-                 
-                 let tx1 = e.x + Math.cos(angle + rad) * ENTITY_CONFIG.ENEMY.SPEED;
-                 let ty1 = e.y + Math.sin(angle + rad) * ENTITY_CONFIG.ENEMY.SPEED;
-                 if (!isMoveForbidden(e.x, e.y, tx1, ty1, true)) {
-                   destX = tx1; destY = ty1; found = true; break;
-                 }
-                 
-                 let tx2 = e.x + Math.cos(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
-                 let ty2 = e.y + Math.sin(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
-                 if (!isMoveForbidden(e.x, e.y, tx2, ty2, true)) {
-                   destX = tx2; destY = ty2;
-                   found = true;
-                   break;
-                 }
-               }
-               if (!found) {
-                 destX = e.x;
-                 destY = e.y;
-               }
-             }
+             let dest = calculateEnemyAvoidanceDest(e, angle);
 
              scene.tweens.add(
                {
                  targets: e,
-                 x: destX, y: destY,
+                 x: dest.x, y: dest.y,
                  duration: SYSTEM.TIMING.TURN_DELAY,
                  onComplete: () => scene.time.delayedCall(
                    SYSTEM.TIMING.TURN_DELAY, () => {
