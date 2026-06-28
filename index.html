@@ -795,9 +795,16 @@
       fireBeam(this, ship.x, ship.y, target.x, target.y, 0x00ffff);
 
       if (!target.active) {
-      enemies = enemies.filter(e => e !== target);
+        // 【撃墜】
+        // 復讐に燃えた敵が現れる。
+        // つまり、撃墜しても敵機数は減らない。
+        enemies = enemies.filter(e => e !== target);
+
+        const rp = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
+        enemies.push(new Enemy(this, rp.x, rp.y));
+        setLog("⚠ ENEMY SHOT DOWN — REINFORCEMENT INCOMING!");
       }
-      this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+        this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
       updateStatus();
       return;
       }
