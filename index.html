@@ -733,6 +733,8 @@
        if (target?.type === 'base') {
          if (isDocked) {
            setLog("⚓ ALREADY DOCKED");
+           isPlayerTurn = false;
+           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            return;
          }
          if (
@@ -779,7 +781,7 @@
          }
          
          if (isLOSBlocked(ship.x, ship.y, target.x, target.y, false)) {
-           setLog("BLOCKED");
+           setLog("BLOCKED 1");
            isPlayerTurn = false;
            fireBeam(this, ship.x, ship.y, target.x, target.y, 0x444444);
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
@@ -947,7 +949,7 @@
         distance = Phaser.Math.Distance.Between(ship.x, ship.y, destX, destY);
 
         if (isMoveForbidden(ship.x, ship.y, destX, destY) || distance < 5) {
-          setLog("BLOCKED");
+          setLog("BLOCKED 2");
           return;
         }
         setLog("-");
