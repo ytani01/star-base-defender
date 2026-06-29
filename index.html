@@ -261,7 +261,7 @@
        },
        BASE: {
          SHIELD_MAX: 1000,
-         DOCKING_RANGE: 60 * SYSTEM.SCALE
+         DOCKING_RANGE: 35 * SYSTEM.SCALE
        },
        ENEMY: {
          SHIELD_MAX: 300,
@@ -450,6 +450,9 @@
            scene, x, y, 'baseImg', 36,  SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
            ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc00
          );
+
+         this.sprite.setDepth(100);
+         this.gauge.setDepth(100);
        }
      }
 
@@ -809,8 +812,13 @@
 
        if (!target) {
          attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
+         if ( ship.energy <= 5 ) {
+           // Game Over
+           updateStatus();
+           gameOverMessage("OUT OF ENERGY ..");
+         }
        }
-     }
+     } // handlePointerDown()
 
       /**
        * 移動時に他のキャラクターと重ならないよう、
@@ -875,8 +883,21 @@
        if (hitStar) return true;
 
        if (isEnemy && starBase.shield > 0 && starBase?.active) {
-         if (Phaser.Math.Distance.Between(x2, y2, starBase.x, starBase.y) <= ENTITY_CONFIG.COLLISION.HIT_RADIUS) return true;
-         if (lineHitsCircle(x1, y1, x2, y2, starBase.x, starBase.y, ENTITY_CONFIG.COLLISION.HIT_RADIUS)) return true;
+         if (
+           Phaser.Math.Distance.Between(
+             x2, y2, starBase.x, starBase.y
+           ) <= ENTITY_CONFIG.COLLISION.HIT_RADIUS
+         ) {
+           return true;
+         }
+         if (
+           lineHitsCircle(
+             x1, y1, x2, y2, starBase.x, starBase.y,
+             ENTITY_CONFIG.COLLISION.HIT_RADIUS
+           )
+         ) {
+           return true;
+         }
        }
        return false;
      }
@@ -911,9 +932,17 @@
         let destX = ship.x + (targetX - ship.x) * ratio;
         let destY = ship.y + (targetY - ship.y) * ratio;
 
-        // 他のキャラクターと重ならないよう移動先を制限
-        const clamped = clampDestToAvoidCharacters(ship.x, ship.y, destX, destY, ship, false);
-        destX = clamped.x;
+        target_is_base = false;
+        dist_target_base = Phaser.Math.Distance.Between(
+          targetX, targetY, starBase.x, starBase.y
+        );
+        if ( dist_target_base <= ENTITY_CONFIG.BASE.DOCKING_RANGE ) {
+          target_is_base = true;
+        }
+
+          // 他のキャラクターと重ならないよう移動先を制限
+          const clamped = clampDestToAvoidCharacters(ship.x, ship.y, destX, destY, ship, false);
+          destX = clamped.x;
         destY = clamped.y;
         distance = Phaser.Math.Distance.Between(ship.x, ship.y, destX, destY);
 
@@ -951,8 +980,11 @@
             // アンドック直後の移動では再ドッキングしない
             if (!skipAutoDock) {
               const dockDist = Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y);
-              if (!isDocked && dockDist <= ENTITY_CONFIG.BASE.DOCKING_RANGE
-                  && starBase.active && starBase.shield > 0) {
+              if (
+                !isDocked && dockDist <= ENTITY_CONFIG.BASE.DOCKING_RANGE
+                && starBase.active && starBase.shield > 0
+                && target_is_base
+              ) {
                 dockShip(scene);
                 // ドッキングアニメ(200ms)が終わってから敵ターン
                 scene.time.delayedCall(220, () =>
