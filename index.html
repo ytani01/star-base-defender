@@ -227,7 +227,7 @@
        },
        STAR_QTY: 15,
        ENEMY_QTY: 3,
-       NEW_ENEMY_INTERVAL: 30,
+       NEW_ENEMY_INTERVAL: 40,
        SCALE: 0.4,
        BOUNDS_RADIUS: 300,
        GUAGE: {
@@ -268,7 +268,7 @@
          DAMAGE: 70,
          SPEED: 30 * SYSTEM.SCALE,
          STOP_DIST: 30 * SYSTEM.SCALE,
-         REGEN: 0.03
+         REGEN: 0.02
        },
        COLLISION: {
          INIT_POS_DISTANCE: 60 * SYSTEM.SCALE,
@@ -1037,16 +1037,21 @@
          return tryDest(destX, destY);
        }
 
-       for (let offset = 15; offset <= 90; offset += 15) {
+       for (let offset = 1; offset <= 180; offset += 1) {
+         console.log(`offset=${offset}`);
          let rad = Phaser.Math.DegToRad(offset);
          
          let tx1 = e.x + Math.cos(angle + rad) * OBJ_CONF.ENEMY.SPEED;
          let ty1 = e.y + Math.sin(angle + rad) * OBJ_CONF.ENEMY.SPEED;
-         if (!isMoveForbidden(e.x, e.y, tx1, ty1, true)) return tryDest(tx1, ty1);
+         if (!isMoveForbidden(e.x, e.y, tx1, ty1, true)) {
+           return tryDest(tx1, ty1);
+         }
          
          let tx2 = e.x + Math.cos(angle - rad) * OBJ_CONF.ENEMY.SPEED;
          let ty2 = e.y + Math.sin(angle - rad) * OBJ_CONF.ENEMY.SPEED;
-         if (!isMoveForbidden(e.x, e.y, tx2, ty2, true)) return tryDest(tx2, ty2);
+         if (!isMoveForbidden(e.x, e.y, tx2, ty2, true)) {
+           return tryDest(tx2, ty2);
+         }
        }
        return { x: e.x, y: e.y };
      }
@@ -1068,18 +1073,25 @@
            let dToBase = Phaser.Math.Distance.Between(e.x, e.y, starBase.x, starBase.y);
            let dToShip = Phaser.Math.Distance.Between(e.x, e.y, ship.x, ship.y);
            
+           // ドッキング中は自機への攻撃なし（基地が全受け）
            let canAttackShip = (
-             !isDocked && // ドッキング中は自機への攻撃なし（基地が全受け）
-             dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE && !isLOSBlocked(e.x, e.y, ship.x, ship.y)
+             !isDocked &&
+             dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE &&
+             !isLOSBlocked(e.x, e.y, ship.x, ship.y)
            );
            // ドッキング中は、自機に届く距離の敵も基地を攻撃できるとみなす
            let canAttackBase = (
-             starBase.shield > 0 && starBase.active && !isLOSBlocked(e.x, e.y, starBase.x, starBase.y, false)
-             && (dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE
-                 || (isDocked && dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE))
+             starBase.shield > 0 &&
+             starBase.active &&
+             !isLOSBlocked(e.x, e.y, starBase.x, starBase.y, false) &&
+             (
+               dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE ||
+               isDocked && dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE
+             )
            );
 
            if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
+             // 基地への攻撃
              fireBeam(scene, e.x, e.y, starBase.x, starBase.y, 0xff00ff);
 
              starBase.takeDamage(
@@ -1100,11 +1112,15 @@
                gameOverMessage("ENTERPRISE DESTROYED");
              }
            } else {
+             // 移動
              let angle;
              if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5) {
+               // ターゲットに向かって移動
                let target = dToBase < dToShip ? {x:starBase.x, y:starBase.y} : {x:ship.x, y:ship.y};
                angle = Phaser.Math.Angle.Between(e.x, e.y, target.x, target.y);
              } else {
+               // 退却
+               // プレーヤーと逆の方向
                angle = Phaser.Math.Angle.Between(ship.x, ship.y, e.x, e.y);
              }
              let dest = calculateEnemyAvoidanceDest(e, angle);
@@ -1132,7 +1148,7 @@
 
              e.x = Math.floor(e.x);
              e.y = Math.floor(e.y);
-           }
+           } // else
 
            e.shield = Math.min(
              OBJ_CONF.ENEMY.SHIELD_MAX,
@@ -1245,7 +1261,12 @@
          String(now.getDate()).padStart(2, '0')
        ].join('/');
        if ( flagClear || forceSave ) {
-         list.push({ score, turns, stage, result, date: dateStr, _new: true });
+         list.push(
+           {
+             score, turns, stage, result,
+             gameid: SYSTEM.GAMEID, date: dateStr, _new: true
+           }
+         );
        }
        list.sort((a, b) => b.score - a.score);
        const newIdx = list.findIndex(s => s._new);
