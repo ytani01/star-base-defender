@@ -239,6 +239,8 @@
          TURN_DELAY: 500,
        }
      };
+     SYSTEM.GAMEID = Phaser.Utils.String.UUID();
+     console.log(`GAMEID=${SYSTEM.GAMEID}`);
      SYSTEM.PLAY_AREA_WIDTH = SYSTEM.BOUNDS_RADIUS * 2 + 20;
      SYSTEM.PLAY_AREA_HEIGHT = SYSTEM.PLAY_AREA_WIDTH;
      SYSTEM.CENTER_X = SYSTEM.PLAY_AREA_WIDTH / 2;
@@ -1102,6 +1104,7 @@
                gameOverMessage("BASE DESTROYED");
              }
            } else if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5 && canAttackShip) {
+             // プレーヤーへの攻撃
              fireBeam(scene, e.x, e.y, ship.x, ship.y, 0xff00ff);
 
              ship.takeDamage(
@@ -1291,7 +1294,8 @@
        const rankLabels = ['1ST', '2ND', '3RD', '4TH', '5TH'];
        list.forEach((s, i) => {
          const tr = document.createElement('tr');
-         const isNew = (i === newIdx);
+         //const isNew = (i === newIdx);
+         const isNew = (s.gameid == SYSTEM.GAMEID);
          if (isNew) tr.className = 'hs-new';
          const rank   = rankLabels[i] || `${i + 1}TH`;
          const prefix = isNew ? '★' : '';
