@@ -756,7 +756,7 @@
        if (target && target.active) {
          // 攻撃
          if ( isDocked ) {
-           setLog("Docking Now: Phaser is deactivated.");
+           setLog("DOCK: All weapons are deactivated");
            return;
          }
 
@@ -814,7 +814,7 @@
 
        if (!target) {
          attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
-         if ( ship.energy <= 5 ) {
+         if ( ship.energy <= 5 && ! isDocked ) {
            // Game Over
            updateStatus();
            gameOverMessage("OUT OF ENERGY ..");
@@ -878,31 +878,40 @@
        let hitStar = stars.some(
          s => {
            if (!s.active) return false;
-           if (Phaser.Math.Distance.Between(x2, y2, s.x, s.y) <= ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS) return true;
-           return lineHitsCircle(x1, y1, x2, y2, s.x, s.y, ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS);
+           if (
+             Phaser.Math.Distance.Between(x2, y2, s.x, s.y)
+             <= ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS
+           ) {
+             return true;
+           }
+           return lineHitsCircle(
+             x1, y1, x2, y2, s.x, s.y, ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS
+           );
          }
        );
-       if (hitStar) return true;
-
-       if (isEnemy && starBase.shield > 0 && starBase?.active) {
-         if (
-           Phaser.Math.Distance.Between(
-             x2, y2, starBase.x, starBase.y
-           ) <= ENTITY_CONFIG.COLLISION.HIT_RADIUS
-         ) {
-           return true;
-         }
-         if (
-           lineHitsCircle(
-             x1, y1, x2, y2, starBase.x, starBase.y,
-             ENTITY_CONFIG.COLLISION.HIT_RADIUS
-           )
-         ) {
-           return true;
-         }
+       if (hitStar) {
+         return true;
        }
+
+       /* if (isEnemy && starBase.shield > 0 && starBase?.active) {
+        *   if (
+        *     Phaser.Math.Distance.Between(
+        *       x2, y2, starBase.x, starBase.y
+        *     ) <= ENTITY_CONFIG.COLLISION.HIT_RADIUS
+        *   ) {
+        *     return true;
+        *   }
+        *   if (
+        *     lineHitsCircle(
+        *       x1, y1, x2, y2, starBase.x, starBase.y,
+        *       ENTITY_CONFIG.COLLISION.HIT_RADIUS
+        *     )
+        *   ) {
+        *     return true;
+        *   }
+        * } // if */
        return false;
-     }
+     } // isMoveForbidden()
 
       /**
        * 自機を基地にドッキングさせる
@@ -921,7 +930,7 @@
           duration: 200,
           ease: 'Sine.easeInOut'
         });
-        setLog("⚓ DOCKED — ENERGY FULL / SHIELD → BASE");
+        setLog("⚓ DOCKED — ENERGY FULL");
         updateStatus();
       }
 
@@ -942,9 +951,9 @@
           target_is_base = true;
         }
 
-          // 他のキャラクターと重ならないよう移動先を制限
-          const clamped = clampDestToAvoidCharacters(ship.x, ship.y, destX, destY, ship, false);
-          destX = clamped.x;
+        // 他のキャラクターと重ならないよう移動先を制限
+        const clamped = clampDestToAvoidCharacters(ship.x, ship.y, destX, destY, ship, false);
+        destX = clamped.x;
         destY = clamped.y;
         distance = Phaser.Math.Distance.Between(ship.x, ship.y, destX, destY);
 
@@ -1272,7 +1281,7 @@
          const { clearedStage, bonus, list, newIdx } = data;
          resultEl.style.color     = '#0f0';
          resultEl.textContent     = `✓ STAGE ${clearedStage} CLEARED!`;
-         finalEl.textContent      = `SCORE: ${Score}   TURNS: ${turnCount}   STAGE BONUS: +${bonus}`;
+         finalEl.textContent      = `TURNS:${turnCount}, STAGE BONUS:+${bonus}, SCORE: ${Score}`;
          renderHSTable(list, newIdx);
          closeBtn.style.display   = 'none';
          restartBtn.textContent   = '▶ NEXT STAGE';
