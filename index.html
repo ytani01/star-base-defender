@@ -251,7 +251,7 @@
      };
      let CurZoom = 1.0;
 
-     const ENTITY_CONFIG = {
+     const OBJ_CONF = {
        PLAYER: {
          ENERGY_MAX: 3000,
          SHIELD_MAX: 1000,
@@ -448,7 +448,7 @@
        constructor(scene, x, y) {
          super(
            scene, x, y, 'baseImg', 36,  SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
-           ENTITY_CONFIG.BASE.SHIELD_MAX, 0xffcc00
+           OBJ_CONF.BASE.SHIELD_MAX, 0xffcc00
          );
 
          this.sprite.setDepth(100);
@@ -460,7 +460,7 @@
        constructor(scene, x, y) {
          super(
            scene, x, y, 'enemyImg', 31, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
-           ENTITY_CONFIG.ENEMY.SHIELD_MAX, 0xff3333
+           OBJ_CONF.ENEMY.SHIELD_MAX, 0xff3333
          );
        }
      }
@@ -470,8 +470,8 @@
          super(
            scene, x, y, 'shipImg',
            29, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H, 
-           ENTITY_CONFIG.PLAYER.SHIELD_MAX, 0xff00ff,
-           ENTITY_CONFIG.PLAYER.ENERGY_MAX, 0x8888ff,
+           OBJ_CONF.PLAYER.SHIELD_MAX, 0xff00ff,
+           OBJ_CONF.PLAYER.ENERGY_MAX, 0x8888ff,
          );
        }
      }
@@ -499,7 +499,7 @@
        const g = this.make.graphics({add:false});
 
        g.lineStyle(3, 0xff0000, 0.3);
-       g.strokeCircle(25, 30, ENTITY_CONFIG.COLLISION.HIT_RADIUS*2);
+       g.strokeCircle(25, 30, OBJ_CONF.COLLISION.HIT_RADIUS*2);
 
        g.fillStyle(0x5588ee);
        g.fillRect(22,25,6,20);
@@ -515,7 +515,7 @@
        g.clear();
 
        g.lineStyle(3, 0xff0000, 0.5);
-       g.strokeCircle(25, 25, ENTITY_CONFIG.COLLISION.HIT_RADIUS*2);
+       g.strokeCircle(25, 25, OBJ_CONF.COLLISION.HIT_RADIUS*2);
 
        g.fillStyle(0x228822);
        g.beginPath();
@@ -618,7 +618,7 @@
        if ( isDocked ) {
          rangeGraphics.lineStyle(2, 0x00ffff, 1);
        }
-       rangeGraphics.strokeCircle(starBase.x, starBase.y, ENTITY_CONFIG.BASE.DOCKING_RANGE);
+       rangeGraphics.strokeCircle(starBase.x, starBase.y, OBJ_CONF.BASE.DOCKING_RANGE);
 
        // 自機＆敵機全て
        [ship, ...enemies].forEach(
@@ -708,7 +708,7 @@
            ax,ay,
            bx,by,
            o.x,o.y,
-           ENTITY_CONFIG.COLLISION.LOS_RADIUS
+           OBJ_CONF.COLLISION.LOS_RADIUS
          )
        );
      }
@@ -721,11 +721,11 @@
        let target = enemies.find(
          e => Phaser.Math.Distance.Between(
            pointer.worldX, pointer.worldY, e.x, e.y
-         ) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
+         ) < OBJ_CONF.COLLISION.HIT_RADIUS
        );
 
        if (!target && starBase.shield > 0 && Phaser.Math.Distance.Between(
-         pointer.worldX, pointer.worldY, starBase.x, starBase.y) < ENTITY_CONFIG.COLLISION.HIT_RADIUS
+         pointer.worldX, pointer.worldY, starBase.x, starBase.y) < OBJ_CONF.COLLISION.HIT_RADIUS
        ) {
          target = {type:'base'};
        }
@@ -739,7 +739,7 @@
          }
          if (
            Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y)
-           <= ENTITY_CONFIG.BASE.DOCKING_RANGE
+           <= OBJ_CONF.BASE.DOCKING_RANGE
          ) {
            // ドッキングエリア内 → 即座にドッキング
            dockShip(this);
@@ -829,7 +829,7 @@
        * isEnemy: true の場合、敵同士も回避対象に含める
        */
       function clampDestToAvoidCharacters(x1, y1, destX, destY, self, isEnemy = false) {
-        const R = ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2; // 2キャラが接触しない最小距離
+        const R = OBJ_CONF.COLLISION.HIT_RADIUS * 2; // 2キャラが接触しない最小距離
 
         // 衝突チェック対象を収集
         const targets = [];
@@ -880,12 +880,12 @@
            if (!s.active) return false;
            if (
              Phaser.Math.Distance.Between(x2, y2, s.x, s.y)
-             <= ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS
+             <= OBJ_CONF.COLLISION.OBSTACLE_RADIUS
            ) {
              return true;
            }
            return lineHitsCircle(
-             x1, y1, x2, y2, s.x, s.y, ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS
+             x1, y1, x2, y2, s.x, s.y, OBJ_CONF.COLLISION.OBSTACLE_RADIUS
            );
          }
        );
@@ -897,14 +897,14 @@
         *   if (
         *     Phaser.Math.Distance.Between(
         *       x2, y2, starBase.x, starBase.y
-        *     ) <= ENTITY_CONFIG.COLLISION.HIT_RADIUS
+        *     ) <= OBJ_CONF.COLLISION.HIT_RADIUS
         *   ) {
         *     return true;
         *   }
         *   if (
         *     lineHitsCircle(
         *       x1, y1, x2, y2, starBase.x, starBase.y,
-        *       ENTITY_CONFIG.COLLISION.HIT_RADIUS
+        *       OBJ_CONF.COLLISION.HIT_RADIUS
         *     )
         *   ) {
         *     return true;
@@ -922,7 +922,7 @@
        */
       function dockShip(scene) {
         isDocked = true;
-        ship.energy = ENTITY_CONFIG.PLAYER.ENERGY_MAX;
+        ship.energy = OBJ_CONF.PLAYER.ENERGY_MAX;
         ship.shield = 0; // シールドOFF: 敵攻撃は基地へリダイレクト
         scene.tweens.add({
           targets: ship,
@@ -938,7 +938,7 @@
         let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, targetX, targetY);
         if (rawDist < 1) return;
 
-        let moveDist = Math.min(rawDist, ENTITY_CONFIG.PLAYER.MAX_MOVE_DIST);
+        let moveDist = Math.min(rawDist, OBJ_CONF.PLAYER.MAX_MOVE_DIST);
         let ratio = moveDist / rawDist;
         let destX = ship.x + (targetX - ship.x) * ratio;
         let destY = ship.y + (targetY - ship.y) * ratio;
@@ -947,7 +947,7 @@
         dist_target_base = Phaser.Math.Distance.Between(
           targetX, targetY, starBase.x, starBase.y
         );
-        if ( dist_target_base <= ENTITY_CONFIG.BASE.DOCKING_RANGE ) {
+        if ( dist_target_base <= OBJ_CONF.BASE.DOCKING_RANGE ) {
           target_is_base = true;
         }
 
@@ -969,13 +969,13 @@
         if (isDocked) {
           isDocked = false;
           skipAutoDock = true;
-          ship.shield = ENTITY_CONFIG.PLAYER.SHIELD_MAX;
+          ship.shield = OBJ_CONF.PLAYER.SHIELD_MAX;
           setLog("UNDOCKED");
           updateStatus();
         }
 
         const actualDist = Phaser.Math.Distance.Between(ship.x, ship.y, destX, destY);
-        let cost = Math.max(1, Math.ceil(actualDist * ENTITY_CONFIG.PLAYER.MOVE_COST_RATE));
+        let cost = Math.max(1, Math.ceil(actualDist * OBJ_CONF.PLAYER.MOVE_COST_RATE));
         if (ship.energy < cost) {
           setLog("NOT ENOUGH ENERGY");
           return;
@@ -992,7 +992,7 @@
             if (!skipAutoDock) {
               const dockDist = Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y);
               if (
-                !isDocked && dockDist <= ENTITY_CONFIG.BASE.DOCKING_RANGE
+                !isDocked && dockDist <= OBJ_CONF.BASE.DOCKING_RANGE
                 && starBase.active && starBase.shield > 0
                 && target_is_base
               ) {
@@ -1013,8 +1013,8 @@
        // 障害物を避けた候補先を clamp して他キャラとの重なりを防ぐ
        const tryDest = (ax, ay) => clampDestToAvoidCharacters(e.x, e.y, ax, ay, e, true);
 
-       let destX = e.x + Math.cos(angle) * ENTITY_CONFIG.ENEMY.SPEED;
-       let destY = e.y + Math.sin(angle) * ENTITY_CONFIG.ENEMY.SPEED;
+       let destX = e.x + Math.cos(angle) * OBJ_CONF.ENEMY.SPEED;
+       let destY = e.y + Math.sin(angle) * OBJ_CONF.ENEMY.SPEED;
 
        if (!isMoveForbidden(e.x, e.y, destX, destY, true)) {
          return tryDest(destX, destY);
@@ -1023,12 +1023,12 @@
        for (let offset = 15; offset <= 90; offset += 15) {
          let rad = Phaser.Math.DegToRad(offset);
          
-         let tx1 = e.x + Math.cos(angle + rad) * ENTITY_CONFIG.ENEMY.SPEED;
-         let ty1 = e.y + Math.sin(angle + rad) * ENTITY_CONFIG.ENEMY.SPEED;
+         let tx1 = e.x + Math.cos(angle + rad) * OBJ_CONF.ENEMY.SPEED;
+         let ty1 = e.y + Math.sin(angle + rad) * OBJ_CONF.ENEMY.SPEED;
          if (!isMoveForbidden(e.x, e.y, tx1, ty1, true)) return tryDest(tx1, ty1);
          
-         let tx2 = e.x + Math.cos(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
-         let ty2 = e.y + Math.sin(angle - rad) * ENTITY_CONFIG.ENEMY.SPEED;
+         let tx2 = e.x + Math.cos(angle - rad) * OBJ_CONF.ENEMY.SPEED;
+         let ty2 = e.y + Math.sin(angle - rad) * OBJ_CONF.ENEMY.SPEED;
          if (!isMoveForbidden(e.x, e.y, tx2, ty2, true)) return tryDest(tx2, ty2);
        }
        return { x: e.x, y: e.y };
@@ -1062,21 +1062,21 @@
                  || (isDocked && dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE))
            );
 
-           if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
+           if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
              fireBeam(scene, e.x, e.y, starBase.x, starBase.y, 0xff00ff);
 
              starBase.takeDamage(
-               Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToBase))
+               Math.floor(OBJ_CONF.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToBase))
              );
              if (starBase.shield <= 0 && !gameOver) {
                updateStatus();
                gameOverMessage("BASE DESTROYED");
              }
-           } else if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5 && canAttackShip) {
+           } else if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5 && canAttackShip) {
              fireBeam(scene, e.x, e.y, ship.x, ship.y, 0xff00ff);
 
              ship.takeDamage(
-               Math.floor(ENTITY_CONFIG.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToShip))
+               Math.floor(OBJ_CONF.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToShip))
              );
              if (ship.shield <= 0 && !gameOver) {
                updateStatus();
@@ -1084,7 +1084,7 @@
              }
            } else {
              let angle;
-             if (e.shield >= ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5) {
+             if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5) {
                let target = dToBase < dToShip ? {x:starBase.x, y:starBase.y} : {x:ship.x, y:ship.y};
                angle = Phaser.Math.Angle.Between(e.x, e.y, target.x, target.y);
              } else {
@@ -1099,7 +1099,7 @@
                  duration: SYSTEM.TIMING.TURN_DELAY,
                  onComplete: () => scene.time.delayedCall(
                    SYSTEM.TIMING.TURN_DELAY, () => {
-                     if (e.shield < ENTITY_CONFIG.ENEMY.SHIELD_MAX * 0.5) {
+                     if (e.shield < OBJ_CONF.ENEMY.SHIELD_MAX * 0.5) {
                        const distFromCenter = Phaser.Math.Distance.Between(
                          e.x, e.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y
                        );
@@ -1118,8 +1118,8 @@
            }
 
            e.shield = Math.min(
-             ENTITY_CONFIG.ENEMY.SHIELD_MAX,
-             e.shield + (ENTITY_CONFIG.ENEMY.SHIELD_MAX * ENTITY_CONFIG.ENEMY.REGEN)
+             OBJ_CONF.ENEMY.SHIELD_MAX,
+             e.shield + (OBJ_CONF.ENEMY.SHIELD_MAX * OBJ_CONF.ENEMY.REGEN)
            );
          });
        });
@@ -1156,27 +1156,27 @@
        document.getElementById('statusScore').textContent = `${Score}`;
 
        let color = "#0f0";
-       if ( shipEnergy < ENTITY_CONFIG.PLAYER.ENERGY_MAX * .3 ) {
+       if ( shipEnergy < OBJ_CONF.PLAYER.ENERGY_MAX * .3 ) {
          color = "#f00";
        }
        document.getElementById('statusShipEnergy').style.color = color;
        document.getElementById('statusShipEnergy').textContent = Math.floor(shipEnergy);
 
        color = "#0f0";
-       if ( shipShield < ENTITY_CONFIG.PLAYER.SHIELD_MAX * .3 ) {
+       if ( shipShield < OBJ_CONF.PLAYER.SHIELD_MAX * .3 ) {
          color = "#f00";
        }
        document.getElementById('statusShipShield').style.color = color;
        document.getElementById('statusShipShield').textContent = 
-         Math.floor((shipShield / ENTITY_CONFIG.PLAYER.SHIELD_MAX) * 100);
+         Math.floor((shipShield / OBJ_CONF.PLAYER.SHIELD_MAX) * 100);
 
        color = "#0f0";
-       if ( baseShield < ENTITY_CONFIG.BASE.SHIELD_MAX * .3 ) {
+       if ( baseShield < OBJ_CONF.BASE.SHIELD_MAX * .3 ) {
          color = "#f00";
        }
        document.getElementById('statusBaseShield').style.color = color;
        document.getElementById('statusBaseShield').textContent = 
-         Math.floor((baseShield / ENTITY_CONFIG.BASE.SHIELD_MAX) * 100);
+         Math.floor((baseShield / OBJ_CONF.BASE.SHIELD_MAX) * 100);
      }
 
      function setLog(msg) {
