@@ -271,6 +271,7 @@
          REGEN: 0.03
        },
        COLLISION: {
+         INIT_POS_DISTANCE: 60 * SYSTEM.SCALE,
          HIT_RADIUS: 30 * SYSTEM.SCALE,
          OBSTACLE_RADIUS: 24 * SYSTEM.SCALE,
          LOS_RADIUS: 16 * SYSTEM.SCALE,
@@ -558,17 +559,17 @@
 
        stars = [];
        for(let i=0; i < SYSTEM.STAR_QTY; i++) {
-         let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.OBSTACLE_RADIUS * 2.5);
+         let p = getSafeRandPos(0.2, 0.8);
          stars.push(new Star(this, p.x, p.y));
        }
 
        enemies = [];
        for(let i=0; i<SYSTEM.ENEMY_QTY; i++){
-         let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
+         let p = getSafeRandPos(0.6, 0.9);
          enemies.push(new Enemy(this, p.x, p.y));
        }
 
-       let pp = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
+       let pp = getSafeRandPos(0.1, 0.3);
        ship = new PlayerShip(this, pp.x, pp.y);
 
        this.cameras.main.setBounds(0, 0, SYSTEM.PLAY_AREA_WIDTH, SYSTEM.PLAY_AREA_HEIGHT);
@@ -643,7 +644,7 @@
        enemies.forEach(e => e.updateGauge());
      }
 
-     function getSafeRandPos(minDistance){
+     function getSafeRandPos(minDist, maxDist){
        let x, y, distToCenter;
        let safe = false;
        let attempts = 0;
@@ -657,27 +658,43 @@
          );
          distToCenter = Phaser.Math.Distance.Between(x, y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
          
-         if(distToCenter > SYSTEM.BOUNDS_RADIUS) continue;
-         if(distToCenter < ENTITY_CONFIG.BASE.DOCKING_RANGE) continue;
+         if ( distToCenter < SYSTEM.BOUNDS_RADIUS * minDist ) {
+           console.log(`distToCenter=${distToCenter} < ${SYSTEM.BOUNDS_RADIUS * minDist}`)
+           continue;
+         }
+         if ( distToCenter > SYSTEM.BOUNDS_RADIUS * maxDist ) {
+           console.log(`distToCenter=${distToCenter} > ${SYSTEM.BOUNDS_RADIUS * maxDist}`)
+           continue;
+         }
          
          safe = true;
 
          for(let s of stars) {
-           if(s.active && Phaser.Math.Distance.Between(x, y, s.x, s.y) < minDistance) {
-             safe = false; break;
+           if (
+             s.active && Phaser.Math.Distance.Between(
+               x, y, s.x, s.y
+             ) < OBJ_CONF.COLLISION.INIT_POS_DISTANCE
+           ) {
+             safe = false;
+             break;
            }
          }
          if(!safe) continue;
 
          for(let e of enemies) {
-           if(e.active && Phaser.Math.Distance.Between(x, y, e.x, e.y) < minDistance) {
+           if (
+             e.active && Phaser.Math.Distance.Between(
+               x, y, e.x, e.y
+             ) < OBJ_CONF.COLLISION.INIT_POS_DISTANCE
+           ) {
              safe = false; break;
            }
          }
          attempts++;
-       }
+         console.log(`attempts=${attempts}: x,y=${x},${y}`);
+       } // while ()
        return { x, y };
-     }
+     } // getSafeRandPos()
 
      function lineHitsCircle(ax,ay,bx,by,cx,cy,r) {
        const dx = bx - ax, dy = by - ay;
@@ -802,7 +819,7 @@
            // 撃墜確定: 敵リストから除外
            enemies = enemies.filter(e => e !== target);
            // ===== 追加: 怒りに燃えた増援が1機即時出現 =====
-           const rp = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
+           const rp = getSafeRandPos(0.8, 0.95);
            enemies.push(new Enemy(this, rp.x, rp.y));
            setLog("⚠ ENEMY SHOT DOWN — REINFORCEMENT INCOMING!");
            // ===============================================
@@ -1134,7 +1151,7 @@
            Score--;
 
            if ( turnCount % SYSTEM.NEW_ENEMY_INTERVAL == 0 ) {
-             let p = getSafeRandPos(ENTITY_CONFIG.COLLISION.HIT_RADIUS * 2);
+             let p = getSafeRandPos(0.8, 0.95);
              enemies.push(new Enemy(scene, p.x, p.y));
            }
 
