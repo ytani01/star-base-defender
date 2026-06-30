@@ -20,6 +20,24 @@
        line-height: 1.5;
      }
      #statusPanel div { margin: -3px 5px; }
+     /* ステータスゲージ用のスタイルを追加 */
+     /* #statusPanel を先頭に付けてCSSの優先度を上げ、マージンを上書きする */
+     #statusPanel .status-gauge {
+       display: inline-block;
+       width: 60px;
+       height: clamp(12px, 2.5vw, 18px);
+       background: #222;
+       border: 1px solid #08f;
+       margin: 0 0 0 8px; /* 上・右・下を0、左のみ8pxに指定 */
+       vertical-align: middle;
+     }
+     #statusPanel .status-gauge-fill {
+       height: 100%;
+       background: #0f0;
+       width: 100%;
+       transition: width 0.2s ease, background-color 0.2s ease;
+       margin: 0; /* 枠と中身のズレの原因となるマージンを無効化 */
+     }
      
      #gameWrapper { position: relative; flex: 1; min-height: 0; }
      #gameCanvas { width: 100%; height: 100%; }
@@ -173,10 +191,13 @@
         </div>
         <div id="statusShip">
           Shield <span id="statusShipShield">0</span>%
+          <div class="status-gauge"><div id="gaugeShipShield" class="status-gauge-fill"></div></div>
           |
           Energy <span id="statusShipEnergy">0</span>
+          <div class="status-gauge"><div id="gaugeShipEnergy" class="status-gauge-fill"></div></div>
           |
           Base Shield <span id="statusBaseShield">0</span>%
+          <div class="status-gauge"><div id="gaugeBaseShield" class="status-gauge-fill"></div></div>
         </div>
         <div id="logStatus">COMMAND: AWAITING ORDERS</div>
       </div>
@@ -943,7 +964,7 @@
      function dockShip(scene) {
        isDocked = true;
        ship.energy = OBJ_CONF.PLAYER.ENERGY_MAX;
-       ship.shield = 0; 
+       ship.shield = OBJ_CONF.PLAYER.SHIELD_MAX;
        scene.tweens.add({
          targets: ship,
          x: starBase.x, y: starBase.y,
@@ -1245,28 +1266,29 @@
        document.getElementById('statusStage').textContent = `${currentStage}`;
        document.getElementById('statusScore').textContent = `${Score}`;
 
-       let color = "#0f0";
-       if ( shipEnergy < OBJ_CONF.PLAYER.ENERGY_MAX * .3 ) {
-         color = "#f00";
-       }
-       document.getElementById('statusShipEnergy').style.color = color;
+       // Energy
+       let energyRatio = shipEnergy / OBJ_CONF.PLAYER.ENERGY_MAX;
+       let energyColor = energyRatio < 0.3 ? "#f00" : "#0f0";
+       document.getElementById('statusShipEnergy').style.color = energyColor;
        document.getElementById('statusShipEnergy').textContent = Math.floor(shipEnergy);
+       document.getElementById('gaugeShipEnergy').style.width = (energyRatio * 100) + '%';
+       document.getElementById('gaugeShipEnergy').style.background = energyColor;
 
-       color = "#0f0";
-       if ( shipShield < OBJ_CONF.PLAYER.SHIELD_MAX * .3 ) {
-         color = "#f00";
-       }
-       document.getElementById('statusShipShield').style.color = color;
-       document.getElementById('statusShipShield').textContent = 
-         Math.floor((shipShield / OBJ_CONF.PLAYER.SHIELD_MAX) * 100);
+       // Ship Shield
+       let shipShieldRatio = shipShield / OBJ_CONF.PLAYER.SHIELD_MAX;
+       let shipShieldColor = shipShieldRatio < 0.3 ? "#f00" : "#0f0";
+       document.getElementById('statusShipShield').style.color = shipShieldColor;
+       document.getElementById('statusShipShield').textContent = Math.floor(shipShieldRatio * 100);
+       document.getElementById('gaugeShipShield').style.width = (shipShieldRatio * 100) + '%';
+       document.getElementById('gaugeShipShield').style.background = shipShieldColor;
 
-       color = "#0f0";
-       if ( baseShield < OBJ_CONF.BASE.SHIELD_MAX * .3 ) {
-         color = "#f00";
-       }
-       document.getElementById('statusBaseShield').style.color = color;
-       document.getElementById('statusBaseShield').textContent = 
-         Math.floor((baseShield / OBJ_CONF.BASE.SHIELD_MAX) * 100);
+       // Base Shield
+       let baseShieldRatio = baseShield / OBJ_CONF.BASE.SHIELD_MAX;
+       let baseShieldColor = baseShieldRatio < 0.3 ? "#f00" : "#0f0";
+       document.getElementById('statusBaseShield').style.color = baseShieldColor;
+       document.getElementById('statusBaseShield').textContent = Math.floor(baseShieldRatio * 100);
+       document.getElementById('gaugeBaseShield').style.width = (baseShieldRatio * 100) + '%';
+       document.getElementById('gaugeBaseShield').style.background = baseShieldColor;
      }
 
      function setLog(msg) {
