@@ -258,10 +258,10 @@
          SHIELD_MAX: 1000,
          DOCK_RESTORE_ENERGY: 1500,
          MAX_MOVE_DIST: 120 * SYSTEM.SCALE,
-         MOVE_COST_RATE: 0.2 / SYSTEM.SCALE
+         MOVE_COST_RATE: 0.3 / SYSTEM.SCALE
        },
        BASE: {
-         SHIELD_MAX: 10000,
+         SHIELD_MAX: 5000,
          DOCKING_RANGE: 35 * SYSTEM.SCALE
        },
        ENEMY: {
@@ -827,7 +827,7 @@
            gameOverMessage("OUT OF ENERGY ..");
          }
        }
-     } 
+     } // handlePointerDown(pointer)
 
      function clampDestToAvoidCharacters(x1, y1, destX, destY, self, isEnemy = false) {
        const R = OBJ_CONF.COLLISION.HIT_RADIUS * 2; 
@@ -867,7 +867,7 @@
          return { x: x1 + dx * stopT, y: y1 + dy * stopT };
        }
        return { x: destX, y: destY };
-     }
+     } // clampDestToAvoidCharacters(x1, y1, destX, destY, self, isEnemy = false)
 
      function isMoveForbidden(x1, y1, x2, y2, isEnemy = false) {
        let hitStar = stars.some(
@@ -888,7 +888,57 @@
          return true;
        }
        return false;
-     } 
+     } // isMoveForbidden(x1, y1, x2, y2, isEnemy = false)
+
+     /**
+      * 進行方向がブロックされている場合、少しずつ角度をずらして
+      * 「とにかく一番遠くまで進めるルート」を確実に見つけ出す関数
+      */
+     function resolveMovement(x, y, desiredX, desiredY, self, speed) {
+       let dx = desiredX - x;
+       let dy = desiredY - y;
+       let angle = Math.atan2(dy, dx);
+       
+       // 0度(直進)から始まり、左右に15度ずつ、最大180度(真後ろ)まで走査
+       let anglesToTest = [0];
+       for (let i = 15; i <= 180; i += 15) {
+         anglesToTest.push((i * Math.PI) / 180);
+         anglesToTest.push((-i * Math.PI) / 180);
+       }
+       
+       let bestDest = { x: x, y: y };
+       let maxDistSq = -1;
+       
+       for (let offset of anglesToTest) {
+         let testAngle = angle + offset;
+         let testDestX = x + Math.cos(testAngle) * speed;
+         let testDestY = y + Math.sin(testAngle) * speed;
+         
+         // 1. 星などの固定障害物を貫通しないかチェック
+         if (isMoveForbidden(x, y, testDestX, testDestY, true)) {
+           continue; 
+         }
+         
+         // 2. 他のキャラクターとの衝突を計算し、ぶつかる直前の座標を取得
+         let clamped = clampDestToAvoidCharacters(x, y, testDestX, testDestY, self, true);
+         
+         // 実際に進める距離の2乗
+         let distSq = (clamped.x - x)**2 + (clamped.y - y)**2;
+         
+         // スピードの80%以上進めるなら、そのルートを即採用 (十分な空きがある)
+         if (distSq >= (speed * 0.8)**2) {
+           return clamped;
+         }
+         
+         // 最もマシ（一番遠くまで逃げられる）ルートを記録しておく
+         if (distSq > maxDistSq) {
+           maxDistSq = distSq;
+           bestDest = clamped;
+         }
+       }
+       
+       return bestDest;
+     } //  resolveMovement(x, y, desiredX, desiredY, self, speed)
 
      function dockShip(scene) {
        isDocked = true;
@@ -974,6 +1024,9 @@
        updateStatus();
      }
 
+     /**
+      *
+      */
      function calculateSteeringDest(e, target, isFleeing = false) {
        let dirX = 0, dirY = 0;
 
@@ -1008,7 +1061,7 @@
            dirX = targetDx / targetDist;
            dirY = targetDy / targetDist;
          }
-       }
+       } // if else
 
        // 2. 障害物(星)からの反発力 + 回り込み力
        let avoidX = 0, avoidY = 0;
@@ -1039,21 +1092,30 @@
            sepY += (dy / dist) * force * 2.0;
          }
        });
-
+      
        // 4. ベクトルを合成
        let finalX = dirX * 1.0 + avoidX + sepX;
        let finalY = dirY * 1.0 + avoidY + sepY;
 
        let finalDist = Math.sqrt(finalX * finalX + finalY * finalY);
-       if (finalDist > 0.001) {
-         finalX = (finalX / finalDist) * OBJ_CONF.ENEMY.SPEED;
-         finalY = (finalY / finalDist) * OBJ_CONF.ENEMY.SPEED;
+       
+       // ★追加: もし全方向からの力が完璧に釣り合ってゼロになってしまった場合（完全なスタック）
+       // ランダムな方向に微小な力を与えて均衡を崩し、その場にとどまるのを防ぐ
+       if (finalDist < 0.001) {
+         let randomAngle = Math.random() * Math.PI * 2;
+         finalX = Math.cos(randomAngle);
+         finalY = Math.sin(randomAngle);
+         finalDist = 1.0;
        }
 
-       let destX = e.x + finalX;
-       let destY = e.y + finalY;
+       finalX = (finalX / finalDist) * OBJ_CONF.ENEMY.SPEED;
+       finalY = (finalY / finalDist) * OBJ_CONF.ENEMY.SPEED;
 
-       return clampDestToAvoidCharacters(e.x, e.y, destX, destY, e, true);
+       let desiredX = e.x + finalX;
+       let desiredY = e.y + finalY;
+
+       // ★変更: 単純なクランプではなく、ルート走査による回避解決を適用
+       return resolveMovement(e.x, e.y, desiredX, desiredY, e, OBJ_CONF.ENEMY.SPEED);
      }
 
      function fireBeam(scene, srcX, srcY, dstX, dstY, color) {
