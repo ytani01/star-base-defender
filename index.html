@@ -5,8 +5,12 @@
     <title>Starbase Defender</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-     body { margin:0; background:#000; padding:0; overflow:hidden; font-family: Arial, sans-serif; }
-     #gameContainer { display: flex; flex-direction: column; height: 100vh; }
+     body {
+       margin:0; background:#000; padding:0; overflow:hidden; font-family: Arial, sans-serif;
+     }
+     #gameContainer {
+       display: flex; flex-direction: column; height: 100vh;
+     }
      
      #statusPanel {
        background:#111;
@@ -521,25 +525,23 @@
      function preload(){
        const g = this.make.graphics({add:false});
 
+       // Ship
        g.lineStyle(3, 0xff0000, 0.3);
        g.strokeCircle(25, 30, OBJ_CONF.COLLISION.HIT_RADIUS*2);
-
        g.fillStyle(0x5588ee);
        g.fillRect(22,25,6,20);
-       
        g.fillStyle(0x4488ff);
        g.fillRect(10,30,8,20);
        g.fillRect(32,30,8,20);
-       
        g.fillStyle(0xaabbff);
        g.fillEllipse(25,15,35,30);
        g.generateTexture('shipImg',50,60);
        
        g.clear();
 
+       // Enemy
        g.lineStyle(3, 0xff0000, 0.5);
        g.strokeCircle(25, 25, OBJ_CONF.COLLISION.HIT_RADIUS*2);
-
        g.fillStyle(0x228822);
        g.beginPath();
        g.moveTo(25,50);
@@ -549,14 +551,13 @@
        g.lineTo(0,15);
        g.lineTo(0,35);
        g.fillPath();
-
        g.fillRect(21,5,8,35)
        g.fillEllipse(25,10,20,18);
-
        g.generateTexture('enemyImg',50,50);
 
        g.clear();
 
+       // Base
        g.fillStyle(0x99ffff);
        g.fillEllipse(30,30,30,55);
        g.lineStyle(6,0x99ffff,1);
@@ -565,7 +566,8 @@
 
        g.clear();
 
-       g.fillStyle(0x504040);
+       // Star
+       g.fillStyle(0xa0a0a0);
        g.fillCircle(25,25,16);
        g.generateTexture('starImg',50,50);
 
@@ -579,21 +581,25 @@
        
        starBase = new BaseStation(this, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
 
+       // Stars
        stars = [];
        for(let i=0; i < SYSTEM.STAR_QTY; i++) {
          let p = getSafeRandPos(0.2, 0.8);
          stars.push(new Star(this, p.x, p.y));
        }
 
+       // Enemies
        enemies = [];
        for(let i=0; i<SYSTEM.ENEMY_QTY; i++){
          let p = getSafeRandPos(0.6, 0.9);
          enemies.push(new Enemy(this, p.x, p.y));
        }
 
+       // Player Ship
        let pp = getSafeRandPos(0.1, 0.3);
        ship = new PlayerShip(this, pp.x, pp.y);
 
+       // Camera
        this.cameras.main.setBounds(0, 0, SYSTEM.PLAY_AREA_WIDTH, SYSTEM.PLAY_AREA_HEIGHT);
        this.cameras.main.startFollow(ship.sprite, true, 0.08, 0.08);
 
@@ -1295,14 +1301,16 @@
 
      function nextStage(scene) {
        const clearedStage = curStage;
-       let bonus = curStage;
+       let bonus = curStage * 100;
        if ( Score > 0 ) {
-         bonus = Score;
+         bonus += Score;
        }
        console.log(`nextStage> bonus=${bonus}`);
        Score += bonus;
 
-       const { list, newIdx } = saveHighScore(Score, turnCount, clearedStage, `STAGE ${clearedStage} CLEARED`, true);
+       const { list, newIdx } = saveHighScore(
+         Score, turnCount, clearedStage, `STAGE ${clearedStage} CLEARED`, true
+       );
 
        curStage++;
        SYSTEM.ENEMY_QTY++;
@@ -1340,12 +1348,10 @@
          String(now.getDate()).padStart(2, '0')
        ].join('/');
        if ( flagClear || forceSave ) {
-         list.push(
-           {
-             score, turns, stage, result,
-             gameid: SYSTEM.GAMEID, date: dateStr, _new: true
-           }
-         );
+         list.push({
+           score, turns, stage, result,
+           gameid: SYSTEM.GAMEID, date: dateStr, _new: true
+         });
        }
        list.sort((a, b) => b.score - a.score);
        const newIdx = list.findIndex(s => s._new);
