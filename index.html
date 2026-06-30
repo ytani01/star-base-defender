@@ -17,11 +17,9 @@
        overflow-y:auto;
        font-size: clamp(22px, 5vw, 30px); 
        font-family: monospace;
-       line-height: 1.5;
+       line-height: 1.1;
      }
-     #statusPanel div { margin: -3px 5px; }
-     /* ステータスゲージ用のスタイルを追加 */
-     /* #statusPanel を先頭に付けてCSSの優先度を上げ、マージンを上書きする */
+     #statusPanel div { margin: 1px 5px; }
      #statusPanel .status-gauge {
        display: inline-block;
        width: 60px;
@@ -52,13 +50,13 @@
        z-index: 1000;
      }
      #zoomUI button {
-       width: 100px;
-       height: 100px;
+       width: 90px;
+       height: 90px;
        font-size: 48px;
        background: rgba(0, 136, 255, 0.5);
        color: #fff;
        border: 2px solid #0ff;
-       border-radius: 50px;
+       border-radius: 30px;
        cursor: pointer;
        user-select: none;
      }
@@ -190,12 +188,13 @@
           <button id="viewScoresBtn">▶ SCORES</button>
         </div>
         <div id="statusShip">
-          Shield <span id="statusShipShield">0</span>%
+          Shipt Shield <span id="statusShipShield">0</span>%
           <div class="status-gauge"><div id="gaugeShipShield" class="status-gauge-fill"></div></div>
           |
           Energy <span id="statusShipEnergy">0</span>
           <div class="status-gauge"><div id="gaugeShipEnergy" class="status-gauge-fill"></div></div>
-          |
+        </div>
+        <div id="StatusBase">
           Base Shield <span id="statusBaseShield">0</span>%
           <div class="status-gauge"><div id="gaugeBaseShield" class="status-gauge-fill"></div></div>
         </div>
@@ -220,6 +219,7 @@
           <table id="hsTable">
             <thead>
               <tr>
+                <th></th>
                 <th>RANK</th>
                 <th>SCORE</th>
                 <th>STAGE</th>
@@ -244,14 +244,14 @@
      // ---------------------------------------------------------
      const SYSTEM = {
        SCORE: {
-         INIT: 300,
+         INIT: 100,
          DESTROY_PENALTY: 50,
        },
+       NEW_ENEMY_INTERVAL: 40,
        STAR_QTY: 15,
        ENEMY_QTY: 3,
-       NEW_ENEMY_INTERVAL: 40,
        SCALE: 0.4,
-       BOUNDS_RADIUS: 300,
+       R_AREA: 300,
        GUAGE: {
          W: 30,
          H: 4
@@ -262,7 +262,7 @@
        }
      };
      SYSTEM.GAMEID = Phaser.Utils.String.UUID();
-     SYSTEM.PLAY_AREA_WIDTH = SYSTEM.BOUNDS_RADIUS * 2 + 20;
+     SYSTEM.PLAY_AREA_WIDTH = SYSTEM.R_AREA * 2 + 20;
      SYSTEM.PLAY_AREA_HEIGHT = SYSTEM.PLAY_AREA_WIDTH;
      SYSTEM.CENTER_X = SYSTEM.PLAY_AREA_WIDTH / 2;
      SYSTEM.CENTER_Y = SYSTEM.PLAY_AREA_HEIGHT / 2;
@@ -326,7 +326,7 @@
      let ship, starBase, rangeGraphics, boundaryGraphics;
      let enemies = stars = [];
      let turnCount = 1;
-     let currentStage = 1;
+     let curStage = 1;
      let Score = SYSTEM.SCORE.INIT;
      let isPlayerTurn = true;
      let gameOver = false;
@@ -631,7 +631,7 @@
      function drawBoundary(){
        boundaryGraphics.clear();
        boundaryGraphics.lineStyle(2, 0x0088ff, 1);
-       boundaryGraphics.strokeCircle(SYSTEM.CENTER_X, SYSTEM.CENTER_Y, SYSTEM.BOUNDS_RADIUS);
+       boundaryGraphics.strokeCircle(SYSTEM.CENTER_X, SYSTEM.CENTER_Y, SYSTEM.R_AREA);
      }
 
      function update(){
@@ -672,17 +672,17 @@
        
        while(!safe && attempts < 100) {
          x = Phaser.Math.Between(
-           SYSTEM.CENTER_X - SYSTEM.BOUNDS_RADIUS, SYSTEM.CENTER_X + SYSTEM.BOUNDS_RADIUS
+           SYSTEM.CENTER_X - SYSTEM.R_AREA, SYSTEM.CENTER_X + SYSTEM.R_AREA
          );
          y = Phaser.Math.Between(
-           SYSTEM.CENTER_Y - SYSTEM.BOUNDS_RADIUS, SYSTEM.CENTER_Y + SYSTEM.BOUNDS_RADIUS
+           SYSTEM.CENTER_Y - SYSTEM.R_AREA, SYSTEM.CENTER_Y + SYSTEM.R_AREA
          );
          distToCenter = Phaser.Math.Distance.Between(x, y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
          
-         if ( distToCenter < SYSTEM.BOUNDS_RADIUS * minDist ) {
+         if ( distToCenter < SYSTEM.R_AREA * minDist ) {
            continue;
          }
-         if ( distToCenter > SYSTEM.BOUNDS_RADIUS * maxDist ) {
+         if ( distToCenter > SYSTEM.R_AREA * maxDist ) {
            continue;
          }
          
@@ -748,6 +748,9 @@
        );
      }
 
+     /**
+      *
+      */
      function handlePointerDown(pointer){
        if(gameOver || !isPlayerTurn) {
          return;
@@ -772,6 +775,8 @@
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            return;
          }
+         // ! isDocked
+         
          if (
            Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y)
            <= OBJ_CONF.BASE.DOCKING_RANGE
@@ -957,7 +962,6 @@
            bestDest = clamped;
          }
        }
-       
        return bestDest;
      } //  resolveMovement(x, y, desiredX, desiredY, self, speed)
 
@@ -973,7 +977,7 @@
        });
        setLog("⚓ DOCKED — ENERGY FULL");
        updateStatus();
-     }
+     } // dockShip()
 
      function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
        let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, targetX, targetY);
@@ -1043,7 +1047,7 @@
          }
        });
        updateStatus();
-     }
+     } // attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
 
      /**
       *
@@ -1137,14 +1141,14 @@
 
        // ★変更: 単純なクランプではなく、ルート走査による回避解決を適用
        return resolveMovement(e.x, e.y, desiredX, desiredY, e, OBJ_CONF.ENEMY.SPEED);
-     }
+     } // calculateSteeringDest(e, target, isFleeing = false)
 
      function fireBeam(scene, srcX, srcY, dstX, dstY, color) {
        const beam = scene.add.graphics();
        beam.lineStyle(4, color, 1);
        beam.lineBetween(srcX, srcY, dstX, dstY);
        scene.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
-     }
+     } // fireBeam()
 
      function enemyTurn(scene) {
        if (gameOver) return;
@@ -1205,26 +1209,20 @@
 
              let dest = calculateSteeringDest(e, target, isFleeing);
 
-             scene.tweens.add(
-               {
-                 targets: e,
-                 x: dest.x, y: dest.y,
-                 duration: SYSTEM.TIMING.TURN_DELAY,
-                 onComplete: () => scene.time.delayedCall(
-                   SYSTEM.TIMING.TURN_DELAY, () => {
-                     if (e.shield < OBJ_CONF.ENEMY.SHIELD_MAX * 0.5) {
-                       const distFromCenter = Phaser.Math.Distance.Between(
-                         e.x, e.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y
-                       );
-
-                       if (distFromCenter > SYSTEM.BOUNDS_RADIUS) {
-                         e.die();
-                       }
-                     }
-                   }
-                 )
-               }
-             );
+             scene.tweens.add({
+               targets: e,
+               x: dest.x, y: dest.y,
+               duration: SYSTEM.TIMING.TURN_DELAY,
+               onComplete: () => {
+                 const distFromCenter = Phaser.Math.Distance.Between(
+                   e.x, e.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y
+                 );
+                 if (distFromCenter > SYSTEM.R_AREA) {
+                   // 領域から出ていった
+                   e.die();
+                 }
+               } // onComplete: () => {..}
+             }); // scene.tweens.add({..})
 
              e.x = Math.floor(e.x);
              e.y = Math.floor(e.y);
@@ -1237,12 +1235,12 @@
          });
        });
 
-       scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => {
+       ADDITIONAL_DELAY = 100;
+       scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY + ADDITIONAL_DELAY, () => {
          enemies = enemies.filter(e => e.active);
          if (enemies.length === 0 && !gameOver) {
            nextStage(scene);
-         }
-         else if (!gameOver) {
+         } else if (!gameOver) {
            turnCount++;
            Score--;
 
@@ -1255,7 +1253,7 @@
            isPlayerTurn = true;
          }
        });
-     }
+     } // enemyTurn()
 
      function updateStatus() {
        let shipEnergy = ship.energy > 0 ? ship.energy : 0;
@@ -1263,7 +1261,7 @@
        let baseShield = starBase.shield > 0 ? starBase.shield : 0;
 
        document.getElementById('statusTurn').textContent = `${turnCount}`;
-       document.getElementById('statusStage').textContent = `${currentStage}`;
+       document.getElementById('statusStage').textContent = `${curStage}`;
        document.getElementById('statusScore').textContent = `${Score}`;
 
        // Energy
@@ -1296,13 +1294,17 @@
      }
 
      function nextStage(scene) {
-       const clearedStage = currentStage;
-       const bonus = currentStage * 100 * 2;
+       const clearedStage = curStage;
+       let bonus = curStage;
+       if ( Score > 0 ) {
+         bonus = Score;
+       }
+       console.log(`nextStage> bonus=${bonus}`);
        Score += bonus;
 
        const { list, newIdx } = saveHighScore(Score, turnCount, clearedStage, `STAGE ${clearedStage} CLEARED`, true);
 
-       currentStage++;
+       curStage++;
        SYSTEM.ENEMY_QTY++;
        isPlayerTurn = false;
 
@@ -1310,7 +1312,7 @@
 
        setLog(`STAGE ${clearedStage} CLEARED!`);
        showHighScoreOverlay('stageclear', { clearedStage, bonus, list, newIdx });
-     }
+     } // nextStage()
 
      function gameOverMessage(msg, clear=false) {
        gameOver = true;
@@ -1368,13 +1370,16 @@
        const rankLabels = ['1ST', '2ND', '3RD', '4TH', '5TH'];
        list.forEach((s, i) => {
          const tr = document.createElement('tr');
-         const isNew = (s.gameid == SYSTEM.GAMEID);
-         if (isNew) tr.className = 'hs-new';
+         const thisGame = (s.gameid == SYSTEM.GAMEID);
+         if ( thisGame ) {
+           tr.className = 'hs-new';
+         }
          const rank   = rankLabels[i] || `${i + 1}TH`;
-         const prefix = isNew ? '★' : '';
+         const prefix = thisGame ? '★' : '';
          const displayStage = s.stage !== undefined ? s.stage : '-';
          tr.innerHTML = `
-           <td>${prefix}${rank}</td>
+           <td>${prefix}</td>
+           <td>${rank}</td>
            <td>${s.score}</td>
            <td>${displayStage}</td>
            <td>${s.turns}</td>
@@ -1382,7 +1387,7 @@
          `;
          tbody.appendChild(tr);
        });
-     }
+     } // renderHSTable()
 
      function showHighScoreOverlay(mode, data = {}) {
        const overlay    = document.getElementById('highScoreOverlay');
@@ -1405,7 +1410,7 @@
          const { msg } = data;
          resultEl.style.color      = '#ff0';
          resultEl.textContent      = msg;
-         finalEl.textContent       = `MISSION FAILED: SCORE: ${Score}   STAGE: ${currentStage}   TURNS: ${turnCount}`;
+         finalEl.textContent       = `MISSION FAILED: SCORE: ${Score}  STAGE: ${curStage}  TURNS: ${turnCount}`;
          renderHSTable(loadHighScores(), -1);
          closeBtn.style.display    = 'none';
          restartBtn.textContent    = '▶ RESTART';
@@ -1414,7 +1419,7 @@
        } else {
          resultEl.style.color      = '#0ff';
          resultEl.textContent      = '▶ HIGH SCORES ◀';
-         finalEl.textContent       = `NOW — SCORE: ${Score}   STAGE: ${currentStage}   TURN: ${turnCount}`;
+         finalEl.textContent       = `NOW — SCORE: ${Score}   STAGE: ${curStage}   TURN: ${turnCount}`;
          renderHSTable(loadHighScores(), -1);
          closeBtn.style.display    = 'inline-block';
          restartBtn.textContent    = '▶ RESTART';
