@@ -240,7 +240,6 @@
        }
      };
      SYSTEM.GAMEID = Phaser.Utils.String.UUID();
-     console.log(`GAMEID=${SYSTEM.GAMEID}`);
      SYSTEM.PLAY_AREA_WIDTH = SYSTEM.BOUNDS_RADIUS * 2 + 20;
      SYSTEM.PLAY_AREA_HEIGHT = SYSTEM.PLAY_AREA_WIDTH;
      SYSTEM.CENTER_X = SYSTEM.PLAY_AREA_WIDTH / 2;
@@ -262,7 +261,7 @@
          MOVE_COST_RATE: 0.2 / SYSTEM.SCALE
        },
        BASE: {
-         SHIELD_MAX: 1000,
+         SHIELD_MAX: 10000,
          DOCKING_RANGE: 35 * SYSTEM.SCALE
        },
        ENEMY: {
@@ -291,10 +290,10 @@
        }
      };
      MECHANICS.WEAPON.MAX_RANGE = Math.floor(
-      -Math.log(MECHANICS.WEAPON.MAX_THRESHOLD) / MECHANICS.WEAPON.ALPHA
+        -Math.log(MECHANICS.WEAPON.MAX_THRESHOLD) / MECHANICS.WEAPON.ALPHA
      );
      MECHANICS.WEAPON.EFFECTIVE_RANGE = Math.floor(
-      -Math.log(MECHANICS.WEAPON.EFFECTIVE_THRESHOLD) / MECHANICS.WEAPON.ALPHA
+        -Math.log(MECHANICS.WEAPON.EFFECTIVE_THRESHOLD) / MECHANICS.WEAPON.ALPHA
      );
 
      const HIGHSCORE = {
@@ -310,8 +309,8 @@
      let isPlayerTurn = true;
      let gameOver = false;
      let flagClear = false;
-     let _pendingScene = null; // ステージクリア後に次ステージへ進むためのシーン参照
-     let isDocked = false;     // ドッキング状態フラグ
+     let _pendingScene = null;
+     let isDocked = false;     
 
      // ---------------------------------------------------------
      // クラス定義
@@ -623,12 +622,11 @@
        }
        rangeGraphics.strokeCircle(starBase.x, starBase.y, OBJ_CONF.BASE.DOCKING_RANGE);
 
-       // 自機＆敵機全て
        [ship, ...enemies].forEach(
          (obj, i)=>{
            if(!obj.active) return;
            let color = (i===0) ? 0x4488ff : 0xff3333;
-           if ( i == 0 ) {  // 自機の場合
+           if ( i == 0 ) {  
              rangeGraphics.lineStyle(0.8, color, 0.3);
              rangeGraphics.strokeCircle(obj.x, obj.y, MECHANICS.WEAPON.MAX_RANGE);
            }
@@ -661,11 +659,9 @@
          distToCenter = Phaser.Math.Distance.Between(x, y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
          
          if ( distToCenter < SYSTEM.BOUNDS_RADIUS * minDist ) {
-           console.log(`distToCenter=${distToCenter} < ${SYSTEM.BOUNDS_RADIUS * minDist}`)
            continue;
          }
          if ( distToCenter > SYSTEM.BOUNDS_RADIUS * maxDist ) {
-           console.log(`distToCenter=${distToCenter} > ${SYSTEM.BOUNDS_RADIUS * maxDist}`)
            continue;
          }
          
@@ -693,10 +689,9 @@
            }
          }
          attempts++;
-         console.log(`attempts=${attempts}: x,y=${x},${y}`);
-       } // while ()
+       }
        return { x, y };
-     } // getSafeRandPos()
+     }
 
      function lineHitsCircle(ax,ay,bx,by,cx,cy,r) {
        const dx = bx - ax, dy = by - ay;
@@ -760,7 +755,6 @@
            Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y)
            <= OBJ_CONF.BASE.DOCKING_RANGE
          ) {
-           // ドッキングエリア内 → 即座にドッキング
            dockShip(this);
            isPlayerTurn = false;
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
@@ -773,7 +767,6 @@
        }
 
        if (target && target.active) {
-         // 攻撃
          if ( isDocked ) {
            setLog("DOCK: All weapons are deactivated");
            return;
@@ -808,7 +801,6 @@
            return;
          }
          
-         // 攻撃命中
          ship.energy -= MECHANICS.WEAPON.PHASER_COST;
          isPlayerTurn = false;
          target.takeDamage(
@@ -818,13 +810,10 @@
          fireBeam(this, ship.x, ship.y, target.x, target.y, 0x00ffff);
 
          if (!target.active) {
-           // 撃墜確定: 敵リストから除外
            enemies = enemies.filter(e => e !== target);
-           // ===== 追加: 怒りに燃えた増援が1機即時出現 =====
            const rp = getSafeRandPos(0.8, 0.95);
            enemies.push(new Enemy(this, rp.x, rp.y));
            setLog("⚠ ENEMY SHOT DOWN — REINFORCEMENT INCOMING!");
-           // ===============================================
          }
          this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
          updateStatus();
@@ -834,64 +823,51 @@
        if (!target) {
          attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
          if ( ship.energy <= 5 && ! isDocked ) {
-           // Game Over
            updateStatus();
            gameOverMessage("OUT OF ENERGY ..");
          }
        }
-     } // handlePointerDown()
+     } 
 
-      /**
-       * 移動時に他のキャラクターと重ならないよう、
-       * 移動先を「接触直前」の位置に丸める。
-       * self: 移動するオブジェクト自身（比較から除外）
-       * isEnemy: true の場合、敵同士も回避対象に含める
-       */
-      function clampDestToAvoidCharacters(x1, y1, destX, destY, self, isEnemy = false) {
-        const R = OBJ_CONF.COLLISION.HIT_RADIUS * 2; // 2キャラが接触しない最小距離
+     function clampDestToAvoidCharacters(x1, y1, destX, destY, self, isEnemy = false) {
+       const R = OBJ_CONF.COLLISION.HIT_RADIUS * 2; 
 
-        // 衝突チェック対象を収集
-        const targets = [];
-        if (ship && ship !== self && ship.active) targets.push(ship);
-        // 基地は敵の移動時のみ障害物扱い（プレイヤーはドッキングのため近づける）
-        if (isEnemy && starBase && starBase !== self && starBase.active && starBase.shield > 0) {
-          targets.push(starBase);
-        }
-        // 敵は常に回避対象（自機からも、敵同士も）
-        enemies.forEach(e => { if (e && e !== self && e.active) targets.push(e); });
+       const targets = [];
+       if (ship && ship !== self && ship.active) targets.push(ship);
+       if (isEnemy && starBase && starBase !== self && starBase.active && starBase.shield > 0) {
+         targets.push(starBase);
+       }
+       enemies.forEach(e => { if (e && e !== self && e.active) targets.push(e); });
 
-        const dx = destX - x1;
-        const dy = destY - y1;
-        const lenSq = dx * dx + dy * dy;
-        if (lenSq < 0.0001) return { x: destX, y: destY };
+       const dx = destX - x1;
+       const dy = destY - y1;
+       const lenSq = dx * dx + dy * dy;
+       if (lenSq < 0.0001) return { x: destX, y: destY };
 
-        let minT = 1.0; // t=0: 出発点, t=1: 目的地
+       let minT = 1.0; 
 
-        for (const tgt of targets) {
-          // 既に重なっている場合はスキップ（抜け出せなくなるのを防ぐ）
-          const curDist = Phaser.Math.Distance.Between(x1, y1, tgt.x, tgt.y);
-          if (curDist < R) continue;
+       for (const tgt of targets) {
+         const curDist = Phaser.Math.Distance.Between(x1, y1, tgt.x, tgt.y);
+         if (curDist < R) continue;
 
-          // 移動ベクトルと tgt の円(半径 R)の交差 t を求める
-          const fx = x1 - tgt.x;
-          const fy = y1 - tgt.y;
-          const a = lenSq;
-          const b = 2 * (fx * dx + fy * dy);
-          const c = fx * fx + fy * fy - R * R;
-          const disc = b * b - 4 * a * c;
-          if (disc < 0) continue; // 交差しない
-          const t = (-b - Math.sqrt(disc)) / (2 * a);
-          if (t > 0 && t < minT) minT = t;
-        }
+         const fx = x1 - tgt.x;
+         const fy = y1 - tgt.y;
+         const a = lenSq;
+         const b = 2 * (fx * dx + fy * dy);
+         const c = fx * fx + fy * fy - R * R;
+         const disc = b * b - 4 * a * c;
+         if (disc < 0) continue; 
+         const t = (-b - Math.sqrt(disc)) / (2 * a);
+         if (t > 0 && t < minT) minT = t;
+       }
 
-        if (minT < 1.0) {
-          // 接触点の少し手前（1px 分）で停止
-          const len = Math.sqrt(lenSq);
-          const stopT = Math.max(0, minT - 1.0 / len);
-          return { x: x1 + dx * stopT, y: y1 + dy * stopT };
-        }
-        return { x: destX, y: destY };
-      }
+       if (minT < 1.0) {
+         const len = Math.sqrt(lenSq);
+         const stopT = Math.max(0, minT - 1.0 / len);
+         return { x: x1 + dx * stopT, y: y1 + dy * stopT };
+       }
+       return { x: destX, y: destY };
+     }
 
      function isMoveForbidden(x1, y1, x2, y2, isEnemy = false) {
        let hitStar = stars.some(
@@ -911,151 +887,173 @@
        if (hitStar) {
          return true;
        }
-
-       /* if (isEnemy && starBase.shield > 0 && starBase?.active) {
-        *   if (
-        *     Phaser.Math.Distance.Between(
-        *       x2, y2, starBase.x, starBase.y
-        *     ) <= OBJ_CONF.COLLISION.HIT_RADIUS
-        *   ) {
-        *     return true;
-        *   }
-        *   if (
-        *     lineHitsCircle(
-        *       x1, y1, x2, y2, starBase.x, starBase.y,
-        *       OBJ_CONF.COLLISION.HIT_RADIUS
-        *     )
-        *   ) {
-        *     return true;
-        *   }
-        * } // if */
        return false;
-     } // isMoveForbidden()
+     } 
 
-      /**
-       * 自機を基地にドッキングさせる
-       * - isDocked = true
-       * - エネルギー満タン
-       * - シールド OFF（敵攻撃は基地が全受け）
-       * - 自機が基地中央へスライド移動
-       */
-      function dockShip(scene) {
-        isDocked = true;
-        ship.energy = OBJ_CONF.PLAYER.ENERGY_MAX;
-        ship.shield = 0; // シールドOFF: 敵攻撃は基地へリダイレクト
-        scene.tweens.add({
-          targets: ship,
-          x: starBase.x, y: starBase.y,
-          duration: 200,
-          ease: 'Sine.easeInOut'
-        });
-        setLog("⚓ DOCKED — ENERGY FULL");
-        updateStatus();
-      }
+     function dockShip(scene) {
+       isDocked = true;
+       ship.energy = OBJ_CONF.PLAYER.ENERGY_MAX;
+       ship.shield = 0; 
+       scene.tweens.add({
+         targets: ship,
+         x: starBase.x, y: starBase.y,
+         duration: 200,
+         ease: 'Sine.easeInOut'
+       });
+       setLog("⚓ DOCKED — ENERGY FULL");
+       updateStatus();
+     }
 
-      function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
-        let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, targetX, targetY);
-        if (rawDist < 1) return;
+     function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
+       let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, targetX, targetY);
+       if (rawDist < 1) return;
 
-        let moveDist = Math.min(rawDist, OBJ_CONF.PLAYER.MAX_MOVE_DIST);
-        let ratio = moveDist / rawDist;
-        let destX = ship.x + (targetX - ship.x) * ratio;
-        let destY = ship.y + (targetY - ship.y) * ratio;
+       let moveDist = Math.min(rawDist, OBJ_CONF.PLAYER.MAX_MOVE_DIST);
+       let ratio = moveDist / rawDist;
+       let destX = ship.x + (targetX - ship.x) * ratio;
+       let destY = ship.y + (targetY - ship.y) * ratio;
 
-        target_is_base = false;
-        dist_target_base = Phaser.Math.Distance.Between(
-          targetX, targetY, starBase.x, starBase.y
-        );
-        if ( dist_target_base <= OBJ_CONF.BASE.DOCKING_RANGE ) {
-          target_is_base = true;
-        }
-
-        // 他のキャラクターと重ならないよう移動先を制限
-        const clamped = clampDestToAvoidCharacters(ship.x, ship.y, destX, destY, ship, false);
-        destX = clamped.x;
-        destY = clamped.y;
-        distance = Phaser.Math.Distance.Between(ship.x, ship.y, destX, destY);
-
-        if (isMoveForbidden(ship.x, ship.y, destX, destY) || distance < 5) {
-          setLog("BLOCKED 2");
-          return;
-        }
-        setLog("-");
-
-        // ドッキング中に移動 → アンドック（シールド100%回復）
-        // この移動では再ドッキングしない
-        let skipAutoDock = false;
-        if (isDocked) {
-          isDocked = false;
-          skipAutoDock = true;
-          ship.shield = OBJ_CONF.PLAYER.SHIELD_MAX;
-          setLog("UNDOCKED");
-          updateStatus();
-        }
-
-        const actualDist = Phaser.Math.Distance.Between(ship.x, ship.y, destX, destY);
-        let cost = Math.max(1, Math.ceil(actualDist * OBJ_CONF.PLAYER.MOVE_COST_RATE));
-        if (ship.energy < cost) {
-          setLog("NOT ENOUGH ENERGY");
-          return;
-        }
-
-        ship.energy -= cost;
-        isPlayerTurn = false;
-        scene.tweens.add({
-          targets: ship,
-          x: destX, y: destY,
-          duration: SYSTEM.TIMING.TURN_DELAY,
-          onComplete: () => {
-            // アンドック直後の移動では再ドッキングしない
-            if (!skipAutoDock) {
-              const dockDist = Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y);
-              if (
-                !isDocked && dockDist <= OBJ_CONF.BASE.DOCKING_RANGE
-                && starBase.active && starBase.shield > 0
-                && target_is_base
-              ) {
-                dockShip(scene);
-                // ドッキングアニメ(200ms)が終わってから敵ターン
-                scene.time.delayedCall(220, () =>
-                  scene.time.delayedCall(delayBeforeEnemyTurn, () => enemyTurn(scene)));
-                return;
-              }
-            }
-            scene.time.delayedCall(delayBeforeEnemyTurn, () => enemyTurn(scene));
-          }
-        });
-        updateStatus();
-      }
-
-     function calculateEnemyAvoidanceDest(e, angle) {
-       // 障害物を避けた候補先を clamp して他キャラとの重なりを防ぐ
-       const tryDest = (ax, ay) => clampDestToAvoidCharacters(e.x, e.y, ax, ay, e, true);
-
-       let destX = e.x + Math.cos(angle) * OBJ_CONF.ENEMY.SPEED;
-       let destY = e.y + Math.sin(angle) * OBJ_CONF.ENEMY.SPEED;
-
-       if (!isMoveForbidden(e.x, e.y, destX, destY, true)) {
-         return tryDest(destX, destY);
+       let target_is_base = false;
+       let dist_target_base = Phaser.Math.Distance.Between(
+         targetX, targetY, starBase.x, starBase.y
+       );
+       if ( dist_target_base <= OBJ_CONF.BASE.DOCKING_RANGE ) {
+         target_is_base = true;
        }
 
-       for (let offset = 1; offset <= 180; offset += 1) {
-         console.log(`offset=${offset}`);
-         let rad = Phaser.Math.DegToRad(offset);
-         
-         let tx1 = e.x + Math.cos(angle + rad) * OBJ_CONF.ENEMY.SPEED;
-         let ty1 = e.y + Math.sin(angle + rad) * OBJ_CONF.ENEMY.SPEED;
-         if (!isMoveForbidden(e.x, e.y, tx1, ty1, true)) {
-           return tryDest(tx1, ty1);
+       const clamped = clampDestToAvoidCharacters(ship.x, ship.y, destX, destY, ship, false);
+       destX = clamped.x;
+       destY = clamped.y;
+       let distance = Phaser.Math.Distance.Between(ship.x, ship.y, destX, destY);
+
+       if (isMoveForbidden(ship.x, ship.y, destX, destY) || distance < 5) {
+         setLog("BLOCKED 2");
+         return;
+       }
+       setLog("-");
+
+       let skipAutoDock = false;
+       if (isDocked) {
+         isDocked = false;
+         skipAutoDock = true;
+         ship.shield = OBJ_CONF.PLAYER.SHIELD_MAX;
+         setLog("UNDOCKED");
+         updateStatus();
+       }
+
+       const actualDist = Phaser.Math.Distance.Between(ship.x, ship.y, destX, destY);
+       let cost = Math.max(1, Math.ceil(actualDist * OBJ_CONF.PLAYER.MOVE_COST_RATE));
+       if (ship.energy < cost) {
+         setLog("NOT ENOUGH ENERGY");
+         return;
+       }
+
+       ship.energy -= cost;
+       isPlayerTurn = false;
+       scene.tweens.add({
+         targets: ship,
+         x: destX, y: destY,
+         duration: SYSTEM.TIMING.TURN_DELAY,
+         onComplete: () => {
+           if (!skipAutoDock) {
+             const dockDist = Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y);
+             if (
+               !isDocked && dockDist <= OBJ_CONF.BASE.DOCKING_RANGE
+               && starBase.active && starBase.shield > 0
+               && target_is_base
+             ) {
+               dockShip(scene);
+               scene.time.delayedCall(220, () =>
+                 scene.time.delayedCall(delayBeforeEnemyTurn, () => enemyTurn(scene)));
+               return;
+             }
+           }
+           scene.time.delayedCall(delayBeforeEnemyTurn, () => enemyTurn(scene));
          }
-         
-         let tx2 = e.x + Math.cos(angle - rad) * OBJ_CONF.ENEMY.SPEED;
-         let ty2 = e.y + Math.sin(angle - rad) * OBJ_CONF.ENEMY.SPEED;
-         if (!isMoveForbidden(e.x, e.y, tx2, ty2, true)) {
-           return tryDest(tx2, ty2);
+       });
+       updateStatus();
+     }
+
+     function calculateSteeringDest(e, target, isFleeing = false) {
+       let dirX = 0, dirY = 0;
+
+       // 1. ターゲットへのベクトル（引力 / 斥力）
+       if (isFleeing && Array.isArray(target)) {
+         // 複数の脅威（自機と基地）から遠ざかるベクトルを合成
+         target.forEach(t => {
+           let dx = e.x - t.x;
+           let dy = e.y - t.y;
+           let dist = Math.sqrt(dx * dx + dy * dy);
+           if (dist > 0.001) {
+             let weight = 1.0 / dist;
+             dirX += (dx / dist) * weight;
+             dirY += (dy / dist) * weight;
+           }
+         });
+         let fDist = Math.sqrt(dirX * dirX + dirY * dirY);
+         if (fDist > 0.001) {
+           dirX /= fDist;
+           dirY /= fDist;
+         }
+       } else {
+         // 通常の追従または単一ターゲットからの退却
+         let targetDx = target.x - e.x;
+         let targetDy = target.y - e.y;
+         if (isFleeing) {
+           targetDx = -targetDx;
+           targetDy = -targetDy;
+         }
+         let targetDist = Math.sqrt(targetDx * targetDx + targetDy * targetDy);
+         if (targetDist > 0.001) {
+           dirX = targetDx / targetDist;
+           dirY = targetDy / targetDist;
          }
        }
-       return { x: e.x, y: e.y };
+
+       // 2. 障害物(星)からの反発力 + 回り込み力
+       let avoidX = 0, avoidY = 0;
+       const STAR_AVOID_RADIUS = OBJ_CONF.COLLISION.OBSTACLE_RADIUS * 3.5;
+       stars.forEach(s => {
+         if (!s.active) return;
+         let dx = e.x - s.x;
+         let dy = e.y - s.y;
+         let dist = Math.sqrt(dx * dx + dy * dy);
+         if (dist > 0 && dist < STAR_AVOID_RADIUS) {
+           let force = 1.0 - (dist / STAR_AVOID_RADIUS);
+           avoidX += (dx / dist) * force * 1.5 - (dy / dist) * force * 1.0;
+           avoidY += (dy / dist) * force * 1.5 + (dx / dist) * force * 1.0;
+         }
+       });
+
+       // 3. 他の敵からの反発力（分離）
+       let sepX = 0, sepY = 0;
+       const ENEMY_AVOID_RADIUS = OBJ_CONF.COLLISION.HIT_RADIUS * 2.5;
+       enemies.forEach(other => {
+         if (!other.active || other === e) return;
+         let dx = e.x - other.x;
+         let dy = e.y - other.y;
+         let dist = Math.sqrt(dx * dx + dy * dy);
+         if (dist > 0 && dist < ENEMY_AVOID_RADIUS) {
+           let force = 1.0 - (dist / ENEMY_AVOID_RADIUS);
+           sepX += (dx / dist) * force * 2.0;
+           sepY += (dy / dist) * force * 2.0;
+         }
+       });
+
+       // 4. ベクトルを合成
+       let finalX = dirX * 1.0 + avoidX + sepX;
+       let finalY = dirY * 1.0 + avoidY + sepY;
+
+       let finalDist = Math.sqrt(finalX * finalX + finalY * finalY);
+       if (finalDist > 0.001) {
+         finalX = (finalX / finalDist) * OBJ_CONF.ENEMY.SPEED;
+         finalY = (finalY / finalDist) * OBJ_CONF.ENEMY.SPEED;
+       }
+
+       let destX = e.x + finalX;
+       let destY = e.y + finalY;
+
+       return clampDestToAvoidCharacters(e.x, e.y, destX, destY, e, true);
      }
 
      function fireBeam(scene, srcX, srcY, dstX, dstY, color) {
@@ -1075,13 +1073,11 @@
            let dToBase = Phaser.Math.Distance.Between(e.x, e.y, starBase.x, starBase.y);
            let dToShip = Phaser.Math.Distance.Between(e.x, e.y, ship.x, ship.y);
            
-           // ドッキング中は自機への攻撃なし（基地が全受け）
            let canAttackShip = (
              !isDocked &&
              dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE &&
              !isLOSBlocked(e.x, e.y, ship.x, ship.y)
            );
-           // ドッキング中は、自機に届く距離の敵も基地を攻撃できるとみなす
            let canAttackBase = (
              starBase.shield > 0 &&
              starBase.active &&
@@ -1093,9 +1089,7 @@
            );
 
            if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
-             // 基地への攻撃
              fireBeam(scene, e.x, e.y, starBase.x, starBase.y, 0xff00ff);
-
              starBase.takeDamage(
                Math.floor(OBJ_CONF.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToBase))
              );
@@ -1104,9 +1098,7 @@
                gameOverMessage("BASE DESTROYED");
              }
            } else if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5 && canAttackShip) {
-             // プレーヤーへの攻撃
              fireBeam(scene, e.x, e.y, ship.x, ship.y, 0xff00ff);
-
              ship.takeDamage(
                Math.floor(OBJ_CONF.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToShip))
              );
@@ -1116,17 +1108,19 @@
              }
            } else {
              // 移動
-             let angle;
-             if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5) {
-               // ターゲットに向かって移動
-               let target = dToBase < dToShip ? {x:starBase.x, y:starBase.y} : {x:ship.x, y:ship.y};
-               angle = Phaser.Math.Angle.Between(e.x, e.y, target.x, target.y);
+             let isFleeing = (e.shield < OBJ_CONF.ENEMY.SHIELD_MAX * 0.5);
+             let target;
+
+             if (!isFleeing) {
+               target = (dToBase < dToShip) ? {x: starBase.x, y: starBase.y} : {x: ship.x, y: ship.y};
              } else {
-               // 退却
-               // プレーヤーと逆の方向
-               angle = Phaser.Math.Angle.Between(ship.x, ship.y, e.x, e.y);
+               target = [
+                 {x: ship.x, y: ship.y},
+                 {x: starBase.x, y: starBase.y}
+               ];
              }
-             let dest = calculateEnemyAvoidanceDest(e, angle);
+
+             let dest = calculateSteeringDest(e, target, isFleeing);
 
              scene.tweens.add(
                {
@@ -1151,7 +1145,7 @@
 
              e.x = Math.floor(e.x);
              e.y = Math.floor(e.y);
-           } // else
+           }
 
            e.shield = Math.min(
              OBJ_CONF.ENEMY.SHIELD_MAX,
@@ -1176,10 +1170,8 @@
 
            updateStatus(); 
            isPlayerTurn = true;
-           //setLog("COMMAND: AWAITING ORDERS");
          }
        });
-
      }
 
      function updateStatus() {
@@ -1224,14 +1216,12 @@
        const bonus = currentStage * 100 * 2;
        Score += bonus;
 
-       // ハイスコアを保存し、順位結果を受け取る
        const { list, newIdx } = saveHighScore(Score, turnCount, clearedStage, `STAGE ${clearedStage} CLEARED`, true);
 
        currentStage++;
        SYSTEM.ENEMY_QTY++;
        isPlayerTurn = false;
 
-       // ボタン押下時に scene.restart() を呼ぶために参照を保持
        _pendingScene = scene;
 
        setLog(`STAGE ${clearedStage} CLEARED!`);
@@ -1294,7 +1284,6 @@
        const rankLabels = ['1ST', '2ND', '3RD', '4TH', '5TH'];
        list.forEach((s, i) => {
          const tr = document.createElement('tr');
-         //const isNew = (i === newIdx);
          const isNew = (s.gameid == SYSTEM.GAMEID);
          if (isNew) tr.className = 'hs-new';
          const rank   = rankLabels[i] || `${i + 1}TH`;
@@ -1311,7 +1300,6 @@
        });
      }
 
-     // mode: 'stageclear' | 'gameover' | 'view'
      function showHighScoreOverlay(mode, data = {}) {
        const overlay    = document.getElementById('highScoreOverlay');
        const resultEl   = document.getElementById('hsResultMsg');
@@ -1321,33 +1309,32 @@
 
        if (mode === 'stageclear') {
          const { clearedStage, bonus, list, newIdx } = data;
-         resultEl.style.color     = '#0f0';
-         resultEl.textContent     = `✓ STAGE ${clearedStage} CLEARED!`;
-         finalEl.textContent      = `TURNS:${turnCount}, STAGE BONUS:+${bonus}, SCORE: ${Score}`;
+         resultEl.style.color      = '#0f0';
+         resultEl.textContent      = `✓ STAGE ${clearedStage} CLEARED!`;
+         finalEl.textContent       = `TURNS:${turnCount}, STAGE BONUS:+${bonus}, SCORE: ${Score}`;
          renderHSTable(list, newIdx);
-         closeBtn.style.display   = 'none';
-         restartBtn.textContent   = '▶ NEXT STAGE';
-         restartBtn.style.display = 'inline-block';
+         closeBtn.style.display    = 'none';
+         restartBtn.textContent    = '▶ NEXT STAGE';
+         restartBtn.style.display  = 'inline-block';
 
        } else if (mode === 'gameover') {
          const { msg } = data;
-         resultEl.style.color     = '#ff0';
-         resultEl.textContent     = msg;
-         finalEl.textContent      = `MISSION FAILED: SCORE: ${Score}   STAGE: ${currentStage}   TURNS: ${turnCount}`;
+         resultEl.style.color      = '#ff0';
+         resultEl.textContent      = msg;
+         finalEl.textContent       = `MISSION FAILED: SCORE: ${Score}   STAGE: ${currentStage}   TURNS: ${turnCount}`;
          renderHSTable(loadHighScores(), -1);
-         closeBtn.style.display   = 'none';
-         restartBtn.textContent   = '▶ RESTART';
-         restartBtn.style.display = 'inline-block';
+         closeBtn.style.display    = 'none';
+         restartBtn.textContent    = '▶ RESTART';
+         restartBtn.style.display  = 'inline-block';
 
        } else {
-         // 'view' モード: 閲覧のみ
-         resultEl.style.color     = '#0ff';
-         resultEl.textContent     = '▶ HIGH SCORES ◀';
-         finalEl.textContent      = `NOW — SCORE: ${Score}   STAGE: ${currentStage}   TURN: ${turnCount}`;
+         resultEl.style.color      = '#0ff';
+         resultEl.textContent      = '▶ HIGH SCORES ◀';
+         finalEl.textContent       = `NOW — SCORE: ${Score}   STAGE: ${currentStage}   TURN: ${turnCount}`;
          renderHSTable(loadHighScores(), -1);
-         closeBtn.style.display   = 'inline-block';
-         restartBtn.textContent   = '▶ RESTART';
-         restartBtn.style.display = 'inline-block';
+         closeBtn.style.display    = 'inline-block';
+         restartBtn.textContent    = '▶ RESTART';
+         restartBtn.style.display  = 'inline-block';
        }
        overlay.style.display = 'flex';
      }
@@ -1357,7 +1344,6 @@
      });
      document.getElementById('hsRestartBtn').addEventListener('click', () => {
        if (_pendingScene) {
-         // ステージクリア後: 次のステージへ進む
          document.getElementById('highScoreOverlay').style.display = 'none';
          turnCount = 1;
          const s = _pendingScene;
@@ -1365,7 +1351,6 @@
          isPlayerTurn = true;
          s.scene.restart();
        } else {
-         // ゲームオーバー後: 最初からやり直し
          location.reload();
        }
      });
