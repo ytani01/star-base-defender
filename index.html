@@ -739,20 +739,23 @@
        return (t1 > 0.05 && t1 < 0.95) || (t2 > 0.05 && t2 < 0.95);
      }
 
-     function isLOSBlocked(ax,ay,bx,by, base=true){
+     /**
+      * LOS(Line of Sight、射線)がブロックされてないか？
+      */
+     function isLOSBlocked(srcObj, targetObj, base = true) {
        let obs = [...stars];
        if (base && starBase.shield > 0) {
          obs.push(starBase);
        }
        return obs.some(
          o => o.active && lineHitsCircle(
-           ax,ay,
-           bx,by,
-           o.x,o.y,
+           srcObj.x, srcObj.y,
+           targetObj.x, targetObj.y,
+           o.x, o.y,
            OBJ_CONF.COLLISION.LOS_RADIUS
          )
        );
-     }
+     } // isLOSBlocked(..)
 
      /**
       *
@@ -822,16 +825,16 @@
            setLog("OUT OF RANGE");
            ship.energy -= MECHANICS.WEAPON.PHASER_COST;
            isPlayerTurn = false;
-           fireBeam(this, ship.x, ship.y, target.x, target.y, 0x444444);
+           fireBeam(this, ship, target, 0x444444);
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            updateStatus();
            return;
          }
          
-         if (isLOSBlocked(ship.x, ship.y, target.x, target.y, false)) {
+         if (isLOSBlocked(ship, target, false)) {
            setLog("BLOCKED 1");
            isPlayerTurn = false;
-           fireBeam(this, ship.x, ship.y, target.x, target.y, 0x444444);
+           fireBeam(this, ship, target, 0x444444);
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            updateStatus();
            return;
@@ -843,7 +846,7 @@
            Math.floor(MECHANICS.WEAPON.BASE_DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * d))
          );
 
-         fireBeam(this, ship.x, ship.y, target.x, target.y, 0x00ffff);
+         fireBeam(this, ship, target, 0x00ffff);
 
          if (!target.active) {
            enemies = enemies.filter(e => e !== target);
@@ -868,30 +871,33 @@
      /**
       *
       */
-
-     function clampDestToAvoidCharacters(x1, y1, destX, destY, self, isEnemy = false) {
+     function clampDestToAvoidCharacters(obj, destX, destY, isEnemy = false) {
        const R = OBJ_CONF.COLLISION.HIT_RADIUS * 2; 
+       // オブジェクトから直接現在座標を取得
+       const startX = obj.x;
+       const startY = obj.y;
 
        const targets = [];
-       if (ship && ship !== self && ship.active) targets.push(ship);
-       if (isEnemy && starBase && starBase !== self && starBase.active && starBase.shield > 0) {
+       // self を obj に置換
+       if (ship && ship !== obj && ship.active) targets.push(ship);
+       if (isEnemy && starBase && starBase !== obj && starBase.active && starBase.shield > 0) {
          targets.push(starBase);
        }
-       enemies.forEach(e => { if (e && e !== self && e.active) targets.push(e); });
+       enemies.forEach(e => { if (e && e !== obj && e.active) targets.push(e); });
 
-       const dx = destX - x1;
-       const dy = destY - y1;
+       const dx = destX - startX;
+       const dy = destY - startY;
        const lenSq = dx * dx + dy * dy;
        if (lenSq < 0.0001) return { x: destX, y: destY };
 
        let minT = 1.0; 
 
        for (const tgt of targets) {
-         const curDist = Phaser.Math.Distance.Between(x1, y1, tgt.x, tgt.y);
+         const curDist = Phaser.Math.Distance.Between(startX, startY, tgt.x, tgt.y);
          if (curDist < R) continue;
 
-         const fx = x1 - tgt.x;
-         const fy = y1 - tgt.y;
+         const fx = startX - tgt.x;
+         const fy = startY - tgt.y;
          const a = lenSq;
          const b = 2 * (fx * dx + fy * dy);
          const c = fx * fx + fy * fy - R * R;
@@ -899,42 +905,44 @@
          if (disc < 0) continue; 
          const t = (-b - Math.sqrt(disc)) / (2 * a);
          if (t > 0 && t < minT) minT = t;
-       } // for()
+       } 
 
        if (minT < 1.0) {
          const len = Math.sqrt(lenSq);
          const stopT = Math.max(0, minT - 1.0 / len);
-         return { x: x1 + dx * stopT, y: y1 + dy * stopT };
+         return { x: startX + dx * stopT, y: startY + dy * stopT };
        }
        return { x: destX, y: destY };
-     } // clampDestToAvoidCharacters(x1, y1, destX, destY, self, isEnemy = false)
+     } // clampDestToAvoidCharacters(..)
 
-     function isMoveForbidden(x1, y1, x2, y2, isEnemy = false) {
+     /**
+      *
+      */
+     function isMoveForbidden(obj, destX, destY, isEnemy = false) {
+       const startX = obj.x;
+       const startY = obj.y;
+
        let hitStar = stars.some(
          s => {
            if (!s.active) return false;
-           if (
-             Phaser.Math.Distance.Between(x2, y2, s.x, s.y)
-             <= OBJ_CONF.COLLISION.OBSTACLE_RADIUS
-           ) {
+           if (Phaser.Math.Distance.Between(destX, destY, s.x, s.y) <= OBJ_CONF.COLLISION.OBSTACLE_RADIUS) {
              return true;
            }
-           return lineHitsCircle(
-             x1, y1, x2, y2, s.x, s.y, OBJ_CONF.COLLISION.OBSTACLE_RADIUS
-           );
+           return lineHitsCircle(startX, startY, destX, destY, s.x, s.y, OBJ_CONF.COLLISION.OBSTACLE_RADIUS);
          }
        );
-       if (hitStar) {
-         return true;
-       }
-       return false;
-     } // isMoveForbidden(x1, y1, x2, y2, isEnemy = false)
+       return hitStar;
+     } // isMoveForbidden(..)
 
      /**
       * 進行方向がブロックされている場合、少しずつ角度をずらして
       * 「とにかく一番遠くまで進めるルート」を確実に見つけ出す関数
       */
-     function resolveMovement(x, y, desiredX, desiredY, self, speed) {
+     function resolveMovement(obj, desiredX, desiredY, speed) {
+       // オブジェクトから直接現在座標を取得
+       const x = obj.x;
+       const y = obj.y;
+       
        let dx = desiredX - x;
        let dy = desiredY - y;
        let angle = Math.atan2(dy, dx);
@@ -955,12 +963,12 @@
          let testDestY = y + Math.sin(testAngle) * speed;
          
          // 1. 星などの固定障害物を貫通しないかチェック
-         if (isMoveForbidden(x, y, testDestX, testDestY, true)) {
+         if (isMoveForbidden(obj, testDestX, testDestY, true)) {
            continue; 
          }
          
-         // 2. 他のキャラクターとの衝突を計算し、ぶつかる直前の座標を取得
-         let clamped = clampDestToAvoidCharacters(x, y, testDestX, testDestY, self, true);
+         // 2. 他のキャラクターとの衝突を計算し、ぶつかる直前の座標を取得 (self -> obj)
+         let clamped = clampDestToAvoidCharacters(obj, testDestX, testDestY, true);
          
          // 実際に進める距離の2乗
          let distSq = (clamped.x - x)**2 + (clamped.y - y)**2;
@@ -977,7 +985,7 @@
          }
        }
        return bestDest;
-     } //  resolveMovement(x, y, desiredX, desiredY, self, speed)
+     } //  resolveMovement(..)
 
      function dockShip(scene) {
        isDocked = true;
@@ -1013,12 +1021,12 @@
          target_is_base = true;
        }
 
-       const clamped = clampDestToAvoidCharacters(ship.x, ship.y, destX, destY, ship, false);
+       const clamped = clampDestToAvoidCharacters(ship, destX, destY, false);
        destX = clamped.x;
        destY = clamped.y;
        let distance = Phaser.Math.Distance.Between(ship.x, ship.y, destX, destY);
 
-       if (isMoveForbidden(ship.x, ship.y, destX, destY) || distance < 5) {
+       if (isMoveForbidden(ship, destX, destY) || distance < 5) {
          setLog("BLOCKED 2");
          return;
        }
@@ -1157,16 +1165,22 @@
        let desiredY = e.y + finalY;
 
        // ★変更: 単純なクランプではなく、ルート走査による回避解決を適用
-       return resolveMovement(e.x, e.y, desiredX, desiredY, e, OBJ_CONF.ENEMY.SPEED);
+       return resolveMovement(e, desiredX, desiredY, OBJ_CONF.ENEMY.SPEED);
      } // calculateSteeringDest(e, target, isFleeing = false)
 
-     function fireBeam(scene, srcX, srcY, dstX, dstY, color) {
+     /**
+      *
+      */
+     function fireBeam(scene, srcObj, targetObj, color) {
        const beam = scene.add.graphics();
        beam.lineStyle(4, color, 1);
-       beam.lineBetween(srcX, srcY, dstX, dstY);
+       beam.lineBetween(srcObj.x, srcObj.y, targetObj.x, targetObj.y);
        scene.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
-     } // fireBeam()
+     } // fireBeam(..)
 
+     /**
+      *
+      */
      function enemyTurn(scene) {
        if (gameOver) return;
 
@@ -1180,12 +1194,12 @@
            let canAttackShip = (
              !isDocked &&
              dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE &&
-             !isLOSBlocked(e.x, e.y, ship.x, ship.y)
+             !isLOSBlocked(e, ship)
            );
            let canAttackBase = (
              starBase.shield > 0 &&
              starBase.active &&
-             !isLOSBlocked(e.x, e.y, starBase.x, starBase.y, false) &&
+             !isLOSBlocked(e, starBase, false) &&
              (
                dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE ||
                isDocked && dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE
@@ -1193,7 +1207,7 @@
            );
 
            if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
-             fireBeam(scene, e.x, e.y, starBase.x, starBase.y, 0xff00ff);
+             fireBeam(scene, e, starBase, 0xff00ff);
              starBase.takeDamage(
                Math.floor(OBJ_CONF.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToBase))
              );
@@ -1202,7 +1216,7 @@
                gameOverMessage("BASE DESTROYED");
              }
            } else if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5 && canAttackShip) {
-             fireBeam(scene, e.x, e.y, ship.x, ship.y, 0xff00ff);
+             fireBeam(scene, e, ship, 0xff00ff);
              ship.takeDamage(
                Math.floor(OBJ_CONF.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToShip))
              );
