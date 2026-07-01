@@ -761,17 +761,20 @@
        if(gameOver || !isPlayerTurn) {
          return;
        }
-       
+
+       // 射程内の敵？
        let target = enemies.find(
          e => Phaser.Math.Distance.Between(
            pointer.worldX, pointer.worldY, e.x, e.y
          ) < OBJ_CONF.COLLISION.HIT_RADIUS
        );
+       console.log(`target=${target?.type}`);
 
        if (!target && starBase.shield > 0 && Phaser.Math.Distance.Between(
          pointer.worldX, pointer.worldY, starBase.x, starBase.y) < OBJ_CONF.COLLISION.HIT_RADIUS
        ) {
          target = {type:'base'};
+         console.log(`target.type=${target.type}`);
        }
 
        if (target?.type === 'base') {
@@ -782,21 +785,22 @@
            return;
          }
          // ! isDocked
-         
+
          if (
            Phaser.Math.Distance.Between(ship.x, ship.y, starBase.x, starBase.y)
            <= OBJ_CONF.BASE.DOCKING_RANGE
          ) {
+           // ドッキング
            dockShip(this);
            isPlayerTurn = false;
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            return;
-         } else {
-           setLog("APPROACH BASE TO DOCK");
-           attemptPlayerMove(this, starBase.x, starBase.y, SYSTEM.TIMING.TURN_DELAY);
-           return;
          }
-       }
+         
+         attemptPlayerMove(this, starBase.x, starBase.y, SYSTEM.TIMING.TURN_DELAY);
+         // setLog("APPROACH BASE TO DOCK");
+         return;
+       } // if (target?.type === 'base')
 
        if (target && target.active) {
          if ( isDocked ) {
@@ -861,6 +865,10 @@
        }
      } // handlePointerDown(pointer)
 
+     /**
+      *
+      */
+
      function clampDestToAvoidCharacters(x1, y1, destX, destY, self, isEnemy = false) {
        const R = OBJ_CONF.COLLISION.HIT_RADIUS * 2; 
 
@@ -891,7 +899,7 @@
          if (disc < 0) continue; 
          const t = (-b - Math.sqrt(disc)) / (2 * a);
          if (t > 0 && t < minT) minT = t;
-       }
+       } // for()
 
        if (minT < 1.0) {
          const len = Math.sqrt(lenSq);
@@ -985,6 +993,9 @@
        updateStatus();
      } // dockShip()
 
+     /**
+      *
+      */
      function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
        let rawDist = Phaser.Math.Distance.Between(ship.x, ship.y, targetX, targetY);
        if (rawDist < 1) return;
@@ -1011,7 +1022,7 @@
          setLog("BLOCKED 2");
          return;
        }
-       setLog("-");
+       setLog("　");
 
        let skipAutoDock = false;
        if (isDocked) {
