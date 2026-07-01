@@ -1198,27 +1198,24 @@
 
        Enemies.forEach(e => {
          scene.time.delayedCall(0, () => {
-           if ( gameOver || !e.active ) return;
-
+           if ( gameOver || !e.active ) {
+             return;
+           }
            let dToBase = Phaser.Math.Distance.Between(e.x, e.y, starBase.x, starBase.y);
            let dToShip = Phaser.Math.Distance.Between(e.x, e.y, ship.x, ship.y);
-           
            let canAttackShip = (
-             !isDocked &&
-             dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE &&
+             !isDocked && dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE &&
              !isLOSBlocked(e, ship)
            );
            let canAttackBase = (
-             starBase.shield > 0 &&
-             starBase.active &&
-             !isLOSBlocked(e, starBase, false) &&
-             (
+             starBase.shield > 0 && starBase.active &&
+             !isLOSBlocked(e, starBase, false) && (
                dToBase <= MECHANICS.WEAPON.EFFECTIVE_RANGE ||
                isDocked && dToShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE
              )
            );
-
            if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
+             // 基地を攻撃
              fireBeam(scene, e, starBase, 0xff00ff);
              starBase.takeDamage(
                Math.floor(OBJ_CONF.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToBase))
@@ -1228,6 +1225,7 @@
                gameOverMessage("BASE DESTROYED");
              }
            } else if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5 && canAttackShip) {
+             // プレーヤーを攻撃
              fireBeam(scene, e, ship, 0xff00ff);
              ship.takeDamage(
                Math.floor(OBJ_CONF.ENEMY.DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * dToShip))
@@ -1249,9 +1247,7 @@
                  {x: starBase.x, y: starBase.y}
                ];
              }
-
              let dest = calculateSteeringDest(e, target, isFleeing);
-
              scene.tweens.add({
                targets: e,
                x: dest.x, y: dest.y,
@@ -1269,14 +1265,16 @@
 
              e.x = Math.floor(e.x);
              e.y = Math.floor(e.y);
-           }
 
-           e.shield = Math.min(
-             OBJ_CONF.ENEMY.SHIELD_MAX,
-             e.shield + (OBJ_CONF.ENEMY.SHIELD_MAX * OBJ_CONF.ENEMY.REGEN)
-           );
-         });
-       });
+             // 移動した場合、回復する
+             // (攻撃した場合は、回復しない)
+             e.shield = Math.min(
+               OBJ_CONF.ENEMY.SHIELD_MAX,
+               e.shield + (OBJ_CONF.ENEMY.SHIELD_MAX * OBJ_CONF.ENEMY.REGEN)
+             );
+           } // else // 移動
+         }); // delayedCall()
+       }); // forEach()
 
        ADDITIONAL_DELAY = 100;
        scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY + ADDITIONAL_DELAY, () => {
