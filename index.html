@@ -328,7 +328,7 @@
      };
 
      let ship, starBase, rangeGraphics, boundaryGraphics;
-     let enemies = stars = [];
+     let Enemies = Stars = [];
      let turnCount = 1;
      let curStage = 1;
      let Score = SYSTEM.SCORE.INIT;
@@ -582,17 +582,17 @@
        starBase = new BaseStation(this, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
 
        // Stars
-       stars = [];
+       Stars = [];
        for(let i=0; i < SYSTEM.STAR_QTY; i++) {
          let p = getSafeRandPos(0.2, 0.8);
-         stars.push(new Star(this, p.x, p.y));
+         Stars.push(new Star(this, p.x, p.y));
        }
 
        // Enemies
-       enemies = [];
+       Enemies = [];
        for(let i=0; i<SYSTEM.ENEMY_QTY; i++){
          let p = getSafeRandPos(0.6, 0.9);
-         enemies.push(new Enemy(this, p.x, p.y));
+         Enemies.push(new Enemy(this, p.x, p.y));
        }
 
        // Player Ship
@@ -649,7 +649,7 @@
        }
        rangeGraphics.strokeCircle(starBase.x, starBase.y, OBJ_CONF.BASE.DOCKING_RANGE);
 
-       [ship, ...enemies].forEach(
+       [ship, ...Enemies].forEach(
          (obj, i)=>{
            if(!obj.active) return;
            let color = (i===0) ? 0x4488ff : 0xff3333;
@@ -668,7 +668,7 @@
        if (starBase) {
          starBase.updateGauge();
        }
-       enemies.forEach(e => e.updateGauge());
+       Enemies.forEach(e => e.updateGauge());
      }
 
      function getSafeRandPos(minDist, maxDist){
@@ -694,7 +694,7 @@
          
          safe = true;
 
-         for(let s of stars) {
+         for(let s of Stars) {
            if (
              s.active && Phaser.Math.Distance.Between(
                x, y, s.x, s.y
@@ -706,7 +706,7 @@
          }
          if(!safe) continue;
 
-         for(let e of enemies) {
+         for(let e of Enemies) {
            if (
              e.active && Phaser.Math.Distance.Between(
                x, y, e.x, e.y
@@ -743,7 +743,7 @@
       * LOS(Line of Sight、射線)がブロックされてないか？
       */
      function isLOSBlocked(srcObj, targetObj, base = true) {
-       let obs = [...stars];
+       let obs = [...Stars];
        if (base && starBase.shield > 0) {
          obs.push(starBase);
        }
@@ -765,8 +765,8 @@
          return;
        }
 
-       // 射程内の敵？
-       let target = enemies.find(
+       // 敵？
+       let target = Enemies.find(
          e => Phaser.Math.Distance.Between(
            pointer.worldX, pointer.worldY, e.x, e.y
          ) < OBJ_CONF.COLLISION.HIT_RADIUS
@@ -806,24 +806,28 @@
        } // if (target?.type === 'base')
 
        if (target && target.active) {
+         // 敵への射撃
          if ( isDocked ) {
            setLog("DOCK: All weapons are deactivated");
            return;
          }
-
-         let d = Phaser.Math.Distance.Between(ship.x, ship.y, target.x, target.y);
-
          if ( ship.energy < MECHANICS.WEAPON.PHASER_COST ) {
            setLog("LOW ENERGY");
-           isPlayerTurn = false;
-           this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
-           updateStatus();
+           /* isPlayerTurn = false;
+            * this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+            * updateStatus(); */
            return;
          }
 
+         //
+         // 発射：何に命中するか、外すか…
+         //
+         ship.energy -= MECHANICS.WEAPON.PHASER_COST;
+         let d = Phaser.Math.Distance.Between(ship.x, ship.y, target.x, target.y);
+
          if (Math.exp(-MECHANICS.WEAPON.ALPHA * d) < MECHANICS.WEAPON.MAX_THRESHOLD) {
+           // 射程外
            setLog("OUT OF RANGE");
-           ship.energy -= MECHANICS.WEAPON.PHASER_COST;
            isPlayerTurn = false;
            fireBeam(this, ship, target, 0x444444);
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
@@ -832,32 +836,40 @@
          }
          
          if (isLOSBlocked(ship, target, false)) {
+           // XXX ToDo: 射線を遮るものが何かによって対応を変えるべき
+           //   Star: グレーで描画、無駄打ち
+           //   他の敵: その敵に命中
+           //   Base: 基地を攻撃！
+           //   isLOSBlocked()の仕様を変更すべき？
            setLog("BLOCKED 1");
-           isPlayerTurn = false;
            fireBeam(this, ship, target, 0x444444);
+           isPlayerTurn = false;
            this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
            updateStatus();
            return;
          }
-         
-         ship.energy -= MECHANICS.WEAPON.PHASER_COST;
+
+         // 命中
+         setLog("Hit !");
          isPlayerTurn = false;
          target.takeDamage(
            Math.floor(MECHANICS.WEAPON.BASE_DAMAGE * Math.exp(-MECHANICS.WEAPON.ALPHA * d))
          );
-
          fireBeam(this, ship, target, 0x00ffff);
 
          if (!target.active) {
-           enemies = enemies.filter(e => e !== target);
+           // 撃墜
+           //   新たな敵が侵入
+           Enemies = Enemies.filter(e => e !== target);
            const rp = getSafeRandPos(0.8, 0.95);
-           enemies.push(new Enemy(this, rp.x, rp.y));
+           Enemies.push(new Enemy(this, rp.x, rp.y));
            setLog("⚠ ENEMY SHOT DOWN — REINFORCEMENT INCOMING!");
          }
+         
          this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
          updateStatus();
          return;
-       }
+       } // if (target && target.active)
 
        if (!target) {
          attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
@@ -883,7 +895,7 @@
        if (isEnemy && starBase && starBase !== obj && starBase.active && starBase.shield > 0) {
          targets.push(starBase);
        }
-       enemies.forEach(e => { if (e && e !== obj && e.active) targets.push(e); });
+       Enemies.forEach(e => { if (e && e !== obj && e.active) targets.push(e); });
 
        const dx = destX - startX;
        const dy = destY - startY;
@@ -922,7 +934,7 @@
        const startX = obj.x;
        const startY = obj.y;
 
-       let hitStar = stars.some(
+       let hitStar = Stars.some(
          s => {
            if (!s.active) return false;
            if (Phaser.Math.Distance.Between(destX, destY, s.x, s.y) <= OBJ_CONF.COLLISION.OBSTACLE_RADIUS) {
@@ -1116,7 +1128,7 @@
        // 2. 障害物(星)からの反発力 + 回り込み力
        let avoidX = 0, avoidY = 0;
        const STAR_AVOID_RADIUS = OBJ_CONF.COLLISION.OBSTACLE_RADIUS * 3.5;
-       stars.forEach(s => {
+       Stars.forEach(s => {
          if (!s.active) return;
          let dx = e.x - s.x;
          let dy = e.y - s.y;
@@ -1131,7 +1143,7 @@
        // 3. 他の敵からの反発力（分離）
        let sepX = 0, sepY = 0;
        const ENEMY_AVOID_RADIUS = OBJ_CONF.COLLISION.HIT_RADIUS * 2.5;
-       enemies.forEach(other => {
+       Enemies.forEach(other => {
          if (!other.active || other === e) return;
          let dx = e.x - other.x;
          let dy = e.y - other.y;
@@ -1184,7 +1196,7 @@
      function enemyTurn(scene) {
        if (gameOver) return;
 
-       enemies.forEach(e => {
+       Enemies.forEach(e => {
          scene.time.delayedCall(0, () => {
            if ( gameOver || !e.active ) return;
 
@@ -1268,8 +1280,8 @@
 
        ADDITIONAL_DELAY = 100;
        scene.time.delayedCall(SYSTEM.TIMING.TURN_DELAY + ADDITIONAL_DELAY, () => {
-         enemies = enemies.filter(e => e.active);
-         if (enemies.length === 0 && !gameOver) {
+         Enemies = Enemies.filter(e => e.active);
+         if (Enemies.length === 0 && !gameOver) {
            nextStage(scene);
          } else if (!gameOver) {
            turnCount++;
@@ -1277,7 +1289,7 @@
 
            if ( turnCount % SYSTEM.NEW_ENEMY_INTERVAL == 0 ) {
              let p = getSafeRandPos(0.8, 0.95);
-             enemies.push(new Enemy(scene, p.x, p.y));
+             Enemies.push(new Enemy(scene, p.x, p.y));
            }
 
            updateStatus(); 
