@@ -192,14 +192,14 @@
           <button id="viewScoresBtn">▶ SCORES</button>
         </div>
         <div id="statusShip">
-          Shipt Shield <span id="statusShipShield">0</span>%
+          Ship Shield <span id="statusShipShield">0</span>
           <div class="status-gauge"><div id="gaugeShipShield" class="status-gauge-fill"></div></div>
           |
           Energy <span id="statusShipEnergy">0</span>
           <div class="status-gauge"><div id="gaugeShipEnergy" class="status-gauge-fill"></div></div>
         </div>
         <div id="StatusBase">
-          Base Shield <span id="statusBaseShield">0</span>%
+          Base Shield <span id="statusBaseShield">0</span>
           <div class="status-gauge"><div id="gaugeBaseShield" class="status-gauge-fill"></div></div>
         </div>
         <div id="logStatus">COMMAND: AWAITING ORDERS</div>
@@ -280,7 +280,7 @@
 
      const OBJ_CONF = {
        PLAYER: {
-         ENERGY_MAX: 3000,
+         ENERGY_MAX: 10000,
          ENERGY_MIN: 10,
          SHIELD_MAX: 1000,
          DOCK_RESTORE_ENERGY: 1500,
@@ -1315,27 +1315,30 @@
        document.getElementById('statusStage').textContent = `${curStage}`;
        document.getElementById('statusScore').textContent = `${Score}`;
 
-       // Energy
-       let energyRatio = playerShipEnergy / OBJ_CONF.PLAYER.ENERGY_MAX;
-       let energyColor = energyRatio < 0.3 ? "#f00" : "#0f0";
-       document.getElementById('statusShipEnergy').style.color = energyColor;
-       document.getElementById('statusShipEnergy').textContent = Math.floor(playerShipEnergy);
-       document.getElementById('gaugeShipEnergy').style.width = (energyRatio * 100) + '%';
-       document.getElementById('gaugeShipEnergy').style.background = energyColor;
-
        // PlayerShip Shield
        let playerShipShieldRatio = playerShipShield / OBJ_CONF.PLAYER.SHIELD_MAX;
        let playerShipShieldColor = playerShipShieldRatio < 0.3 ? "#f00" : "#0f0";
        document.getElementById('statusShipShield').style.color = playerShipShieldColor;
-       document.getElementById('statusShipShield').textContent = playerShipShield + ":" + Math.floor(playerShipShieldRatio * 100);
+       document.getElementById('statusShipShield').textContent =
+         `${playerShipShield}(${Math.floor(playerShipShieldRatio * 100)}%)`;
        document.getElementById('gaugeShipShield').style.width = (playerShipShieldRatio * 100) + '%';
        document.getElementById('gaugeShipShield').style.background = playerShipShieldColor;
+
+       // PlayerShip Energy
+       let energyRatio = playerShipEnergy / OBJ_CONF.PLAYER.ENERGY_MAX;
+       let energyColor = energyRatio < 0.3 ? "#f00" : "#0f0";
+       document.getElementById('statusShipEnergy').style.color = energyColor;
+       document.getElementById('statusShipEnergy').textContent =
+         `${playerShipEnergy}(${Math.floor(energyRatio * 100)}%)`;
+       document.getElementById('gaugeShipEnergy').style.width = (energyRatio * 100) + '%';
+       document.getElementById('gaugeShipEnergy').style.background = energyColor;
 
        // Base Shield
        let baseShieldRatio = baseShield / OBJ_CONF.BASE.SHIELD_MAX;
        let baseShieldColor = baseShieldRatio < 0.3 ? "#f00" : "#0f0";
        document.getElementById('statusBaseShield').style.color = baseShieldColor;
-       document.getElementById('statusBaseShield').textContent = Math.floor(baseShieldRatio * 100);
+       document.getElementById('statusBaseShield').textContent =
+         `${baseShield}(${Math.floor(baseShieldRatio * 100)}%)`;
        document.getElementById('gaugeBaseShield').style.width = (baseShieldRatio * 100) + '%';
        document.getElementById('gaugeBaseShield').style.background = baseShieldColor;
      }
