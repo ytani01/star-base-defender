@@ -1,3 +1,7 @@
+### Obsidian ###
+.obsidian/
+*.temp
+
 ### Emacs ###
 # -*- mode: gitignore; -*-
 *~
