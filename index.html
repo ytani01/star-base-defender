@@ -247,6 +247,8 @@
      // 設定・定数の定義
      // ---------------------------------------------------------
      const SYSTEM = {
+       SCALE: 0.4,
+       R_AREA: 300,
        SCORE: {
          INIT: 100,
          DESTROY_PENALTY: 50,
@@ -254,8 +256,6 @@
        NEW_ENEMY_INTERVAL: 40,
        STAR_QTY: 15,
        ENEMY_QTY: 3,
-       SCALE: 0.4,
-       R_AREA: 300,
        GUAGE: {
          W: 30,
          H: 4
@@ -528,7 +528,7 @@
 
        // PlayerShip
        g.lineStyle(3, 0xff0000, 0.3);
-       g.strokeCircle(25, 30, OBJ_CONF.COLLISION.HIT_RADIUS*2);
+       g.strokeCircle(25, 30, OBJ_CONF.COLLISION.HIT_RADIUS * 2);
        g.fillStyle(0x5588ee);
        g.fillRect(22,25,6,20);
        g.fillStyle(0x4488ff);
@@ -542,18 +542,23 @@
 
        // Enemy
        g.lineStyle(3, 0xff0000, 0.5);
-       g.strokeCircle(25, 25, OBJ_CONF.COLLISION.HIT_RADIUS*2);
+       g.strokeCircle(25, 25, OBJ_CONF.COLLISION.HIT_RADIUS * 2);
        g.fillStyle(0x228822);
        g.beginPath();
        g.moveTo(25,50);
        g.lineTo(50,35);
-       g.lineTo(50,15);
+       g.lineTo(50,12);
+       g.lineTo(46,12);
+       g.lineTo(46,25);
        g.lineTo(25,35);
-       g.lineTo(0,15);
+       g.lineTo(4,25);
+       g.lineTo(4,12);
+       g.lineTo(0,12);
+       g.lineTo(0,25);
        g.lineTo(0,35);
        g.fillPath();
        g.fillRect(21,5,8,35)
-       g.fillEllipse(25,10,20,18);
+       g.fillEllipse(25,10,18,17);
        g.generateTexture('enemyImg',50,50);
 
        g.clear();
@@ -721,7 +726,7 @@
        return { x, y };
      }
 
-     function lineHitsCircle(ax,ay,bx,by,cx,cy,r) {
+     function hasObstacleOnPath(ax,ay,bx,by,cx,cy,r) {
        const dx = bx - ax, dy = by - ay;
        const a = dx * dx + dy * dy;
        if (a < 0.001) {
@@ -749,7 +754,7 @@
          obs.push(starBase);
        }
        return obs.some(
-         o => o.active && lineHitsCircle(
+         o => o.active && hasObstacleOnPath(
            srcObj.x, srcObj.y,
            targetObj.x, targetObj.y,
            o.x, o.y,
@@ -792,6 +797,7 @@
          }
 
          const distToBase = Phaser.Math.Distance.Between(playerShip.x, playerShip.y, starBase.x, starBase.y);
+         console.log(`distToBase=${distToBase} / ${OBJ_CONF.BASE.DOCKING_RANGE}`);
          if (distToBase <= OBJ_CONF.BASE.DOCKING_RANGE) {
            dockShip(this);
            endTurn();
@@ -829,7 +835,7 @@
            return;
          }
 
-         setLog("Hit !");
+         setLog("HIT !");
          const damage = Math.floor(MECHANICS.WEAPON.BASE_DAMAGE * hitChance);
          clickedObj.takeDamage(damage);
          fireBeam(this, playerShip, clickedObj, 0x00ffff);
@@ -936,7 +942,7 @@
            if (Phaser.Math.Distance.Between(destX, destY, s.x, s.y) <= OBJ_CONF.COLLISION.OBSTACLE_RADIUS) {
              return true;
            }
-           return lineHitsCircle(startX, startY, destX, destY, s.x, s.y, OBJ_CONF.COLLISION.OBSTACLE_RADIUS);
+           return hasObstacleOnPath(startX, startY, destX, destY, s.x, s.y, OBJ_CONF.COLLISION.OBSTACLE_RADIUS);
          }
        );
        return hitStar;
@@ -1034,11 +1040,11 @@
        destY = clamped.y;
        let distance = Phaser.Math.Distance.Between(playerShip.x, playerShip.y, destX, destY);
 
-       if (isMoveForbidden(playerShip, destX, destY) || distance < 5) {
+       if ( isMoveForbidden(playerShip, destX, destY) ) {
          setLog("BLOCKED 2");
          return;
        }
-       setLog("　");
+       setLog("MOVE");
 
        let skipAutoDock = false;
        if (isDocked) {
@@ -1051,7 +1057,11 @@
 
        const actualDist = Phaser.Math.Distance.Between(playerShip.x, playerShip.y, destX, destY);
        let cost = Math.max(1, Math.ceil(actualDist * OBJ_CONF.PLAYER.MOVE_COST_RATE));
-       if (playerShip.energy < cost) {
+       if ( playerShip.energy - cost <= OBJ_CONF.PLAYER.ENERGY_MIN ) {
+         if ( target_is_base ) {
+           gameOverMessage("NO ENERGY TO CONTINUE");
+           return;
+         }
          setLog("NOT ENOUGH ENERGY");
          return;
        }
@@ -1085,7 +1095,7 @@
      /**
       *
       */
-     function calculateSteeringDest(e, target, isFleeing = false) {
+     function calcDest(e, target, isFleeing = false) {
        let dirX = 0, dirY = 0;
 
        // 1. ターゲットへのベクトル（引力 / 斥力）
@@ -1119,7 +1129,7 @@
            dirX = targetDx / targetDist;
            dirY = targetDy / targetDist;
          }
-       } // if else
+       }
 
        // 2. 障害物(星)からの反発力 + 回り込み力
        let avoidX = 0, avoidY = 0;
@@ -1174,7 +1184,7 @@
 
        // ★変更: 単純なクランプではなく、ルート走査による回避解決を適用
        return resolveMovement(e, desiredX, desiredY, OBJ_CONF.ENEMY.SPEED);
-     } // calculateSteeringDest(e, target, isFleeing = false)
+     } // calcDest(e, target, isFleeing = false)
 
      /**
       *
@@ -1197,6 +1207,7 @@
            if ( gameOver || !e.active ) {
              return;
            }
+
            let dToBase = Phaser.Math.Distance.Between(e.x, e.y, starBase.x, starBase.y);
            let dToPlayerShip = Phaser.Math.Distance.Between(e.x, e.y, playerShip.x, playerShip.y);
            let canAttackPlayerShip = (
@@ -1243,7 +1254,7 @@
                  {x: starBase.x, y: starBase.y}
                ];
              }
-             let dest = calculateSteeringDest(e, target, isFleeing);
+             let dest = calcDest(e, target, isFleeing);
              scene.tweens.add({
                targets: e,
                x: dest.x, y: dest.y,
@@ -1292,6 +1303,9 @@
        });
      } // enemyTurn()
 
+     /**
+      *
+      */
      function updateStatus() {
        let playerShipEnergy = playerShip.energy > 0 ? playerShip.energy : 0;
        let playerShipShield = playerShip.shield > 0 ? playerShip.shield : 0;
@@ -1313,7 +1327,7 @@
        let playerShipShieldRatio = playerShipShield / OBJ_CONF.PLAYER.SHIELD_MAX;
        let playerShipShieldColor = playerShipShieldRatio < 0.3 ? "#f00" : "#0f0";
        document.getElementById('statusShipShield').style.color = playerShipShieldColor;
-       document.getElementById('statusShipShield').textContent = Math.floor(playerShipShieldRatio * 100);
+       document.getElementById('statusShipShield').textContent = playerShipShield + ":" + Math.floor(playerShipShieldRatio * 100);
        document.getElementById('gaugeShipShield').style.width = (playerShipShieldRatio * 100) + '%';
        document.getElementById('gaugeShipShield').style.background = playerShipShieldColor;
 
