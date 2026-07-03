@@ -183,9 +183,9 @@
     <div id="gameContainer">
       <div id="statusPanel">
         <div id="turn">
-          STAGE <span id="statusStage">1</span>
+          Turn <span id="statusStage">1</span>-<span id="statusTurn">1</span>
           |
-          TURN <span id="statusTurn">1</span>
+          ENEMY  <span id="statusEnemyCount">1</span>
           |
           SCORE <span id="statusScore">100</span>
           |
@@ -342,10 +342,20 @@
      let isDocked = false;     
 
      // ---------------------------------------------------------
-     // クラス定義
+     // グローバルメソッド
      // ---------------------------------------------------------
-     function drawGauge(graphics, cx, cy, width, height, ratio, color) {
-       graphics.clear();
+     /**
+      *
+      */
+     function getActiveEnemyCount() {
+       return Enemies.filter(enemy => enemy.active).length;
+     } // getActiveEnemyCount()
+
+     /**
+      *
+      */     
+     function drawGauge(g, cx, cy, width, height, ratio, color) {
+       g.clear();
        if ( !isFinite(cy) ) {
          return;
        }
@@ -353,16 +363,19 @@
        const x = cx - width / 2;
        const y = cy - height / 2;
        
-       graphics.fillStyle(0x555555, 1);
-       graphics.fillRect(x, y, width, height);
+       g.fillStyle(0x555555, 1);
+       g.fillRect(x, y, width, height);
        
        const r = Math.max(0, Math.min(1, ratio));
        if (r > 0) {
-         graphics.fillStyle(color, 1);
-         graphics.fillRect(x, y, width * r, height);
+         g.fillStyle(color, 1);
+         g.fillRect(x, y, width * r, height);
        }
-     }
+     } // drawGauge()
 
+     // ---------------------------------------------------------
+     // クラス定義
+     // ---------------------------------------------------------
      class GameObject {
        constructor(scene, x, y, texture, scale=SYSTEM.SCALE) {
          this.scene = scene;
@@ -1346,12 +1359,14 @@
       *
       */
      function updateStatus() {
-       let playerShipEnergy = playerShip.energy > 0 ? playerShip.energy : 0;
-       let playerShipShield = playerShip.shield > 0 ? playerShip.shield : 0;
-       let baseShield = starBase.shield > 0 ? starBase.shield : 0;
+       const playerShipEnergy = playerShip.energy > 0 ? playerShip.energy : 0;
+       const playerShipShield = playerShip.shield > 0 ? playerShip.shield : 0;
+       const baseShield = starBase.shield > 0 ? starBase.shield : 0;
+       const enemyCount = getActiveEnemyCount();
 
        document.getElementById('statusTurn').textContent = `${turnCount}`;
        document.getElementById('statusStage').textContent = `${curStage}`;
+       document.getElementById('statusEnemyCount').textContent = `${enemyCount}`;
        document.getElementById('statusScore').textContent = `${Score}`;
 
        // PlayerShip Shield
@@ -1377,7 +1392,7 @@
        document.getElementById('statusBaseShield').textContent = baseShield;
        document.getElementById('gaugeBaseShield').style.width = (baseShieldRatio * 100) + '%';
        document.getElementById('gaugeBaseShield').style.background = baseShieldColor;
-     }
+     } // updateStatus()
 
      function setLog(msg) {
        document.getElementById('logStatus').textContent = msg;
