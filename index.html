@@ -258,7 +258,7 @@
        ENEMY_QTY: 3,
        GUAGE: {
          W: 30,
-         H: 4
+         H: 3
        },
        TIMING: {
          BEAM_DUR: 500,
@@ -288,7 +288,7 @@
          MOVE_COST_RATE: 0.3 / SYSTEM.SCALE
        },
        BASE: {
-         SHIELD_MAX: 4000,
+         SHIELD_MAX: 5000,
          DOCKING_RANGE: 35 * SYSTEM.SCALE
        },
        ENEMY: {
@@ -296,7 +296,9 @@
          DAMAGE: 70,
          SPEED: 30 * SYSTEM.SCALE,
          STOP_DIST: 30 * SYSTEM.SCALE,
-         REGEN: 0.02
+         REGEN: 0.02,
+         FEAR_INIT: 0.5,
+         FEAR_FACTOR: 0.2
        },
        COLLISION: {
          INIT_POS_DISTANCE: 60 * SYSTEM.SCALE,
@@ -344,7 +346,9 @@
      // ---------------------------------------------------------
      function drawGauge(graphics, cx, cy, width, height, ratio, color) {
        graphics.clear();
-       if (!isFinite(cy)) return;
+       if ( !isFinite(cy) ) {
+         return;
+       }
 
        const x = cx - width / 2;
        const y = cy - height / 2;
@@ -402,15 +406,26 @@
          this.gauge_w = gauge_w;
          this.gauge_h = gauge_h;
          this.gauge = this.scene.add.graphics();
+
+         this.g_shield = this.scene.add.graphics();
        }
 
        updateGauge() {
          if (! this.active ) {
            if (this.guage) {
              this.gauge.clear();
+             this.g_shield.clear();
            }
            return;
          }
+
+         // update Shield circle
+         const shield_ratio = this.shield / this.shield_max;
+         const shield_color = 0xffffff;
+         //console.log(`shield_color=${shield_color.toString(16)}`);
+         this.g_shield.clear();
+         this.g_shield.lineStyle(2 * shield_ratio, shield_color, 1);
+         this.g_shield.strokeCircle(this.x, this.y, OBJ_CONF.COLLISION.HIT_RADIUS);
 
          drawGauge(
            this.gauge,
@@ -426,6 +441,9 @@
          this.active = false;
          if ( this.gauge ) {
            this.gauge.destroy();
+         }
+         if ( this.g_shield ) {
+           this.g_shield.destroy();
          }
          this.destroy();
        }
@@ -444,25 +462,25 @@
          scene, x, y, texture,
          gauge_y, gauge_w, gauge_h,
          shield_max, gauge_color,
-         energy_max, e_gauge_color,
+         energy_max, energy_color,
          scale=SYSTEM.SCALE
        ) {
          super(scene, x, y, texture, gauge_y, gauge_w, gauge_h, shield_max, gauge_color, scale);
          this.energy_max = energy_max;
-         this.e_gauge_color = e_gauge_color;
+         this.g_energy_color = energy_color;
 
          this.energy = this.energy_max;
-         this.e_gauge = this.scene.add.graphics();
+         this.g_energy = this.scene.add.graphics();
        }
 
        updateGauge() {
          super.updateGauge();
          drawGauge(
-           this.e_gauge,
+           this.g_energy,
            this.x, this.y + (this.gauge_y * this.scale) + this.gauge_h + 1,
            this.gauge_w, this.gauge_h,
            this.energy / this.energy_max,
-           this.e_gauge_color
+           this.g_energy_color
          );         
        }
      }
@@ -488,9 +506,11 @@
      class Enemy extends ObjWithShield {
        constructor(scene, x, y) {
          super(
-           scene, x, y, 'enemyImg', 31, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
+           scene, x, y, 'enemyImg',
+           36, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
            OBJ_CONF.ENEMY.SHIELD_MAX, 0xff3333
          );
+         this.fear_mind = OBJ_CONF.ENEMY.FEAR_INIT;
        }
      }
 
@@ -498,7 +518,7 @@
        constructor(scene, x, y) {
          super(
            scene, x, y, 'playerShipImg',
-           29, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H, 
+           36, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H, 
            OBJ_CONF.PLAYER.SHIELD_MAX, 0xff00ff,
            OBJ_CONF.PLAYER.ENERGY_MAX, 0x8888ff,
          );
@@ -527,47 +547,49 @@
        const g = this.make.graphics({add:false});
 
        // PlayerShip
-       g.lineStyle(3, 0xff0000, 0.3);
-       g.strokeCircle(25, 30, OBJ_CONF.COLLISION.HIT_RADIUS * 2);
-       g.fillStyle(0x5588ee);
-       g.fillRect(22,25,6,20);
+       //
        g.fillStyle(0x4488ff);
-       g.fillRect(10,30,8,20);
-       g.fillRect(32,30,8,20);
-       g.fillStyle(0xaabbff);
-       g.fillEllipse(25,15,35,30);
-       g.generateTexture('playerShipImg',50,60);
+       g.fillRect(27,25,8,24);
+       g.fillStyle(0x4488ff);
+       g.fillRect(10,30,10,22);
+       g.fillRect(40,30,10,22);
+       g.fillStyle(0x4488ff);
+       g.fillEllipse(30,17,35,30);
+       g.generateTexture('playerShipImg',60,60);
        
        g.clear();
 
        // Enemy
-       g.lineStyle(3, 0xff0000, 0.5);
-       g.strokeCircle(25, 25, OBJ_CONF.COLLISION.HIT_RADIUS * 2);
        g.fillStyle(0x228822);
        g.beginPath();
-       g.moveTo(25,50);
-       g.lineTo(50,35);
-       g.lineTo(50,12);
-       g.lineTo(46,12);
-       g.lineTo(46,25);
-       g.lineTo(25,35);
-       g.lineTo(4,25);
-       g.lineTo(4,12);
-       g.lineTo(0,12);
-       g.lineTo(0,25);
-       g.lineTo(0,35);
+       g.moveTo(31,57);
+       g.lineTo(55,40);
+       g.lineTo(55,20);
+       g.lineTo(50,20);
+       g.lineTo(50,32);
+       g.lineTo(31,41);
+       g.lineTo(30,41);
+       g.lineTo(10,32);
+       g.lineTo(10,20);
+       g.lineTo(5,20);
+       g.lineTo(5,25);
+       g.lineTo(5,40);
+       g.moveTo(30,57);
        g.fillPath();
-       g.fillRect(21,5,8,35)
-       g.fillEllipse(25,10,18,17);
-       g.generateTexture('enemyImg',50,50);
+       g.fillRect(26,10,8,35)
+       g.fillEllipse(30,13,18,17);
+       g.generateTexture('enemyImg',60,60);
 
        g.clear();
 
        // Base
-       g.fillStyle(0x99ffff);
-       g.fillEllipse(30,30,30,55);
-       g.lineStyle(6,0x99ffff,1);
-       g.strokeEllipse(30,30,55,25);
+       const base_color = 0x88ffff;
+       g.fillStyle(0x0000,.3);
+       g.fillCircle(30,30,30);
+       g.fillStyle(base_color);
+       g.fillEllipse(30,30,24,53);
+       g.lineStyle(5, base_color ,1);
+       g.strokeEllipse(30,30,48,25);
        g.generateTexture('baseImg',60,60);
 
        g.clear();
@@ -646,27 +668,34 @@
        boundaryGraphics.strokeCircle(SYSTEM.CENTER_X, SYSTEM.CENTER_Y, SYSTEM.R_AREA);
      }
 
-     function update(){
+     /**
+      *
+      */
+     function update() {
        rangeGraphics.clear();
 
-       rangeGraphics.lineStyle(1, 0xffffff, 0.5);
+       // ドッキング状態
+       rangeGraphics.lineStyle(1, 0x00ffff, 0.5);
        if ( isDocked ) {
          rangeGraphics.lineStyle(2, 0x00ffff, 1);
        }
        rangeGraphics.strokeCircle(starBase.x, starBase.y, OBJ_CONF.BASE.DOCKING_RANGE);
 
+       // 射程範囲
        [playerShip, ...Enemies].forEach(
          (obj, i)=>{
-           if(!obj.active) return;
+           if(!obj.active) {
+             return;
+           }
            let color = (i===0) ? 0x4488ff : 0xff3333;
            if ( i == 0 ) {  
-             rangeGraphics.lineStyle(0.8, color, 0.3);
+             rangeGraphics.lineStyle(1, color, 0.3);
              rangeGraphics.strokeCircle(obj.x, obj.y, MECHANICS.WEAPON.MAX_RANGE);
            }
-           rangeGraphics.lineStyle(1.2, color, 0.5);
+           rangeGraphics.lineStyle(1, color, 0.5);
            rangeGraphics.strokeCircle(obj.x, obj.y, MECHANICS.WEAPON.EFFECTIVE_RANGE);
          }
-       );
+       ); // forEach()
 
        if (playerShip) {
          playerShip.updateGauge();
@@ -675,8 +704,11 @@
          starBase.updateGauge();
        }
        Enemies.forEach(e => e.updateGauge());
-     }
+     } // update()
 
+     /**
+      *
+      */
      function getSafeRandPos(minDist, maxDist){
        let x, y, distToCenter;
        let safe = false;
@@ -1160,7 +1192,7 @@
            sepY += (dy / dist) * force * 2.0;
          }
        });
-      
+       
        // 4. ベクトルを合成
        let finalX = dirX * 1.0 + avoidX + sepX;
        let finalY = dirY * 1.0 + avoidY + sepY;
@@ -1221,6 +1253,12 @@
                isDocked && dToPlayerShip <= MECHANICS.WEAPON.EFFECTIVE_RANGE
              )
            );
+
+           const new_fear = Phaser.Math.FloatBetween(0.2, 0.8)
+           const fear_factor = OBJ_CONF.ENEMY.FEAR_FACTOR;
+           e.fear_mind = e.fear_mind * (1 - fear_factor) + new_fear * fear_factor;
+           console.log(`new_fiear=${new_fear.toFixed(2)}, fear_mind=${e.fear_mind.toFixed(2)}, shield=${(e.shield / OBJ_CONF.ENEMY.SHIELD_MAX).toFixed(2)}`);
+           
            if (e.shield >= OBJ_CONF.ENEMY.SHIELD_MAX * 0.5 && canAttackBase) {
              // 基地を攻撃
              fireBeam(scene, e, starBase, 0xff00ff);
@@ -1243,7 +1281,8 @@
              }
            } else {
              // 移動
-             let isFleeing = (e.shield < OBJ_CONF.ENEMY.SHIELD_MAX * 0.5);
+             //const isFleeing = (e.shield < OBJ_CONF.ENEMY.SHIELD_MAX * 0.5);
+             const isFleeing = e.fear_mind > e.shield / OBJ_CONF.ENEMY.SHIELD_MAX
              let target;
 
              if (!isFleeing) {
@@ -1319,8 +1358,7 @@
        let playerShipShieldRatio = playerShipShield / OBJ_CONF.PLAYER.SHIELD_MAX;
        let playerShipShieldColor = playerShipShieldRatio < 0.3 ? "#f00" : "#0f0";
        document.getElementById('statusShipShield').style.color = playerShipShieldColor;
-       document.getElementById('statusShipShield').textContent =
-         `${playerShipShield}(${Math.floor(playerShipShieldRatio * 100)}%)`;
+       document.getElementById('statusShipShield').textContent = playerShipShield;
        document.getElementById('gaugeShipShield').style.width = (playerShipShieldRatio * 100) + '%';
        document.getElementById('gaugeShipShield').style.background = playerShipShieldColor;
 
@@ -1328,8 +1366,7 @@
        let energyRatio = playerShipEnergy / OBJ_CONF.PLAYER.ENERGY_MAX;
        let energyColor = energyRatio < 0.3 ? "#f00" : "#0f0";
        document.getElementById('statusShipEnergy').style.color = energyColor;
-       document.getElementById('statusShipEnergy').textContent =
-         `${playerShipEnergy}(${Math.floor(energyRatio * 100)}%)`;
+       document.getElementById('statusShipEnergy').textContent = playerShipEnergy;
        document.getElementById('gaugeShipEnergy').style.width = (energyRatio * 100) + '%';
        document.getElementById('gaugeShipEnergy').style.background = energyColor;
 
@@ -1337,8 +1374,7 @@
        let baseShieldRatio = baseShield / OBJ_CONF.BASE.SHIELD_MAX;
        let baseShieldColor = baseShieldRatio < 0.3 ? "#f00" : "#0f0";
        document.getElementById('statusBaseShield').style.color = baseShieldColor;
-       document.getElementById('statusBaseShield').textContent =
-         `${baseShield}(${Math.floor(baseShieldRatio * 100)}%)`;
+       document.getElementById('statusBaseShield').textContent = baseShield;
        document.getElementById('gaugeBaseShield').style.width = (baseShieldRatio * 100) + '%';
        document.getElementById('gaugeBaseShield').style.background = baseShieldColor;
      }
