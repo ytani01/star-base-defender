@@ -130,6 +130,13 @@
        padding: 6px 6px; white-space: nowrap;
      }
      #hsTable tbody tr.hs-new td {color: #ff0;}
+     #hsTable tbody tr {
+       cursor: pointer;
+       transition: background-color 0.2s;
+     }
+     #hsTable tbody tr:hover {
+       background-color: rgba(0, 255, 255, 0.15);
+     }
      #hsNoRecord {
        color: #444;
        text-align: center;
@@ -351,6 +358,7 @@
      let flagClear = false;
      let _pendingScene = null;
      let isDocked = false;     
+     let currentScene = null;
 
      // ---------------------------------------------------------
      // グローバルメソッド
@@ -673,6 +681,7 @@
       *
       */
      function create(){
+       currentScene = this;
        rangeGraphics = this.add.graphics();
        boundaryGraphics = this.add.graphics();
        drawBoundary();
@@ -1621,6 +1630,33 @@
            <td>${s.turns}</td>
            <td>${s.date}</td>
          `;
+         
+         // ★追加: 行をクリックした際の処理
+         tr.addEventListener('click', () => {
+           // スコアを引き継ぐ
+           Score = s.score;
+           // 記録されたステージの次からスタートする
+           curStage = (s.stage !== undefined ? s.stage : 1) + 1;
+           turnCount = 1;
+           
+           // 敵の初期生成数を、進行するステージに合わせて再計算
+           // (初期値3 + ステージ進行分)
+           SYSTEM.N_ENEMY = 3 + (curStage - 1);
+           
+           gameOver = false;
+           flagClear = false;
+           isPlayerTurn = true;
+           _pendingScene = null;
+           
+           // オーバーレイを非表示にする
+           document.getElementById('highScoreOverlay').style.display = 'none';
+           
+           // シーンを再起動
+           if (currentScene) {
+             currentScene.scene.restart();
+           }
+         });
+
          tbody.appendChild(tr);
        });
      } // renderHSTable()
