@@ -192,8 +192,6 @@
         <div id="turn">
           Turn <span id="statusStage">1</span>-<span id="statusTurn">1</span>
           |
-          ENEMY  <span id="statusEnemyCount">1</span>
-          |
           SCORE <span id="statusScore">100</span>
           |
           <button id="viewScoresBtn">▶ SCORES</button>
@@ -209,7 +207,10 @@
           Base Shield <span id="statusBaseShield">0</span>
           <div class="status-gauge"><div id="gaugeBaseShield" class="status-gauge-fill"></div></div>
         </div>
-        <div id="logStatus">COMMAND: AWAITING ORDERS</div>
+        <div id="StatusEnemy">
+          ENEMY COUNT <span id="statusEnemyCount">1</span>
+        </div>
+        <div id="logStatus">COMMAND: Stand by for orders, Captain.</div>
       </div>
       
       <div id="gameWrapper">
@@ -288,8 +289,8 @@
 
      const OBJ_CONF = {
        PLAYER: {
-         R: 30 * SYSTEM.SCALE,
-         SHIELD_MAX: 1000,
+         W: 60,
+         SHIELD_MAX: 800,
          SPEED: 120 * SYSTEM.SCALE,
 
          ENERGY_MAX: 10000,
@@ -297,14 +298,14 @@
          MOVE_COST_RATE: 0.3 / SYSTEM.SCALE,
        },
        BASE: {
-         R: 30 * SYSTEM.SCALE,
-         SHIELD_MAX: 5000,
+         W: 60,
+         SHIELD_MAX: 4000,
          RECOVERY_RATE: 0.005,
 
          DOCKING_RANGE: 35 * SYSTEM.SCALE,
        },
        ENEMY: {
-         R: 30 * SYSTEM.SCALE,
+         W: 60,
          SHIELD_MAX: 300,
          SPEED: 30 * SYSTEM.SCALE,
          RECOVERY_RATE: 0.01,
@@ -313,9 +314,13 @@
          FEAR_FACTOR: 0.2
        },
        STAR: {
-         R: 16 * SYSTEM.SCALE,
+         W: 50
        }
      };
+     OBJ_CONF.PLAYER.R = OBJ_CONF.PLAYER.W / 2 * SYSTEM.SCALE;
+     OBJ_CONF.BASE.R = OBJ_CONF.BASE.W / 2 * SYSTEM.SCALE;
+     OBJ_CONF.ENEMY.R = OBJ_CONF.ENEMY.W / 2 * SYSTEM.SCALE;
+     OBJ_CONF.STAR.R = OBJ_CONF.ENEMY.W / 2 * SYSTEM.SCALE;
 
      const WEAPON = {
        PLAYER: {
@@ -437,6 +442,13 @@
        }
        set y(val) {
          this.sprite.y = val;
+       }
+
+       get w() {
+         return this.sprite.width * SYSTEM.SCALE;
+       }
+       get h() {
+         return this.sprite.height * SYSTEM.SCALE;
        }
 
        destroy() {
@@ -677,9 +689,13 @@
        g.clear();
 
        // Star
+       const W_STAR = OBJ_CONF.STAR.W;
+       const R_STAR = W_STAR / 2;
+       const CX_STAR = W_STAR / 2;
+       const CY_STAR = W_STAR / 2;
        g.fillStyle(0xa0a0a0);
-       g.fillCircle(25,25,16);
-       g.generateTexture('starImg',50,50);
+       g.fillCircle(CX_STAR, CY_STAR, R_STAR);
+       g.generateTexture('starImg', W_STAR, W_STAR);
 
        g.destroy();
      }
@@ -924,7 +940,7 @@
        if (clickedObj === StarBase) {
          // --- 基地に対するアクション ---
          if (isDocked) {
-           setLog("StarBase> Currently docking");
+           setLog("STARBASE: Mooring tractor beam active. Docking in progress.");
            endTurn();
            return;
          }
@@ -946,7 +962,7 @@
          }
 
          if (Player.energy < WEAPON.PLAYER.COST) {
-           setLog("Chief Engineer> LOW ENERGY", "#000", "#a00");
+           setLog("ENGINEERING: Warning! Warp core power critical.", "#000", "#a00");
            return;
          }
 
@@ -957,20 +973,20 @@
          const hitChance = Math.exp(-WEAPON.ALPHA * dist);
 
          if (hitChance < WEAPON.MAX_THRESHOLD) {
-           setLog("Tactical Officer> OUT OF RANGE", "#ff0", "#a00");
+           setLog("TACTICAL: Target beyond maximum phaser range.", "#ff0", "#a00");
            fireBeam(this, Player, clickedObj, 0x444444);
            endTurn();
            return;
          }
 
          if (isLOSBlocked(Player, clickedObj, false)) {
-           setLog("Tactical Officer> BLOCKED 1", "#ff0", "#a00");
+           setLog("TACTICAL: Target lock failed. Obstacle in line of sight.", "#ff0", "#a00");
            fireBeam(this, Player, clickedObj, 0x444444);
            endTurn();
            return;
          }
 
-         setLog("Tactical Officer> HIT THE ENEMY !", "#0ff", "#000");
+         setLog("TACTICAL: Direct hit! Enemy shields fluctuating.", "#0ff", "#000");
          const damage = Math.floor(WEAPON.PLAYER.POWER * hitChance);
          clickedObj.takeDamage(damage);
          fireBeam(this, Player, clickedObj, 0x00ffff);
@@ -979,7 +995,7 @@
            Enemies = Enemies.filter(e => e !== clickedObj);
            const rp = getSafeRandPos(0.8, 0.95);
            Enemies.push(new Enemy(this, rp.x, rp.y));
-           setLog("Tactical Officer> ENEMY SHOT DOWN — REINFORCEMENT INCOMING!");
+           setLog("TACTICAL: Target destroyed. New warp signatures detected!");
          }
          endTurn();
        } else if (clickedObj === Player) {
@@ -987,7 +1003,7 @@
          const d_shield = Player.shield_max - Player.shield;
          console.log(`d_shield=${d_shield}, Player.energe=${Player.energy}`);
          if ( d_shield <= 0 ) {
-           setLog("Chief Engineer> SHIELD IS MAX", "#0f0", "#024");
+           setLog("ENGINEERING: Deflector shields operating at maximum capacity.", "#fff", "#111");
            return;
          }
 
@@ -995,7 +1011,7 @@
          const energy_supply = Math.min(Player.energy - OBJ_CONF.PLAYER.ENERGY_MIN, d_shield);
          console.log(`energy_supply=${energy_supply}`);
          if ( energy_supply <= 0 ) {
-           setLog("Chief Engineer> LOW ENERGY");
+           setLog("ENGINEERING: Insufficient power for shield regeneration.");
            return;
          }
 
@@ -1004,7 +1020,10 @@
          console.log(`energy=${Player.energy}, shield=${Player.shield}`)
 
          const shiled_p = Math.floor(Player.shield / Player.shield_max * 100);
-         setLog(`Chief Engineer> SHIELD=${shiled_p}%, ENERGY=${Player.energy}`);
+         setLog(
+           `ENGINEERING: Shields at ${shiled_p}%. Energy reserves at ${Player.energy}.`,
+           "#fff", "#111"
+         );
          endTurn();
        } else {
          // --- 空間に対するアクション（移動） ---
@@ -1012,27 +1031,32 @@
 
          if (Player.energy < OBJ_CONF.PLAYER.ENERGY_MIN && !isDocked) {
            updateStatus();
-           gameOverMessage("OUT OF ENERGY ..");
+           gameOverMessage("SYSTEM: Total power failure. Life support failing...");
          }
        }
      } // handlePointerDown()
 
      /**
-      *
+      * なにか衝突したら停止するように座標を計算
       */
-     function clampDestToAvoidCharacters(obj, destX, destY, isEnemy = false) {
-       const R = OBJ_CONF.PLAYER.R + OBJ_CONF.ENEMY.R;
+     function clampDest(obj, destX, destY) {
        // オブジェクトから直接現在座標を取得
        const startX = obj.x;
        const startY = obj.y;
 
        const targets = [];
-       // self を obj に置換
-       if (Player && Player !== obj && Player.active) targets.push(Player);
-       if (isEnemy && StarBase && StarBase !== obj && StarBase.active && StarBase.shield > 0) {
-         targets.push(StarBase);
-       }
-       Enemies.forEach(e => { if (e && e !== obj && e.active) targets.push(e); });
+       if ( !(obj instanceof PlayerShip) ) targets.push(Player);
+       if ( obj instanceof Enemy ) targets.push(StarBase);
+       Enemies.forEach(
+         e => {
+           if (e && e !== obj && e.active) targets.push(e);
+         }
+       );
+       Stars.forEach(
+         e => {
+           if (e && e !== obj && e.active) targets.push(e);
+         }
+       );
 
        const dx = destX - startX;
        const dy = destY - startY;
@@ -1042,6 +1066,9 @@
        let minT = 1.0; 
 
        for (const tgt of targets) {
+         let R = (obj.w + tgt.w) / 2;
+         //console.log(`R=${R}`);
+
          const curDist = Phaser.Math.Distance.Between(startX, startY, tgt.x, tgt.y);
          if (curDist < R) continue;
 
@@ -1054,7 +1081,7 @@
          if (disc < 0) continue; 
          const t = (-b - Math.sqrt(disc)) / (2 * a);
          if (t > 0 && t < minT) minT = t;
-       } 
+       }  // for ()
 
        if (minT < 1.0) {
          const len = Math.sqrt(lenSq);
@@ -1062,23 +1089,7 @@
          return { x: startX + dx * stopT, y: startY + dy * stopT };
        }
        return { x: destX, y: destY };
-     } // clampDestToAvoidCharacters(..)
-
-     /**
-      *
-      */
-     function isMoveForbidden(obj, destX, destY) {
-       const startX = obj.x;
-       const startY = obj.y;
-
-       return Stars.some(s => {
-         if (!s.active) return false;
-         if (Phaser.Math.Distance.Between(destX, destY, s.x, s.y) <= OBJ_CONF.STAR.R) {
-           return true;
-         }
-         return hasObstacleOnPath(startX, startY, destX, destY, s.x, s.y, OBJ_CONF.STAR.R);
-       });
-     } // isMoveForbidden(..)
+     } // clampDest(..)
 
      /**
       * 進行方向がブロックされている場合、少しずつ角度をずらして
@@ -1108,13 +1119,8 @@
          let testDestX = x + Math.cos(testAngle) * speed;
          let testDestY = y + Math.sin(testAngle) * speed;
          
-         // 1. 星などの固定障害物を貫通しないかチェック
-         if (isMoveForbidden(obj, testDestX, testDestY, true)) {
-           continue; 
-         }
-         
-         // 2. 他のキャラクターとの衝突を計算し、ぶつかる直前の座標を取得 (self -> obj)
-         let clamped = clampDestToAvoidCharacters(obj, testDestX, testDestY, true);
+         // 他のキャラクターとの衝突を計算し、ぶつかる直前の座標を取得 (self -> obj)
+         let clamped = clampDest(obj, testDestX, testDestY);
          
          // 実際に進める距離の2乗
          let distSq = (clamped.x - x)**2 + (clamped.y - y)**2;
@@ -1146,7 +1152,7 @@
          duration: 200,
          ease: 'Sine.easeInOut'
        });
-       setLog("StarBase> DOCKED — ENERGY FULL", "#220", "#0ff");
+       setLog("STARBASE: Docking complete. Power transfer successful.", "#220", "#0ff");
        updateStatus();
      } // dockShip()
 
@@ -1170,23 +1176,18 @@
          target_is_base = true;
        }
 
-       const clamped = clampDestToAvoidCharacters(Player, destX, destY, false);
+       const clamped = clampDest(Player, destX, destY);
        destX = clamped.x;
        destY = clamped.y;
        let distance = Phaser.Math.Distance.Between(Player.x, Player.y, destX, destY);
-
-       if ( isMoveForbidden(Player, destX, destY) ) {
-         setLog("BLOCKED 2");
-         return;
-       }
-       setLog("Chief Pilot> IMPULSE ENGIN START");
+       setLog("HELM: Course laid in. Impulse power engaged.");
 
        let skipAutoDock = false;
        if (isDocked) {
          isDocked = false;
          skipAutoDock = true;
          Player.shield = OBJ_CONF.PLAYER.SHIELD_MAX;
-         setLog("StarBase> UNDOCKED");
+         setLog("STARBASE: Tractor beam released. Clear for departure.");
          updateStatus();
        }
 
@@ -1194,10 +1195,10 @@
        let cost = Math.max(1, Math.ceil(actualDist * OBJ_CONF.PLAYER.MOVE_COST_RATE));
        if ( Player.energy - cost <= OBJ_CONF.PLAYER.ENERGY_MIN ) {
          if ( target_is_base ) {
-           gameOverMessage("NO ENERGY TO CONTINUE");
+           gameOverMessage("ENGINEERING: Insufficient power for impulse drive.");
            return;
          }
-         setLog("NOT ENOUGH ENERGY");
+         setLog("ENGINEERING: Insufficient power for impulse drive.");
          return;
        }
 
@@ -1247,7 +1248,7 @@
            }
          });
          let fDist = Math.sqrt(dirX * dirX + dirY * dirY);
-         if (fDist > 0.001) {
+         if (fDist > 0.000001) {
            dirX /= fDist;
            dirY /= fDist;
          }
@@ -1363,9 +1364,15 @@
 
        // 評価結果に基づいてアクションを分岐
        if (context.canAttackBase) {
-         attackTarget(scene, enemy, StarBase, context.distToBase, "BASE DESTROYED");
+         attackTarget(
+           scene, enemy, StarBase, context.distToBase,
+           "SYSTEM: Starbase critical failure. Core breach imminent..."
+         );
        } else if (context.canAttackPlayer) {
-         attackTarget(scene, enemy, Player, context.distToPlayer, "ENTERPRISE DESTROYED");
+         attackTarget(
+           scene, enemy, Player, context.distToPlayer,
+           "SYSTEM: Hull integrity zero. Ship destroyed."
+         );
        } else {
          moveEnemy(scene, enemy, context);
        }
@@ -1456,6 +1463,14 @@
            const distFromCenter = Phaser.Math.Distance.Between(enemy.x, enemy.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
            if (distFromCenter > SYSTEM.R_AREA) {
              enemy.die(); // 領域外へ出たら消滅
+
+             if ( !gameOver ) {
+               const remaining = getActiveEnemyCount();
+               setLog(
+                 `TACTICAL: Hostile vessel has retreated. ${remaining} targets remaining.`,
+                 "#0f0", "#222"
+               );
+             }
            }
          }
        });
@@ -1486,6 +1501,7 @@
          if (turnCount % SYSTEM.NEW_ENEMY_INTERVAL === 0) {
            const p = getSafeRandPos(0.8, 0.95);
            Enemies.push(new Enemy(scene, p.x, p.y));
+           setLog("TACTICAL: Alert! New hostile warp signature detected.", "#ff0", "#000")
          }
 
          // 基地の回復
@@ -1514,6 +1530,7 @@
 
        document.getElementById('statusTurn').textContent = `${turnCount}`;
        document.getElementById('statusStage').textContent = `${curStage}`;
+       document.getElementById('statusEnemyCount').style.color = "#ff0"
        document.getElementById('statusEnemyCount').textContent = `${enemyCount}`;
        document.getElementById('statusScore').textContent = `${Score}`;
 
@@ -1536,7 +1553,7 @@
        // Base Shield
        let baseShieldRatio = baseShield / OBJ_CONF.BASE.SHIELD_MAX;
        let baseShieldColor = baseShieldRatio < 0.3 ? "#f00" : "#0f0";
-       document.getElementById('statusBaseShield').style.color = baseShieldColor;
+           document.getElementById('statusBaseShield').style.color = baseShieldColor;
        document.getElementById('statusBaseShield').textContent = baseShield;
        document.getElementById('gaugeBaseShield').style.width = (baseShieldRatio * 100) + '%';
        document.getElementById('gaugeBaseShield').style.background = baseShieldColor;
@@ -1564,7 +1581,7 @@
 
        _pendingScene = scene;
 
-       setLog(`STAGE ${clearedStage} CLEARED!`);
+       setLog(`COMMAND: Sector ${clearedStage} secured. Awaiting new orders.`);
        showHighScoreOverlay('stageclear', { clearedStage, bonus, list, newIdx });
      } // nextStage()
 
@@ -1722,6 +1739,7 @@
          location.reload();
        }
      });
+
      document.getElementById('hsCloseBtn').addEventListener('click', () => {
        document.getElementById('highScoreOverlay').style.display = 'none';
      });
