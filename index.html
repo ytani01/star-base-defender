@@ -300,14 +300,14 @@
        BASE: {
          W: 60,
          SHIELD_MAX: 4000,
-         RECOVERY_RATE: 0.005,
+         RECOVERY_RATE: 0.01,
 
          DOCKING_RANGE: 35 * SYSTEM.SCALE,
        },
        ENEMY: {
          W: 60,
          SHIELD_MAX: 300,
-         SPEED: 30 * SYSTEM.SCALE,
+         SPEED: 40 * SYSTEM.SCALE,
          RECOVERY_RATE: 0.01,
 
          FEAR_INIT: 0.5,
@@ -1352,12 +1352,10 @@
      }
 
      /**
-      * 2. 敵1体の具体的な行動（思考と実行）
+      * 敵1体の具体的な行動（思考と実行）
       */
      function executeEnemyAction(scene, enemy) {
        if (gameOver || !enemy.active) return;
-
-       updateEnemyFear(enemy);
 
        // 状況を評価し、コンテキスト（距離や攻撃可能フラグなど）を取得
        const context = evaluateTacticalSituation(enemy);
@@ -1379,16 +1377,7 @@
      }
 
      /**
-      * 3. 恐怖度の更新
-      */
-     function updateEnemyFear(enemy) {
-       const new_fear = Phaser.Math.FloatBetween(0.2, 0.8);
-       const fear_factor = OBJ_CONF.ENEMY.FEAR_FACTOR;
-       enemy.fear_mind = enemy.fear_mind * (1 - fear_factor) + new_fear * fear_factor;
-     }
-
-     /**
-      * 4. 戦況の評価（距離計算、攻撃可否、逃走判断）
+      * 戦況の評価（距離計算、攻撃可否、逃走判断）
       */
      function evaluateTacticalSituation(enemy) {
        const distToBase = Phaser.Math.Distance.Between(enemy.x, enemy.y, StarBase.x, StarBase.y);
