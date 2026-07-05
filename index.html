@@ -1372,7 +1372,9 @@
        const context = evaluateTacticalSituation(enemy);
 
        // 評価結果に基づいてアクションを分岐
-       if (context.canAttackBase) {
+       if (context.isFleeing) {
+         moveEnemy(scene, enemy, context);
+       } else if (context.canAttackBase) {
          attackTarget(
            scene, enemy, StarBase, context.distToBase,
            "SYSTEM: Starbase critical failure. Core breach imminent..."
@@ -1415,6 +1417,7 @@
 
        // 逃走判断 (恐怖心がシールド残量割合を上回った場合)
        const isFleeing = enemy.fear_mind > (enemy.shield / OBJ_CONF.ENEMY.SHIELD_MAX);
+       console.log(`enemy.shield=${enemy.shield}, ${enemy.fear_mind}, ${isFleeing}`);
 
        return { distToBase, distToPlayer, canAttackBase, canAttackPlayer, isFleeing };
      }
@@ -1462,7 +1465,13 @@
          onComplete: () => {
            const distFromCenter = Phaser.Math.Distance.Between(enemy.x, enemy.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
            if (distFromCenter > SYSTEM.R_AREA) {
-             enemy.die(); // 領域外へ出たら消滅
+             // 領域外へ出たら消滅
+             enemy.die();
+             // fear_mind
+             Enemies.forEach(e => {
+               e.fear_mind = Math.min(0.8, e.fear_mind + .1);
+               console.log(`e.fear_mind=${e.fear_mind}`);
+             });
 
              if ( !gameOver ) {
                const remaining = getActiveEnemyCount();
@@ -1501,6 +1510,12 @@
          if (turnCount % SYSTEM.NEW_ENEMY_INTERVAL === 0) {
            const p = getSafeRandPos(0.8, 0.95);
            Enemies.push(new Enemy(scene, p.x, p.y));
+           // fear_mind
+           Enemies.forEach(e => {
+             e.fear_mind = Math.max(0.2, e.fear_mind - .1);
+             console.log(`e.fear_mind=${e.fear_mind}`);
+           });
+
            setLog("TACTICAL: Alert! New hostile warp signature detected.", "#ff0", "#000")
          }
 
