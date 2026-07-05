@@ -276,14 +276,14 @@
      };
      SYSTEM.GAME_ID = Phaser.Utils.String.UUID();
      SYSTEM.PLAY_AREA_WIDTH = SYSTEM.R_AREA * 2 + 30;
-     SYSTEM.PLAY_AREA_HEIGHT = SYSTEM.PLAY_AREA_WIDTH;
+     SYSTEM.PLAY_AREA_HEIGHT = SYSTEM.PLAY_AREA_WIDTH; 
      SYSTEM.CENTER_X = SYSTEM.PLAY_AREA_WIDTH / 2;
      SYSTEM.CENTER_Y = SYSTEM.PLAY_AREA_HEIGHT / 2;
 
      const CAMERA = {
        ZOOM_MIN: 1.0,
        ZOOM_MAX: 4.0,
-       STEP: 2.0
+       STEP: 2.0,
      };
      let CurZoom = 1.0;
 
@@ -297,21 +297,23 @@
          ENERGY_MIN: 10,
          MOVE_COST_RATE: 0.3 / SYSTEM.SCALE,
        },
-       BASE: {
-         W: 60,
-         SHIELD_MAX: 4000,
-         RECOVERY_RATE: 0.01,
-
-         DOCKING_RANGE: 35 * SYSTEM.SCALE,
-       },
        ENEMY: {
          W: 60,
          SHIELD_MAX: 300,
          SPEED: 40 * SYSTEM.SCALE,
+
          RECOVERY_RATE: 0.01,
 
          FEAR_INIT: 0.5,
          FEAR_FACTOR: 0.2
+       },
+       BASE: {
+         W: 60,
+         SHIELD_MAX: 4000,
+
+         RECOVERY_RATE: 0.01,
+
+         DOCKING_RANGE: 35 * SYSTEM.SCALE,
        },
        STAR: {
          W: 50
@@ -444,11 +446,24 @@
          this.sprite.y = val;
        }
 
+       get orig_w() {
+         return this.sprite.width;
+       }
+       get orig_h() {
+         return this.sprite.height;
+       }
+       get orig_r() {
+         return (this.orig_w + this.orig_h) / 4;
+       }
+
        get w() {
-         return this.sprite.width * SYSTEM.SCALE;
+         return this.orig_w * SYSTEM.SCALE;
        }
        get h() {
-         return this.sprite.height * SYSTEM.SCALE;
+         return this.orig_h * SYSTEM.SCALE;
+       }
+       get r() {
+         return (this.w + this.h) / 4;
        }
 
        destroy() {
@@ -488,7 +503,9 @@
            return;
          }
 
+         //
          // update Shield circle
+         //
          const shield_ratio = this.shield / this.shield_max;
          let shield_color = 0xffffff;
          if ( shield_ratio < 0.5 ) {
@@ -497,12 +514,13 @@
          if ( shield_ratio < 0.25 ) {
            shield_color = 0xff0000;
          }
-         // const shield_color = 0xff0000 + Math.floor(0xffff * shield_ratio);
-         //console.log(`shield_color=${shield_color.toString(16)}`);
          this.g_shield.clear();
          this.g_shield.lineStyle(2 * shield_ratio, shield_color, 1);
-         this.g_shield.strokeCircle(this.x, this.y, OBJ_CONF.PLAYER.R);
+         this.g_shield.strokeCircle(this.x, this.y, this.r);
 
+         //
+         // update Gauge
+         //
          drawGauge(
            this.gauge,
            this.x, this.y + (this.gauge_y * this.scale),
@@ -510,7 +528,7 @@
            this.shield / this.shield_max,
            this.gauge_color
          );
-       }
+       } // updateGauge()
 
        die() {
          this.shield = 0;
@@ -641,7 +659,6 @@
        const g = this.make.graphics({add:false});
 
        // PlayerShip
-       //
        g.fillStyle(0x4488ff);
        g.fillRect(27,25,8,24);
        g.fillStyle(0x4488ff);
@@ -818,9 +835,9 @@
        let safe = false;
        let attempts = 0;
        
-       // オブジェクト同士が重ならないための最低距離（旧 INIT_POS_DISTANCE 相当）
-       // 自機の半径(30)の2倍 = 60
+       // オブジェクト同士が重ならないための最低距離
        const MIN_SPAWN_DIST = OBJ_CONF.PLAYER.R * 2;
+       console.log(`MIN_SPAWN_DIST=${MIN_SPAWN_DIST}`);
        
        while(!safe && attempts < 100) {
          x = Phaser.Math.Between(
@@ -915,13 +932,7 @@
        const clickables = [...Enemies, StarBase, Player];
        const clickedObj = clickables.find(e => {
          if (!e || !e.active) return false;
-         // クラスやオブジェクトの種類に応じて半径を決定
-         //
-         // XXX ToDo: もっと美しくできる。
-         //   ここでは、星か星以外かしかみていない。
-         //   各クラスのインスタンス変数にすべき
-         const r = (e instanceof Star) ? OBJ_CONF.STAR.R : OBJ_CONF.PLAYER.R;
-         return Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, e.x, e.y) < r;
+         return Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, e.x, e.y) < e.r;
        });
        if ( clickedObj ) {
          console.log(`clickedObj=${clickedObj.constructor.name}`);
@@ -1303,7 +1314,7 @@
 
        let finalDist = Math.sqrt(finalX * finalX + finalY * finalY);
        
-       // ★追加: もし全方向からの力が完璧に釣り合ってゼロになってしまった場合（完全なスタック）
+       // もし全方向からの力が完璧に釣り合ってゼロになってしまった場合（完全なスタック）
        // ランダムな方向に微小な力を与えて均衡を崩し、その場にとどまるのを防ぐ
        if (finalDist < 0.001) {
          let randomAngle = Math.random() * Math.PI * 2;
@@ -1318,7 +1329,7 @@
        let desiredX = e.x + finalX;
        let desiredY = e.y + finalY;
 
-       // ★変更: 単純なクランプではなく、ルート走査による回避解決を適用
+       // 単純なクランプではなく、ルート走査による回避解決を適用
        return resolveMovement(e, desiredX, desiredY, OBJ_CONF.ENEMY.SPEED);
      } // calcDest(e, target, isFleeing = false)
 
