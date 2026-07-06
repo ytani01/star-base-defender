@@ -264,7 +264,7 @@
        NEW_ENEMY_INTERVAL: 40,
        N_STAR: 15,
        N_ENEMY: 3,
-       GUAGE: {
+       GAUGE: {
          W: 30,
          H: 3
        },
@@ -309,7 +309,7 @@
      OBJ_CONF.PLAYER.R = OBJ_CONF.PLAYER.W / 2 * SYSTEM.SCALE;
      OBJ_CONF.BASE.R = OBJ_CONF.BASE.W / 2 * SYSTEM.SCALE;
      OBJ_CONF.ENEMY.R = OBJ_CONF.ENEMY.W / 2 * SYSTEM.SCALE;
-     OBJ_CONF.STAR.R = OBJ_CONF.ENEMY.W / 2 * SYSTEM.SCALE;
+     OBJ_CONF.STAR.R = OBJ_CONF.STAR.W / 2 * SYSTEM.SCALE;
 
      const WEAPON = {
        PLAYER: {
@@ -329,9 +329,6 @@
      WEAPON.PLAYER.EFFECTIVE_RANGE = Math.floor(
         -Math.log(WEAPON.EFFECTIVE_THRESHOLD) / WEAPON.ALPHA
      );
-     WEAPON.ENEMY.MAX_RANGE = Math.floor(
-        -Math.log(WEAPON.MAX_THRESHOLD) / WEAPON.ALPHA
-     );
      WEAPON.ENEMY.EFFECTIVE_RANGE = Math.floor(
         -Math.log(WEAPON.EFFECTIVE_THRESHOLD) / WEAPON.ALPHA
      );
@@ -341,7 +338,7 @@
        STORAGE_KEY: 'starbaseDefenderScores'
      };
 
-     let Player, StarBase, rangeGraphics, boundaryGraphics;
+     let Player, ObjStarBase, rangeGraphics, boundaryGraphics;
      let Enemies = [];
      let Stars = [];
      let turnCount = 1;
@@ -468,12 +465,11 @@
        constructor(
          scene, x, y, texture,
          gauge_y, gauge_w, gauge_h,
-         shield, shield_recovery_rate, gauge_color,
+         shield, gauge_color,
          scale=SYSTEM.SCALE
        ) {
          super(scene, x, y, texture, scale);
          this.shield = shield;
-         this.shield_recovery_rate = shield_recovery_rate;
          this.gauge_color = gauge_color;
          this.gauge_y = gauge_y;
          this.gauge_w = gauge_w;
@@ -485,7 +481,7 @@
 
        updateGauge() {
          if (! this.active ) {
-           if (this.guage) {
+           if (this.gauge) {
              this.gauge.clear();
              this.g_shield.clear();
            }
@@ -547,13 +543,13 @@
        constructor(
          scene, x, y, texture,
          gauge_y, gauge_w, gauge_h,
-         shield, shield_recovery_rate, gauge_color,
+         shield, gauge_color,
          energy, energy_color,
          scale=SYSTEM.SCALE
        ) {
          super(
            scene, x, y, texture, gauge_y, gauge_w, gauge_h,
-           shield, shield_recovery_rate, gauge_color, scale
+           shield, gauge_color, scale
          );
          this.energy = energy;
          this.g_energy_color = energy_color;
@@ -592,8 +588,8 @@
 
        constructor(scene, x, y) {
          super(
-           scene, x, y, 'baseImg', 36,  SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
-           BaseStation.SHIELD_MAX, BaseStation.SHIELD_RECOVERY_RATE, 0xffcc00
+           scene, x, y, 'baseImg', 36,  SYSTEM.GAUGE.W, SYSTEM.GAUGE.H,
+           BaseStation.SHIELD_MAX, 0xffcc00
          );
 
          this.sprite.setDepth(100);
@@ -611,8 +607,8 @@
        constructor(scene, x, y) {
          super(
            scene, x, y, 'enemyImg',
-           36, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H,
-           Enemy.SHIELD_MAX, Enemy.SHIELD_RECOVERY_RATE, 0xff3333
+           36, SYSTEM.GAUGE.W, SYSTEM.GAUGE.H,
+           Enemy.SHIELD_MAX, 0xff3333
          );
          this.fear_mind = OBJ_CONF.ENEMY.FEAR_INIT;
        }
@@ -632,8 +628,8 @@
        constructor(scene, x, y) {
          super(
            scene, x, y, 'PlayerImg',
-           36, SYSTEM.GUAGE.W, SYSTEM.GUAGE.H, 
-           PlayerShip.SHIELD_MAX, PlayerShip.SHIELD_RECOVERY_RATE, 0xff00ff,
+           36, SYSTEM.GAUGE.W, SYSTEM.GAUGE.H, 
+           PlayerShip.SHIELD_MAX, 0xff00ff,
            PlayerShip.ENERGY_MAX, 0x44ffff,
          );
        }
@@ -1035,7 +1031,7 @@
          Player.shield += energy_supply;
          console.log(`energy=${Player.energy}, shield=${Player.shield}`)
 
-         const shiled_p = Math.floor(Player.shield / Player.shield_max * 100);
+         const shiled_p = Math.floor(Player.shield / PlayerShip.SHIELD_MAX * 100);
          setLog(
            `ENGINEERING: Shields at ${shiled_p}%. Energy reserves at ${Player.energy}.`,
            "#fff", "#111"
@@ -1195,7 +1191,6 @@
        const clamped = clampDest(Player, destX, destY);
        destX = clamped.x;
        destY = clamped.y;
-       let distance = Phaser.Math.Distance.Between(Player.x, Player.y, destX, destY);
        setLog("HELM: Course laid in. Impulse power engaged.");
 
        let skipAutoDock = false;
@@ -1650,7 +1645,7 @@
        return { list, newIdx: madeIt ? newIdx : -1 };
      }
 
-     function renderHSTable(list, newIdx) {
+     function renderHSTable(list) {
        const tbody  = document.getElementById('hsTableBody');
        const noRec  = document.getElementById('hsNoRecord');
        tbody.innerHTML = '';
@@ -1720,7 +1715,7 @@
          resultEl.style.color      = '#0f0';
          resultEl.textContent      = `✓ STAGE ${clearedStage} CLEARED!`;
          finalEl.textContent       = `TURNS:${turnCount}, STAGE BONUS:+${bonus}, SCORE: ${Score}`;
-         renderHSTable(list, newIdx);
+         renderHSTable(list);
          closeBtn.style.display    = 'none';
          restartBtn.textContent    = '▶ NEXT STAGE';
          restartBtn.style.display  = 'inline-block';
@@ -1730,7 +1725,7 @@
          resultEl.style.color      = '#ff0';
          resultEl.textContent      = msg;
          finalEl.textContent       = `MISSION FAILED: SCORE: ${Score}  STAGE: ${curStage}  TURNS: ${turnCount}`;
-         renderHSTable(loadHighScores(), -1);
+         renderHSTable(loadHighScores());
          closeBtn.style.display    = 'none';
          restartBtn.textContent    = '▶ RESTART';
          restartBtn.style.display  = 'inline-block';
@@ -1739,7 +1734,7 @@
          resultEl.style.color      = '#0ff';
          resultEl.textContent      = '▶ HIGH SCORES ◀';
          finalEl.textContent       = `NOW — SCORE: ${Score}   STAGE: ${curStage}   TURN: ${turnCount}`;
-         renderHSTable(loadHighScores(), -1);
+         renderHSTable(loadHighScores());
          closeBtn.style.display    = 'inline-block';
          restartBtn.textContent    = '▶ RESTART';
          restartBtn.style.display  = 'inline-block';
