@@ -305,7 +305,7 @@
          RECOVERY_RATE: 0.01,
 
          FEAR_INIT: 0.5,
-         FEAR_FACTOR: 0.2
+         FEAR_STEP: 0.05
        },
        BASE: {
          W: 60,
@@ -1469,7 +1469,7 @@
              enemy.die();
              // fear_mind
              Enemies.forEach(e => {
-               e.fear_mind = Math.min(0.8, e.fear_mind + .1);
+               e.fear_mind = Math.min(0.8, e.fear_mind + OBJ_CONF.ENEMY.FEAR_STEP);
                console.log(`e.fear_mind=${e.fear_mind}`);
              });
 
@@ -1512,7 +1512,7 @@
            Enemies.push(new Enemy(scene, p.x, p.y));
            // fear_mind
            Enemies.forEach(e => {
-             e.fear_mind = Math.max(0.2, e.fear_mind - .1);
+             e.fear_mind = Math.max(0.2, e.fear_mind - OBJ_CONF.ENEMY.FEAR_STEP);
              console.log(`e.fear_mind=${e.fear_mind}`);
            });
 
