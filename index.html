@@ -287,29 +287,6 @@
      };
      let CurZoom = 1.0;
 
-     const OBJ_CONF = {
-       PLAYER: {
-         W: 60,
-         SPEED: 120 * SYSTEM.SCALE,
-       },
-       ENEMY: {
-         W: 60,
-         SPEED: 40 * SYSTEM.SCALE,
-
-         FEAR_INIT: 0.5,
-         FEAR_STEP: 0.05
-       },
-       BASE: {
-         W: 60,
-       },
-       STAR: {
-         W: 50
-       }
-     };
-     OBJ_CONF.PLAYER.R = OBJ_CONF.PLAYER.W / 2 * SYSTEM.SCALE;
-     OBJ_CONF.BASE.R = OBJ_CONF.BASE.W / 2 * SYSTEM.SCALE;
-     OBJ_CONF.ENEMY.R = OBJ_CONF.ENEMY.W / 2 * SYSTEM.SCALE;
-     OBJ_CONF.STAR.R = OBJ_CONF.STAR.W / 2 * SYSTEM.SCALE;
 
      const WEAPON = {
        PLAYER: {
@@ -573,6 +550,8 @@
       *
       */
      class Star extends GameObj {
+       static W = 50;
+       static R = 50 / 2 * SYSTEM.SCALE;
        constructor(scene, x, y) {
          super(scene, x, y, 'starImg');
        }
@@ -582,6 +561,8 @@
       *
       */
      class BaseStation extends ObjWithShield {
+       static W = 60;
+       static R = 60 / 2 * SYSTEM.SCALE;
        static SHIELD_MAX = 4000;
        static SHIELD_RECOVERY_RATE = 0.01;
        static DOCKING_RANGE = 35 * SYSTEM.SCALE;
@@ -601,6 +582,11 @@
       *
       */
      class Enemy extends ObjWithShield {
+       static W = 60;
+       static SPEED = 40 * SYSTEM.SCALE;
+       static R = 60 / 2 * SYSTEM.SCALE;
+       static FEAR_INIT = 0.5;
+       static FEAR_STEP = 0.05;
        static SHIELD_MAX = 300;
        static SHIELD_RECOVERY_RATE = 0.01;
 
@@ -610,15 +596,18 @@
            36, SYSTEM.GAUGE.W, SYSTEM.GAUGE.H,
            Enemy.SHIELD_MAX, 0xff3333
          );
-         this.fear_mind = OBJ_CONF.ENEMY.FEAR_INIT;
+         this.fear_mind = Enemy.FEAR_INIT;
        }
      }
 
      /**
       *
       */
-     class PlayerShip extends ObjWithEnergy {
-       static SHIELD_MAX = 800;
+      class PlayerShip extends ObjWithEnergy {
+        static W = 60;
+        static SPEED = 120 * SYSTEM.SCALE;
+        static R = 60 / 2 * SYSTEM.SCALE;
+        static SHIELD_MAX = 800;
        static SHIELD_RECOVERY_RATE = 0;
 
        static ENERGY_MAX = 10000;
@@ -707,7 +696,7 @@
        g.clear();
 
        // Star
-       const W_STAR = OBJ_CONF.STAR.W;
+       const W_STAR = Star.W;
        const R_STAR = W_STAR / 2;
        const CX_STAR = W_STAR / 2;
        const CY_STAR = W_STAR / 2;
@@ -837,7 +826,7 @@
        let attempts = 0;
        
        // オブジェクト同士が重ならないための最低距離
-       const MIN_SPAWN_DIST = OBJ_CONF.PLAYER.R * 2;
+       const MIN_SPAWN_DIST = PlayerShip.R * 2;
        console.log(`MIN_SPAWN_DIST=${MIN_SPAWN_DIST}`);
        
        while(!safe && attempts < 100) {
@@ -906,7 +895,7 @@
        // 1. 星（障害物）による遮蔽の判定
        let hitStar = Stars.some(s => 
          s.active && hasObstacleOnPath(
-           srcObj.x, srcObj.y, targetObj.x, targetObj.y, s.x, s.y, OBJ_CONF.STAR.R
+           srcObj.x, srcObj.y, targetObj.x, targetObj.y, s.x, s.y, Star.R
          )
        );
        if (hitStar) return true;
@@ -914,7 +903,7 @@
        // 2. 基地による遮蔽の判定（基地の見た目のサイズで正確に判定）
        if (checkBase && ObjStarBase && ObjStarBase.active && ObjStarBase.shield > 0) {
          if (hasObstacleOnPath(
-           srcObj.x, srcObj.y, targetObj.x, targetObj.y, ObjStarBase.x, ObjStarBase.y, OBJ_CONF.BASE.R
+           srcObj.x, srcObj.y, targetObj.x, targetObj.y, ObjStarBase.x, ObjStarBase.y, BaseStation.R
          )) {
            return true;
          }
@@ -1175,7 +1164,7 @@
        let rawDist = Phaser.Math.Distance.Between(Player.x, Player.y, targetX, targetY);
        if (rawDist < 1) return;
 
-       let moveDist = Math.min(rawDist, OBJ_CONF.PLAYER.SPEED);
+       let moveDist = Math.min(rawDist, PlayerShip.SPEED);
        let ratio = moveDist / rawDist;
        let destX = Player.x + (targetX - Player.x) * ratio;
        let destY = Player.y + (targetY - Player.y) * ratio;
@@ -1280,7 +1269,7 @@
 
        // 2. 障害物(星)からの反発力 + 回り込み力
        let avoidX = 0, avoidY = 0;
-       const STAR_AVOID_RADIUS = OBJ_CONF.STAR.R * 3.5;
+       const STAR_AVOID_RADIUS = Star.R * 3.5;
        Stars.forEach(s => {
          if (!s.active) return;
          let dx = e.x - s.x;
@@ -1295,7 +1284,7 @@
 
        // 3. 他の敵からの反発力（分離）
        let sepX = 0, sepY = 0;
-       const ENEMY_AVOID_RADIUS = OBJ_CONF.ENEMY.R * 2.5;
+       const ENEMY_AVOID_RADIUS = Enemy.R * 2.5;
        Enemies.forEach(other => {
          if (!other.active || other === e) return;
          let dx = e.x - other.x;
@@ -1323,14 +1312,14 @@
          finalDist = 1.0;
        }
 
-       finalX = (finalX / finalDist) * OBJ_CONF.ENEMY.SPEED;
-       finalY = (finalY / finalDist) * OBJ_CONF.ENEMY.SPEED;
+       finalX = (finalX / finalDist) * Enemy.SPEED;
+       finalY = (finalY / finalDist) * Enemy.SPEED;
 
        let desiredX = e.x + finalX;
        let desiredY = e.y + finalY;
 
        // 単純なクランプではなく、ルート走査による回避解決を適用
-       return resolveMovement(e, desiredX, desiredY, OBJ_CONF.ENEMY.SPEED);
+       return resolveMovement(e, desiredX, desiredY, Enemy.SPEED);
      } // calcDest(e, target, isFleeing = false)
 
      /**
@@ -1472,7 +1461,7 @@
              enemy.die();
              // fear_mind
              Enemies.forEach(e => {
-               e.fear_mind = Math.min(0.8, e.fear_mind + OBJ_CONF.ENEMY.FEAR_STEP);
+               e.fear_mind = Math.min(0.8, e.fear_mind + Enemy.FEAR_STEP);
                console.log(`e.fear_mind=${e.fear_mind}`);
              });
 
@@ -1515,7 +1504,7 @@
            Enemies.push(new Enemy(scene, p.x, p.y));
            // fear_mind
            Enemies.forEach(e => {
-             e.fear_mind = Math.max(0.2, e.fear_mind - OBJ_CONF.ENEMY.FEAR_STEP);
+             e.fear_mind = Math.max(0.2, e.fear_mind - Enemy.FEAR_STEP);
              console.log(`e.fear_mind=${e.fear_mind}`);
            });
 
