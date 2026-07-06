@@ -10,5 +10,3 @@
 
 ## Tracks
 
-- [x] **Track: 現在、OBJ_CONF.PLAYER.W などとなっているのをクラス変数 PlayerShip.W のようにしたい。**
-*Link: [./tracks/refactor_config_20260706/](./tracks/refactor_config_20260706/)*
