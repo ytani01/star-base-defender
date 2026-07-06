@@ -1,0 +1,8 @@
+{
+  "track_id": "refactor_config_20260706",
+  "type": "refactor",
+  "status": "new",
+  "created_at": "2026-07-06T18:05:00Z",
+  "updated_at": "2026-07-06T18:05:00Z",
+  "description": "現在、OBJ_CONF.PLAYER.W などとなっているのをクラス変数 PlayerShip.W のようにしたい。"
+}
