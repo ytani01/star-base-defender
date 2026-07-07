@@ -221,7 +221,7 @@
           ENEMY COUNT
           <span id="statusEnemyCount">1</span>
         </div>
-        <div id="logStatus">COMMAND: Stand by for orders, Captain.</div>
+        <div id="logStatus">副長: 艦長、命令をどうぞ。</div>
       </div>
       
       <div id="gameWrapper">
@@ -948,7 +948,7 @@
        if (clickedObj === g_starBase) {
          // --- 基地に対するアクション ---
          if (g_isDocked) {
-           setMsg("STARBASE: Mooring tractor beam active. Docking in progress.");
+           setMsg("STARBASE: ドッキング中。エネルギー補給完了してます。いつでも出航できます。");
            endTurn();
            return;
          }
@@ -965,7 +965,7 @@
        } else if (clickedObj instanceof EnemyShip) {
          // --- 敵に対するアクション ---
          if (g_isDocked) {
-           setMsg("Tactical Officer> All weapons are deactivated", "#ff0", "#a00");
+           setMsg("戦術士官: ドッキング中のため、兵器は使用できません。", "#a00");
            return;
          }
 
@@ -981,20 +981,23 @@
          const hitChance = Math.exp(-WEAPON.ALPHA * dist);
 
          if (hitChance < WEAPON.MAX_THRESHOLD) {
-           setMsg("TACTICAL: Target beyond maximum phaser range.", "#ff0", "#a00");
+           setMsg(
+             "戦術士官: 射程範囲外のため、敵艦にダメージなし。",
+             "#ff0", "#a00"
+           );
            fireBeam(this, g_playerShip, clickedObj, 0x444444);
            endTurn();
            return;
          }
 
          if (isLOSBlocked(g_playerShip, clickedObj, false)) {
-           setMsg("TACTICAL: Target lock failed. Obstacle in line of sight.", "#ff0", "#a00");
+           setMsg("戦術士官: 障害物に遮られ、敵艦にダメージなし。", "#ff0", "#a00");
            fireBeam(this, g_playerShip, clickedObj, 0x444444);
            endTurn();
            return;
          }
 
-         setMsg("TACTICAL: Direct hit! Enemy shields fluctuating.", "#0ff", "#000");
+         setMsg("戦術士官: 攻撃命中！ 敵艦シールド減少！", "#0ff", "#000");
          const damage = Math.floor(WEAPON.PLAYER.POWER * hitChance);
          clickedObj.takeDamage(damage);
          fireBeam(this, g_playerShip, clickedObj, 0x00ffff);
@@ -1003,7 +1006,7 @@
            g_enemies = g_enemies.filter(e => e !== clickedObj);
            const rp = getSafeRandPos(0.8, 0.95);
            g_enemies.push(new EnemyShip(this, rp.x, rp.y));
-           setMsg("TACTICAL: Target destroyed. New warp signatures detected!");
+           setMsg("戦術士官: 敵艦を撃破！ 別の新たな敵艦を検知しました！", "#ff0");
          }
          endTurn();
        } else if (clickedObj === g_playerShip) {
@@ -1011,7 +1014,7 @@
          const d_shield = PlayerShip.SHIELD_MAX - g_playerShip.shield;
          console.log(`d_shield=${d_shield}, g_playerShip.energe=${g_playerShip.energy}`);
          if ( d_shield <= 0 ) {
-           setMsg("ENGINEERING: Deflector shields operating at maximum capacity.", "#fff", "#111");
+           setMsg("機関部: シールドはすでに最大です。", "#fff", "#111");
            return;
          }
 
@@ -1019,7 +1022,7 @@
          const energy_supply = Math.min(g_playerShip.energy - PlayerShip.ENERGY_MIN, d_shield);
          console.log(`energy_supply=${energy_supply}`);
          if ( energy_supply <= 0 ) {
-           setMsg("ENGINEERING: Insufficient power for shield regeneration.");
+           setMsg("機関部: エネルギー不足により、シールドを補強できません！");
            return;
          }
 
@@ -1028,8 +1031,9 @@
          console.log(`energy=${g_playerShip.energy}, shield=${g_playerShip.shield}`)
 
          const shiled_p = Math.floor(g_playerShip.shield / PlayerShip.SHIELD_MAX * 100);
+         const energy_p = Math.floor(g_playerShip.energy / PlayerShip.ENERGY_MAX * 100);
          setMsg(
-           `ENGINEERING: Shields at ${shiled_p}%. Energy reserves at ${g_playerShip.energy}.`,
+           `機関部: シールド ${shiled_p}% に増強。エネルギー残量 ${energy_p}。`,
            "#fff", "#111"
          );
          endTurn();
@@ -1039,7 +1043,7 @@
 
          if (g_playerShip.energy < PlayerShip.ENERGY_MIN && !g_isDocked) {
            updateStatus();
-           gameOver("SYSTEM: Total power failure. Life support failing...");
+           gameOver("艦内コンピュータ: パワー障害。生命維持装置ダウン...");
          }
        }
      } // handlePointerDown()
@@ -1175,7 +1179,7 @@
          duration: 200,
          ease: 'Sine.easeInOut'
        });
-       setMsg("STARBASE: Docking complete. Power transfer successful.", "#220", "#0ff");
+       setMsg("STARBASE: ドッキング完了。エネルギーを補給しました。", "#220", "#0ff");
        updateStatus();
      } // dockShip()
 
@@ -1208,14 +1212,14 @@
          let distance = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, destX, destY);
          return;
        }
-       setMsg("HELM: Course laid in. Impulse power engaged.");
+       setMsg("操舵手: インパルスエンジン、コースセット ... 移動完了");
 
        let skipAutoDock = false;
        if (g_isDocked) {
          g_isDocked = false;
          skipAutoDock = true;
          g_playerShip.shield = PlayerShip.SHIELD_MAX;
-         setMsg("STARBASE: Tractor beam released. Clear for departure.");
+         setMsg("STARBASE: ドッキング解除");
          updateStatus();
        }
 
@@ -1499,7 +1503,7 @@
              if ( !g_isGameOver ) {
                const remaining = getActiveEnemyCount();
                setMsg(
-                 `TACTICAL: Hostile vessel has retreated. ${remaining} targets remaining.`,
+                 `副長: 敵艦が退却。残存敵数、${remaining}隻`,
                  "#0f0", "#222"
                );
              }
@@ -1545,7 +1549,7 @@
              console.log(`e.fear_mind=${e.fear_mind}`);
            });
 
-           setMsg("TACTICAL: Alert! New hostile warp signature detected.", "#ff0", "#000")
+           setMsg("戦術士官: 新たな敵が出現しました！", "#ff0", "#000")
          }
 
          // 基地の回復
