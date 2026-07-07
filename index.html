@@ -571,11 +571,13 @@
        static R = 60 / 2 * SYSTEM.SCALE;
        static SHIELD_MAX = 4000;
        static SHIELD_RECOVERY_RATE = 0.01;
+       static SHIELD_COLOR = 0x00ffff;
        static DOCKING_RANGE = 35 * SYSTEM.SCALE;
 
        constructor(scene, x, y) {
-         super(scene, x, y, 'baseImg', StarBase.SHIELD_MAX, 0xffcc00);
+         super(scene, x, y, 'baseImg', StarBase.SHIELD_MAX, StarBase.SHIELD_COLOR);
 
+         this.gauge_y = this.gauge_y + this.gauge_h / 2 * 3;
          this.sprite.setDepth(1);
          this.shield_gauge.setDepth(1);
        }
@@ -593,9 +595,10 @@
        static FEAR_RECOVERY = 0.005;
        static SHIELD_MAX = 300;
        static SHIELD_RECOVERY_RATE = 0.01;
+       static SHIELD_COLOR = 0xff8800;
 
        constructor(scene, x, y) {
-         super(scene, x, y, 'enemyImg', EnemyShip.SHIELD_MAX, 0xff3333);
+         super(scene, x, y, 'enemyImg', EnemyShip.SHIELD_MAX, EnemyShip.SHIELD_COLOR);
 
          this.fear_mind = EnemyShip.FEAR_INIT;
        }
@@ -610,16 +613,19 @@
        static SPEED = 120 * SYSTEM.SCALE;
        static SHIELD_MAX = 800;
        static SHIELD_RECOVERY_RATE = 0;
+       static SHIELD_COLOR = 0xffffff;
 
        static ENERGY_MAX = 10000;
        static ENERGY_MIN = 10;
+       static ENERGY_COLOR = 0xffff00;
+
        static MOVE_COST_RATE = 0.3;
 
        constructor(scene, x, y) {
          super(
            scene, x, y, 'PlayerImg',
-           PlayerShip.SHIELD_MAX, 0xff00ff,
-           PlayerShip.ENERGY_MAX, 0x44ffff,
+           PlayerShip.SHIELD_MAX, PlayerShip.SHIELD_COLOR,
+           PlayerShip.ENERGY_MAX, PlayerShip.ENERGY_COLOR
          );
 
          this.sprite.setDepth(10);
