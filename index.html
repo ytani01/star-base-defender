@@ -275,13 +275,11 @@
        NEW_ENEMY_INTERVAL: 40,
        N_STAR: 15,
        N_ENEMY: 3,
-       GAUGE: {
-         H: 4
-       },
        TIMING: {
          BEAM_DUR: 500,
          TURN_DELAY: 500,
-         TURN_MARGIN: 100  // ターン切り替え時の余韻
+         TURN_MARGIN: 100,
+         GAMEOVER: 4000
        }
      };
      SYSTEM.GAME_ID = Phaser.Utils.String.UUID();
@@ -1618,7 +1616,7 @@
        g_flagClear = clear;
        g_isPlayerTurn = false;
        setMsg(msg);
-       setTimeout(() => showHighScoreOverlay('gameover', { msg }), 800);
+       setTimeout(() => showHighScoreOverlay('gameover', { msg }), SYSTEM.TIMING.GAMEOVER);
      } // gameOver()
 
      function loadHighScores() {
