@@ -276,7 +276,6 @@
        N_STAR: 15,
        N_ENEMY: 3,
        GAUGE: {
-         W: 30,
          H: 4
        },
        TIMING: {
@@ -308,8 +307,8 @@
          POWER: 90,
        },
        ALPHA: 0.0075 / SYSTEM.SCALE,
-       EFFECTIVE_THRESHOLD: 0.4,
-       MAX_THRESHOLD: 0.1
+       EFFECTIVE_THRESHOLD: 0.45,
+       MAX_THRESHOLD: 0.2
      };
      WEAPON.PLAYER.MAX_RANGE = Math.floor(-Math.log(WEAPON.MAX_THRESHOLD) / WEAPON.ALPHA);
      WEAPON.PLAYER.EFFECTIVE_RANGE = Math.floor(-Math.log(WEAPON.EFFECTIVE_THRESHOLD) / WEAPON.ALPHA);
@@ -346,7 +345,7 @@
      } // getActiveEnemyCount()
 
      /**
-      *
+      * ゲージの描画
       */     
      function drawGauge(g, cx, cy, width, height, ratio, color) {
        g.clear();
@@ -368,7 +367,7 @@
      } // drawGauge()
 
      /**
-      *
+      * 宇宙域境界の描画
       */
      function drawBoundary(){
        boundaryGraphics.clear();
@@ -377,14 +376,14 @@
      } // drawBoundary()
 
      /**
-      *
+      * メッセージの表示
       */
-     function setLog(msg, fg="#0ff", bg="transparent") {
+     function setMsg(msg, fg="#0ff", bg="transparent") {
        const el = document.getElementById('logStatus')
        el.style.color = fg;
        el.style.backgroundColor = bg;
        el.textContent = msg;
-     } // setLog()
+     } // setMsg()
 
      // ---------------------------------------------------------
      // クラス定義
@@ -414,21 +413,21 @@
          this.sprite.y = val;
        }
 
-       get orig_w() {
+       get src_w() {
          return this.sprite.width;
        }
-       get orig_h() {
+       get src_h() {
          return this.sprite.height;
        }
-       get orig_r() {
-         return (this.orig_w + this.orig_h) / 4;
+       get src_r() {
+         return (this.src_w + this.src_h) / 4;
        }
 
        get w() {
-         return this.orig_w * SYSTEM.SCALE;
+         return this.src_w * this.scale;
        }
        get h() {
-         return this.orig_h * SYSTEM.SCALE;
+         return this.src_h * this.scale;
        }
        get r() {
          return (this.w + this.h) / 4;
@@ -445,35 +444,36 @@
       */
      class ObjWithShield extends GameObj {
        static SHIELD_MAX = 0; // dummy
+       static GAUGE_H = 8;
+       static GAUGE_Y_OFFSET = 18;
 
        constructor(
          scene, x, y, texture,
-         gauge_y, gauge_w, gauge_h,
-         shield, gauge_color,
+         shield, shield_gauge_color,
          scale=SYSTEM.SCALE
        ) {
          super(scene, x, y, texture, scale);
          this.shield = shield;
-         this.gauge_color = gauge_color;
-         this.gauge_y = gauge_y;
-         this.gauge_w = gauge_w;
-         this.gauge_h = gauge_h;
-         this.gauge = this.scene.add.graphics();
+         this.shield_gauge_color = shield_gauge_color;
 
-         this.g_shield = this.scene.add.graphics();
+         this.gauge_h = this.constructor.GAUGE_H * scale;
+         this.gauge_y = this.h + this.constructor.GAUGE_Y_OFFSET * scale;
+         this.gauge_w = this.w;
+         this.shield_gauge = this.scene.add.graphics();
+         this.shield_circle = this.scene.add.graphics();
        }
 
        updateGauge() {
          if (! this.active ) {
-           if (this.gauge) {
-             this.gauge.clear();
-             this.g_shield.clear();
+           if (this.shield_gauge) {
+             this.shield_gauge.destroy();
+             this.shield_circle.destroy();
            }
            return;
          }
 
          //
-         // update Shield circle
+         // draw Shield circle
          //
          const shield_ratio = this.shield / this.constructor.SHIELD_MAX;
          let shield_color = 0xffffff;
@@ -483,42 +483,45 @@
          if ( shield_ratio < 0.25 ) {
            shield_color = 0xff0000;
          }
-         this.g_shield.clear();
-         this.g_shield.lineStyle(2 * shield_ratio, shield_color, 1);
-         this.g_shield.strokeCircle(this.x, this.y, this.r);
+         this.shield_circle.clear();
+         this.shield_circle.lineStyle(3 * shield_ratio, shield_color, 1);
+         this.shield_circle.strokeCircle(this.x, this.y, this.r);
 
-         //
-         // update Gauge
-         //
          drawGauge(
-           this.gauge,
+           this.shield_gauge,
            this.x, this.y + (this.gauge_y * this.scale),
            this.gauge_w, this.gauge_h,
            this.shield / this.constructor.SHIELD_MAX,
-           this.gauge_color
+           this.shield_gauge_color
          );
        } // updateGauge()
 
-       die() {
-         this.shield = 0;
-         this.active = false;
-         if ( this.gauge ) {
-           this.gauge.destroy();
-         }
-         if ( this.g_shield ) {
-           this.g_shield.destroy();
-         }
-         this.destroy();
-       }
-
+       /**
+        *
+        */
        takeDamage(amount) {
          this.shield -= amount;
          if (this.shield <= 0) {
            g_score -= SYSTEM.SCORE.DESTROY_PENALTY;
            this.die();
          }
-       }       
-     }
+       } // takeDamage()
+
+       /**
+        *
+        */
+       die() {
+         this.shield = 0;
+         this.active = false;
+         if ( this.shield_gauge ) {
+           this.shield_gauge.destroy();
+         }
+         if ( this.shield_circle ) {
+           this.shield_circle.destroy();
+         }
+         this.destroy();
+       } // die()
+     } // class ObjWithShield
      
      /**
       *
@@ -526,43 +529,39 @@
      class ObjWithEnergy extends ObjWithShield {
        constructor(
          scene, x, y, texture,
-         gauge_y, gauge_w, gauge_h,
          shield, gauge_color,
          energy, energy_color,
          scale=SYSTEM.SCALE
        ) {
-         super(
-           scene, x, y, texture, gauge_y, gauge_w, gauge_h,
-           shield, gauge_color, scale
-         );
+         super(scene, x, y, texture, shield, gauge_color, scale);
          this.energy = energy;
-         this.g_energy_color = energy_color;
+         this.energy_gauge_color = energy_color;
 
-         this.g_energy = this.scene.add.graphics();
+         this.energy_gauge = this.scene.add.graphics();
        }
 
        updateGauge() {
          super.updateGauge();
          drawGauge(
-           this.g_energy,
+           this.energy_gauge,
            this.x, this.y + (this.gauge_y * this.scale) + this.gauge_h + 1,
            this.gauge_w, this.gauge_h,
            this.energy / this.constructor.ENERGY_MAX,
-           this.g_energy_color
+           this.energy_gauge_color
          );         
        }
-     }
+     } // class ObjWithEnergy
 
      /**
       *
       */
      class Star extends GameObj {
-       static W = 50;
-       static R = 50 / 2 * SYSTEM.SCALE;
+       static W = 40;
+       static R = 40 / 2 * SYSTEM.SCALE;
        constructor(scene, x, y) {
          super(scene, x, y, 'starImg');
        }
-     }
+     } // class Star
 
      /**
       *
@@ -575,13 +574,10 @@
        static DOCKING_RANGE = 35 * SYSTEM.SCALE;
 
        constructor(scene, x, y) {
-         super(
-           scene, x, y, 'baseImg', 36,  SYSTEM.GAUGE.W, SYSTEM.GAUGE.H,
-           StarBase.SHIELD_MAX, 0xffcc00
-         );
+         super(scene, x, y, 'baseImg', StarBase.SHIELD_MAX, 0xffcc00);
 
-         this.sprite.setDepth(100);
-         this.gauge.setDepth(100);
+         this.sprite.setDepth(1);
+         this.shield_gauge.setDepth(1);
        }
      }
 
@@ -590,32 +586,29 @@
       */
      class EnemyShip extends ObjWithShield {
        static W = 60;
-       static SPEED = 40 * SYSTEM.SCALE;
        static R = 60 / 2 * SYSTEM.SCALE;
-       static FEAR_INIT = 0.5;
+       static SPEED = 40 * SYSTEM.SCALE;
+       static FEAR_INIT = 0.4;
        static FEAR_STEP = 0.05;
        static FEAR_RECOVERY = 0.005;
        static SHIELD_MAX = 300;
        static SHIELD_RECOVERY_RATE = 0.01;
 
        constructor(scene, x, y) {
-         super(
-           scene, x, y, 'enemyImg',
-           36, SYSTEM.GAUGE.W, SYSTEM.GAUGE.H,
-           EnemyShip.SHIELD_MAX, 0xff3333
-         );
+         super(scene, x, y, 'enemyImg', EnemyShip.SHIELD_MAX, 0xff3333);
+
          this.fear_mind = EnemyShip.FEAR_INIT;
        }
-     }
+     } // class EnemyShip
 
      /**
       *
       */
-      class PlayerShip extends ObjWithEnergy {
-        static W = 60;
-        static SPEED = 120 * SYSTEM.SCALE;
-        static R = 60 / 2 * SYSTEM.SCALE;
-        static SHIELD_MAX = 800;
+     class PlayerShip extends ObjWithEnergy {
+       static W = 60;
+       static R = 60 / 2 * SYSTEM.SCALE;
+       static SPEED = 120 * SYSTEM.SCALE;
+       static SHIELD_MAX = 800;
        static SHIELD_RECOVERY_RATE = 0;
 
        static ENERGY_MAX = 10000;
@@ -625,12 +618,14 @@
        constructor(scene, x, y) {
          super(
            scene, x, y, 'PlayerImg',
-           36, SYSTEM.GAUGE.W, SYSTEM.GAUGE.H, 
            PlayerShip.SHIELD_MAX, 0xff00ff,
            PlayerShip.ENERGY_MAX, 0x44ffff,
          );
+
+         this.sprite.setDepth(10);
+         this.shield_gauge.setDepth(10);
        }
-     }
+     } // class PlayerShip
 
      // ---------------------------------------------------------
      // ゲーム(Phaser)初期化・ループ
@@ -949,7 +944,7 @@
        if (clickedObj === g_starBase) {
          // --- 基地に対するアクション ---
          if (g_isDocked) {
-           setLog("STARBASE: Mooring tractor beam active. Docking in progress.");
+           setMsg("STARBASE: Mooring tractor beam active. Docking in progress.");
            endTurn();
            return;
          }
@@ -966,12 +961,12 @@
        } else if (clickedObj instanceof EnemyShip) {
          // --- 敵に対するアクション ---
          if (g_isDocked) {
-           setLog("Tactical Officer> All weapons are deactivated", "#ff0", "#a00");
+           setMsg("Tactical Officer> All weapons are deactivated", "#ff0", "#a00");
            return;
          }
 
          if (g_playerShip.energy < WEAPON.PLAYER.COST) {
-           setLog("ENGINEERING: Warning! Warp core power critical.", "#000", "#a00");
+           setMsg("ENGINEERING: Warning! Warp core power critical.", "#000", "#a00");
            return;
          }
 
@@ -982,20 +977,20 @@
          const hitChance = Math.exp(-WEAPON.ALPHA * dist);
 
          if (hitChance < WEAPON.MAX_THRESHOLD) {
-           setLog("TACTICAL: Target beyond maximum phaser range.", "#ff0", "#a00");
+           setMsg("TACTICAL: Target beyond maximum phaser range.", "#ff0", "#a00");
            fireBeam(this, g_playerShip, clickedObj, 0x444444);
            endTurn();
            return;
          }
 
          if (isLOSBlocked(g_playerShip, clickedObj, false)) {
-           setLog("TACTICAL: Target lock failed. Obstacle in line of sight.", "#ff0", "#a00");
+           setMsg("TACTICAL: Target lock failed. Obstacle in line of sight.", "#ff0", "#a00");
            fireBeam(this, g_playerShip, clickedObj, 0x444444);
            endTurn();
            return;
          }
 
-         setLog("TACTICAL: Direct hit! Enemy shields fluctuating.", "#0ff", "#000");
+         setMsg("TACTICAL: Direct hit! Enemy shields fluctuating.", "#0ff", "#000");
          const damage = Math.floor(WEAPON.PLAYER.POWER * hitChance);
          clickedObj.takeDamage(damage);
          fireBeam(this, g_playerShip, clickedObj, 0x00ffff);
@@ -1004,7 +999,7 @@
            g_enemies = g_enemies.filter(e => e !== clickedObj);
            const rp = getSafeRandPos(0.8, 0.95);
            g_enemies.push(new EnemyShip(this, rp.x, rp.y));
-           setLog("TACTICAL: Target destroyed. New warp signatures detected!");
+           setMsg("TACTICAL: Target destroyed. New warp signatures detected!");
          }
          endTurn();
        } else if (clickedObj === g_playerShip) {
@@ -1012,7 +1007,7 @@
          const d_shield = PlayerShip.SHIELD_MAX - g_playerShip.shield;
          console.log(`d_shield=${d_shield}, g_playerShip.energe=${g_playerShip.energy}`);
          if ( d_shield <= 0 ) {
-           setLog("ENGINEERING: Deflector shields operating at maximum capacity.", "#fff", "#111");
+           setMsg("ENGINEERING: Deflector shields operating at maximum capacity.", "#fff", "#111");
            return;
          }
 
@@ -1020,7 +1015,7 @@
          const energy_supply = Math.min(g_playerShip.energy - PlayerShip.ENERGY_MIN, d_shield);
          console.log(`energy_supply=${energy_supply}`);
          if ( energy_supply <= 0 ) {
-           setLog("ENGINEERING: Insufficient power for shield regeneration.");
+           setMsg("ENGINEERING: Insufficient power for shield regeneration.");
            return;
          }
 
@@ -1029,7 +1024,7 @@
          console.log(`energy=${g_playerShip.energy}, shield=${g_playerShip.shield}`)
 
          const shiled_p = Math.floor(g_playerShip.shield / PlayerShip.SHIELD_MAX * 100);
-         setLog(
+         setMsg(
            `ENGINEERING: Shields at ${shiled_p}%. Energy reserves at ${g_playerShip.energy}.`,
            "#fff", "#111"
          );
@@ -1040,7 +1035,7 @@
 
          if (g_playerShip.energy < PlayerShip.ENERGY_MIN && !g_isDocked) {
            updateStatus();
-           GameOver("SYSTEM: Total power failure. Life support failing...");
+           gameOver("SYSTEM: Total power failure. Life support failing...");
          }
        }
      } // handlePointerDown()
@@ -1161,7 +1156,7 @@
          duration: 200,
          ease: 'Sine.easeInOut'
        });
-       setLog("STARBASE: Docking complete. Power transfer successful.", "#220", "#0ff");
+       setMsg("STARBASE: Docking complete. Power transfer successful.", "#220", "#0ff");
        updateStatus();
      } // dockShip()
 
@@ -1188,14 +1183,14 @@
        const clamped = clampDest(g_playerShip, destX, destY);
        destX = clamped.x;
        destY = clamped.y;
-       setLog("HELM: Course laid in. Impulse power engaged.");
+       setMsg("HELM: Course laid in. Impulse power engaged.");
 
        let skipAutoDock = false;
        if (g_isDocked) {
          g_isDocked = false;
          skipAutoDock = true;
          g_playerShip.shield = PlayerShip.SHIELD_MAX;
-         setLog("STARBASE: Tractor beam released. Clear for departure.");
+         setMsg("STARBASE: Tractor beam released. Clear for departure.");
          updateStatus();
        }
 
@@ -1203,10 +1198,10 @@
        let cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
        if ( g_playerShip.energy - cost <= PlayerShip.ENERGY_MIN ) {
          if ( target_is_base ) {
-           GameOver("ENGINEERING: Insufficient power for impulse drive.");
+           gameOver("ENGINEERING: Insufficient power for impulse drive.");
            return;
          }
-         setLog("ENGINEERING: Insufficient power for impulse drive.");
+         setMsg("ENGINEERING: Insufficient power for impulse drive.");
          return;
        }
 
@@ -1351,7 +1346,7 @@
 
        // 各敵の行動を処理
        g_enemies.forEach(enemy => {
-         scene.time.delayedCall(0, () => executeEnemyAction(scene, enemy));
+         scene.time.delayedCall(0, () => execEnemyAction(scene, enemy));
        });
 
        // 敵フェーズ終了後の処理（次ターン準備）
@@ -1362,70 +1357,71 @@
      /**
       * 敵1体の具体的な行動（思考と実行）
       */
-     function executeEnemyAction(scene, enemy) {
+     function execEnemyAction(scene, enemy) {
        if (g_isGameOver || !enemy.active) return;
 
        // 状況を評価し、コンテキスト（距離や攻撃可能フラグなど）を取得
-       const context = evaluateTacticalSituation(enemy);
+       const context = evalTacticalSituation(enemy);
 
        // 評価結果に基づいてアクションを分岐
        if (context.isFleeing) {
-         moveEnemy(scene, enemy, context);
+         console.log("fleeing");
+         enemyMove(scene, enemy, context);
        } else if (context.canAttackBase) {
-         attackTarget(
+         console.log("attack base");
+         enemyAttack(
            scene, enemy, g_starBase, context.distToBase,
            "SYSTEM: Starbase critical failure. Core breach imminent..."
          );
        } else if (context.canAttackPlayer) {
-         attackTarget(
+         console.log("attack player");
+         enemyAttack(
            scene, enemy, g_playerShip, context.distToPlayer,
            "SYSTEM: Hull integrity zero. Ship destroyed."
          );
        } else {
-         moveEnemy(scene, enemy, context);
+         console.log("move");
+         enemyMove(scene, enemy, context);
        }
-     }
+     } // execEnemyAction
 
      /**
       * 戦況の評価（距離計算、攻撃可否、逃走判断）
       */
-     function evaluateTacticalSituation(enemy) {
-       const distToBase = Phaser.Math.Distance.Between(enemy.x, enemy.y, g_starBase.x, g_starBase.y);
-       const distToPlayer = Phaser.Math.Distance.Between(enemy.x, enemy.y, g_playerShip.x, g_playerShip.y);
-
-       // 攻撃の前提条件 (シールド50%以上)
-       const hasEnoughShieldToAttack = enemy.shield >= (EnemyShip.SHIELD_MAX * 0.5);
+     function evalTacticalSituation(enemy) {
+       const isFleeing = enemy.fear_mind > (enemy.shield / EnemyShip.SHIELD_MAX);
+       const distToPlayer = Phaser.Math.Distance.Between(
+         enemy.x, enemy.y, g_playerShip.x, g_playerShip.y
+       );
+       const distToBase = Phaser.Math.Distance.Between(
+         enemy.x, enemy.y, g_starBase.x, g_starBase.y
+       );
 
        // プレイヤーへの攻撃可否
        const isPlayerInRange = distToPlayer <= WEAPON.ENEMY.EFFECTIVE_RANGE;
-       const canAttackPlayer = hasEnoughShieldToAttack && 
+       const canAttackPlayer = !isFleeing &&
                                !g_isDocked && 
                                isPlayerInRange && 
                                !isLOSBlocked(enemy, g_playerShip);
 
-       // 基地への攻撃可否 (プレイヤーがドック中なら、射程判定を緩和)
-       const isBaseInRange = distToBase <= WEAPON.ENEMY.EFFECTIVE_RANGE || 
-                             (g_isDocked && isPlayerInRange);
-       const canAttackBase = hasEnoughShieldToAttack && 
+       // 基地への攻撃可否
+       const isBaseInRange = distToBase <= WEAPON.ENEMY.EFFECTIVE_RANGE;
+       const canAttackBase = !isFleeing &&
                              g_starBase.active && 
-                             g_starBase.shield > 0 && 
                              isBaseInRange && 
                              !isLOSBlocked(enemy, g_starBase, false);
 
-       // 逃走判断 (恐怖心がシールド残量割合を上回った場合)
-       const isFleeing = enemy.fear_mind > (enemy.shield / EnemyShip.SHIELD_MAX);
        console.log(
-         `enemy.shield=${enemy.shield}, max=${EnemyShip.SHIELD_MAX}, ` +
-         `fear=${enemy.fear_mind.toFixed(3)}, isFleeing=${isFleeing}`
+         `enemy.shield=${enemy.shield}/${EnemyShip.SHIELD_MAX}, isFleeing=${isFleeing}`
        );
 
        return { distToBase, distToPlayer, canAttackBase, canAttackPlayer, isFleeing };
-     }
+     } // evalTacticalSituation()
 
      /**
-      * 5. 攻撃処理（重複コードの統合）
+      * 攻撃処理
       */
-     function attackTarget(scene, enemy, target, distance, gameOverMsg) {
+     function enemyAttack(scene, enemy, target, distance, gameOverMsg) {
        fireBeam(scene, enemy, target, 0xff00ff);
        
        const target_damage = Math.floor(WEAPON.ENEMY.POWER * Math.exp(-WEAPON.ALPHA * distance));
@@ -1433,14 +1429,14 @@
 
        if (target.shield <= 0 && !g_isGameOver) {
          updateStatus();
-         GameOver(gameOverMsg);
+         gameOver(gameOverMsg);
        }
-     }
+     } // enemyAttack()
 
      /**
-      * 6. 移動処理とシールド回復
+      * 移動処理とシールド回復
       */
-     function moveEnemy(scene, enemy, context) {
+     function enemyMove(scene, enemy, context) {
        let targetDest;
 
        if (context.isFleeing) {
@@ -1477,7 +1473,7 @@
 
              if ( !g_isGameOver ) {
                const remaining = getActiveEnemyCount();
-               setLog(
+               setMsg(
                  `TACTICAL: Hostile vessel has retreated. ${remaining} targets remaining.`,
                  "#0f0", "#222"
                );
@@ -1500,10 +1496,10 @@
          EnemyShip.FEAR_INIT,
          (enemy.fear_mind - EnemyShip.FEAR_RECOVERY)
        );
-     } // moveEnemy()
+     } // enemyMove()
 
      /**
-      * 7. ターン終了処理と次ターンへの準備
+      * ターン終了処理と次ターンへの準備
       */
      function finalizeEnemyTurn(scene) {
        g_enemies = g_enemies.filter(e => e.active);
@@ -1524,7 +1520,7 @@
              console.log(`e.fear_mind=${e.fear_mind}`);
            });
 
-           setLog("TACTICAL: Alert! New hostile warp signature detected.", "#ff0", "#000")
+           setMsg("TACTICAL: Alert! New hostile warp signature detected.", "#ff0", "#000")
          }
 
          // 基地の回復
@@ -1540,10 +1536,10 @@
          updateStatus(); 
          g_isPlayerTurn = true;
        }
-     }
+     } // finalizeEnemyTurn()
 
      /**
-      *
+      * ステータスエリア更新
       */
      function updateStatus() {
        const PlayerEnergy = g_playerShip.energy > 0 ? g_playerShip.energy : 0;
@@ -1583,7 +1579,7 @@
      } // updateStatus()
 
      /**
-      *
+      * 次のステージに移行
       */
      function nextStage(scene) {
        const clearedStage = g_curStage;
@@ -1604,17 +1600,20 @@
 
        g_pendingScene = scene;
 
-       setLog(`COMMAND: Sector ${clearedStage} secured. Awaiting new orders.`);
+       setMsg(`COMMAND: Sector ${clearedStage} secured. Awaiting new orders.`);
        showHighScoreOverlay('stageclear', { clearedStage, bonus, list, newIdx });
      } // nextStage()
 
-     function GameOver(msg, clear=false) {
+     /**
+      * ゲームオーバー
+      */
+     function gameOver(msg, clear=false) {
        g_isGameOver = true;
        g_flagClear = clear;
        g_isPlayerTurn = false;
-       setLog(msg);
+       setMsg(msg);
        setTimeout(() => showHighScoreOverlay('gameover', { msg }), 800);
-     } // GameOver
+     } // gameOver()
 
      function loadHighScores() {
        try {
@@ -1747,7 +1746,7 @@
          restartBtn.style.display  = 'inline-block';
        }
        overlay.style.display = 'flex';
-     }
+     } // showHighScoreOverlay()
 
      document.getElementById('viewScoresBtn').addEventListener('click', () => {
        showHighScoreOverlay('view');
