@@ -1262,20 +1262,20 @@
      function calcDest(e, target, isFleeing = false) {
        let dirX = 0, dirY = 0;
 
-       // 1. ターゲットへのベクトル（引力 / 斥力）
+       // ターゲットへのベクトル（引力 / 斥力）
        if (isFleeing && Array.isArray(target)) {
          // 複数の脅威（自機と基地）から遠ざかるベクトルを合成
          target.forEach(t => {
            let dx = e.x - t.x;
            let dy = e.y - t.y;
-           let dist = Math.sqrt(dx * dx + dy * dy);
+           let dist = Math.hypot(dx, dy);
            if (dist > 0.001) {
              let weight = 1.0 / dist;
              dirX += (dx / dist) * weight;
              dirY += (dy / dist) * weight;
            }
          });
-         let fDist = Math.sqrt(dirX * dirX + dirY * dirY);
+         let fDist = Math.hypot(dirX, dirY); // = Math.sqrt(dirX * dirX + dirY * dirY);
          if (fDist > 0.000001) {
            dirX /= fDist;
            dirY /= fDist;
@@ -1288,7 +1288,7 @@
            targetDx = -targetDx;
            targetDy = -targetDy;
          }
-         let targetDist = Math.sqrt(targetDx * targetDx + targetDy * targetDy);
+         let targetDist = Math.hypot(targetDx, targetDy);
          if (targetDist > 0.001) {
            dirX = targetDx / targetDist;
            dirY = targetDy / targetDist;
@@ -1299,10 +1299,10 @@
        let avoidX = 0, avoidY = 0;
        const STAR_AVOID_RADIUS = Star.R * 3.5;
        g_stars.forEach(s => {
-         if (!s.active) return;
+         // if (!s.active) return;
          let dx = e.x - s.x;
          let dy = e.y - s.y;
-         let dist = Math.sqrt(dx * dx + dy * dy);
+         let dist = Math.hypot(dx, dy);
          if (dist > 0 && dist < STAR_AVOID_RADIUS) {
            let force = 1.0 - (dist / STAR_AVOID_RADIUS);
            avoidX += (dx / dist) * force * 1.5 - (dy / dist) * force * 1.0;
@@ -1317,7 +1317,7 @@
          if (!other.active || other === e) return;
          let dx = e.x - other.x;
          let dy = e.y - other.y;
-         let dist = Math.sqrt(dx * dx + dy * dy);
+         let dist = Math.hypot(dx, dy);
          if (dist > 0 && dist < ENEMY_AVOID_RADIUS) {
            let force = 1.0 - (dist / ENEMY_AVOID_RADIUS);
            sepX += (dx / dist) * force * 2.0;
@@ -1329,7 +1329,7 @@
        let finalX = dirX * 1.0 + avoidX + sepX;
        let finalY = dirY * 1.0 + avoidY + sepY;
 
-       let finalDist = Math.sqrt(finalX * finalX + finalY * finalY);
+       let finalDist = Math.hypot(finalX, finalY);
        
        // もし全方向からの力が完璧に釣り合ってゼロになってしまった場合（完全なスタック）
        // ランダムな方向に微小な力を与えて均衡を崩し、その場にとどまるのを防ぐ
