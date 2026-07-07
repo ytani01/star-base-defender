@@ -1100,50 +1100,65 @@
      } // clampDest(..)
 
      /**
-      * 進行方向がブロックされている場合、少しずつ角度をずらして
-      * 「とにかく一番遠くまで進めるルート」を確実に見つけ出す関数
+      * 進行方向に障害物がある場合、少しずつ角度をずらして迂回ルートを探す。
+      * 完全に接している場合でも滑らかに回り込み、障害物に沿って停止する。
       */
      function resolveMovement(obj, desiredX, desiredY, speed) {
-       // オブジェクトから直接現在座標を取得
        const x = obj.x;
        const y = obj.y;
-       
+
        let dx = desiredX - x;
        let dy = desiredY - y;
-       let angle = Math.atan2(dy, dx);
+       let reqDistSq = dx * dx + dy * dy;
        
-       // 0度(直進)から始まり、左右に15度ずつ、最大180度(真後ろ)まで走査
-       let anglesToTest = [0];
-       for (let i = 15; i <= 180; i += 15) {
-         anglesToTest.push((i * Math.PI) / 180);
-         anglesToTest.push((-i * Math.PI) / 180);
+       // 1. 直進で到達可能か評価
+       let directDest = clampDest(obj, desiredX, desiredY);
+       let directMoveSq = (directDest.x - x)**2 + (directDest.y - y)**2;
+       
+       // 障害物なし（または目的地が手前）ならそのまま採用
+       if (directMoveSq >= reqDistSq * 0.99) {
+         return directDest;
+       }
+
+       // 2. 障害物に阻まれた場合、迂回ルートを走査
+       let baseAngle = Math.atan2(dy, dx);
+       let bestDest = directDest;
+       let minTargetDistSq = (directDest.x - desiredX)**2 + (directDest.y - desiredY)**2;
+
+       // 左右両方向を走査（1度に見つけた最短ルートを優先するため、両方最後まで計算する）
+       for (let sign of [1, -1]) {
+         // 3度刻みで120度まで走査（完全に接している状態から抜け出すには90度以上必要な場合がある）
+         for (let i = 3; i <= 120; i += 3) {
+           let testAngle = baseAngle + (i * Math.PI / 180) * sign;
+           let testX = x + Math.cos(testAngle) * speed;
+           let testY = y + Math.sin(testAngle) * speed;
+           
+           let clamped = clampDest(obj, testX, testY);
+           
+           let moveDistSq = (clamped.x - x)**2 + (clamped.y - y)**2;
+           let distToTargetSq = (clamped.x - desiredX)**2 + (clamped.y - desiredY)**2;
+           
+           // 全く動けないルートは無視（0.1ピクセル未満）
+           if (moveDistSq < 0.1) continue;
+
+           // 現在のベストルートが「スタック状態（ほぼ動けない）」か判定
+           let currentBestMoveSq = (bestDest.x - x)**2 + (bestDest.y - y)**2;
+           let stuck = currentBestMoveSq < 1.0;
+
+           // 「より目的地に近い」か、「スタックから抜け出せる」ならベストルートを更新
+           if (distToTargetSq < minTargetDistSq || stuck) {
+             minTargetDistSq = distToTargetSq;
+             bestDest = clamped;
+           }
+
+           // 予定距離（speed）をほぼ100%進めた＝障害物を完全に回避して空間に抜けた
+           // これ以上角度を広げると無駄な大回りになるため、この方向で走査を打ち切る
+           if (moveDistSq >= speed * speed * 0.99) {
+             break; 
+           }
+         }
        }
        
-       let bestDest = { x: x, y: y };
-       let maxDistSq = -1;
-       
-       for (let offset of anglesToTest) {
-         let testAngle = angle + offset;
-         let testDestX = x + Math.cos(testAngle) * speed;
-         let testDestY = y + Math.sin(testAngle) * speed;
-         
-         // 他のキャラクターとの衝突を計算し、ぶつかる直前の座標を取得 (self -> obj)
-         let clamped = clampDest(obj, testDestX, testDestY);
-         
-         // 実際に進める距離の2乗
-         let distSq = (clamped.x - x)**2 + (clamped.y - y)**2;
-         
-         // スピードの80%以上進めるなら、そのルートを即採用 (十分な空きがある)
-         if (distSq >= (speed * 0.8)**2) {
-           return clamped;
-         }
-         
-         // 最もマシ（一番遠くまで逃げられる）ルートを記録しておく
-         if (distSq > maxDistSq) {
-           maxDistSq = distSq;
-           bestDest = clamped;
-         }
-       }
        return bestDest;
      } //  resolveMovement(..)
 
@@ -1184,9 +1199,15 @@
          target_is_base = true;
        }
 
-       const clamped = clampDest(g_playerShip, destX, destY);
-       destX = clamped.x;
-       destY = clamped.y;
+       const finalDest = resolveMovement(g_playerShip, destX, destY, moveDist);
+       destX = finalDest.x;
+       destY = finalDest.y;
+
+       let distance = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, destX, destY);
+       if (distance < 1) {
+         let distance = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, destX, destY);
+         return;
+       }
        setMsg("HELM: Course laid in. Impulse power engaged.");
 
        let skipAutoDock = false;
@@ -1272,7 +1293,7 @@
            dirX = targetDx / targetDist;
            dirY = targetDy / targetDist;
          }
-       }
+       } // if ()
 
        // 2. 障害物(星)からの反発力 + 回り込み力
        let avoidX = 0, avoidY = 0;
