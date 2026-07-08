@@ -1105,7 +1105,7 @@
 
      /**
       * 進行方向に障害物がある場合、少しずつ角度をずらして迂回ルートを探す。
-      * 完全に接している場合でも滑らかに回り込み、障害物に沿って停止する。
+      * 完全に接している場合でも滑らかに回り込み、大回りせずに障害物に沿って停止する。
       */
      function resolveMovement(obj, desiredX, desiredY, speed) {
        const x = obj.x;
@@ -1129,13 +1129,18 @@
        let bestDest = directDest;
        let minTargetDistSq = (directDest.x - desiredX)**2 + (directDest.y - desiredY)**2;
 
-       // 左右両方向を走査（1度に見つけた最短ルートを優先するため、両方最後まで計算する）
+       // 左右両方向を走査
        for (let sign of [1, -1]) {
-         // 3度刻みで120度まで走査（完全に接している状態から抜け出すには90度以上必要な場合がある）
-         for (let i = 3; i <= 120; i += 3) {
-           let testAngle = baseAngle + (i * Math.PI / 180) * sign;
-           let testX = x + Math.cos(testAngle) * speed;
-           let testY = y + Math.sin(testAngle) * speed;
+         // 5度刻みで最大90度まで走査
+         for (let i = 5; i <= 90; i += 5) {
+           let offset = (i * Math.PI) / 180;
+           let testAngle = baseAngle + offset * sign;
+           
+           // 【重要】角度が逸れるほど移動予定距離をコサインで減衰させ、大回りを防ぐ
+           let adjustedSpeed = speed * Math.cos(offset);
+           
+           let testX = x + Math.cos(testAngle) * adjustedSpeed;
+           let testY = y + Math.sin(testAngle) * adjustedSpeed;
            
            let clamped = clampDest(obj, testX, testY);
            
@@ -1149,15 +1154,15 @@
            let currentBestMoveSq = (bestDest.x - x)**2 + (bestDest.y - y)**2;
            let stuck = currentBestMoveSq < 1.0;
 
-           // 「より目的地に近い」か、「スタックから抜け出せる」ならベストルートを更新
+           // 「より本来の目的地に近い」か、「スタックから抜け出せる」ならベストルートを更新
            if (distToTargetSq < minTargetDistSq || stuck) {
              minTargetDistSq = distToTargetSq;
              bestDest = clamped;
            }
 
-           // 予定距離（speed）をほぼ100%進めた＝障害物を完全に回避して空間に抜けた
-           // これ以上角度を広げると無駄な大回りになるため、この方向で走査を打ち切る
-           if (moveDistSq >= speed * speed * 0.99) {
+           // 障害物を回避して空き地に出た場合（調整後のスピードをほぼ出し切れた）
+           // これ以上角度を広げても無駄に横へ行くだけなので、この方向の走査を打ち切る
+           if (moveDistSq >= (adjustedSpeed * 0.95)**2) {
              break; 
            }
          }
