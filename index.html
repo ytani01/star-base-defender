@@ -19,7 +19,7 @@
        flex: 0 0 auto;
        border-bottom:2px solid #08f;
        overflow-y:auto;
-       font-size: clamp(14px, 2.5vw, 18px);
+       font-size: clamp(14px, 2.5vw, 20px);
        font-family: monospace;
        line-height: 1.1;
      }
@@ -276,7 +276,7 @@
        N_STAR: 15,
        N_ENEMY: 3,
        TIMING: {
-         BEAM_DUR: 500,
+         BEAM_DUR: 400,
          TURN_DELAY: 500,
          TURN_MARGIN: 100,
          GAMEOVER: 4000
@@ -390,6 +390,77 @@
        return Math.exp(-WEAPON.ALPHA * distance);
      }
 
+     /**
+      * 艦載フェイザーアレイ 照射音ジェネレーター
+      * @param {boolean} isPlayer 
+      */
+     function playBeamSound(isPlayer) {
+       if (!window.audioCtx) {
+         window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+       }
+       if (window.audioCtx.state === 'suspended') {
+         window.audioCtx.resume();
+       }
+
+       const ctx = window.audioCtx;
+       let now = ctx.currentTime
+       if ( ! isPlayer ) {
+         now += Math.random() * 0.5;
+       }
+       // ビームの持続時間（SYSTEM.TIMING.BEAM_DURに合わせて500ms）
+       let duration = SYSTEM.TIMING.BEAM_DUR / 1000;
+       if ( ! isPlayer ) {
+         duration = SYSTEM.TIMING.BEAM_DUR / 1000 / 2;
+       }
+
+       // 1. エンベロープ用ゲイン（音量の時間変化）
+       const envelope = ctx.createGain();
+       envelope.gain.setValueAtTime(0, now);
+       envelope.gain.linearRampToValueAtTime(0.3, now + 0.02); // 瞬時に立ち上がる
+       envelope.gain.linearRampToValueAtTime(0.2, now + duration - 0.15); // 持続
+       envelope.gain.linearRampToValueAtTime(0.1, now + duration - 0.05); // 持続
+       envelope.gain.linearRampToValueAtTime(0, now + duration); // 鋭く遮断
+
+       // 2. メインオシレーター（鋸歯状波で厚みのある音色を作る）
+       const osc = ctx.createOscillator();
+       osc.type = 'sawtooth';
+       if ( isPlayer ) {
+         osc.frequency.setValueAtTime(800, now);
+       } else {
+         osc.frequency.setValueAtTime(600, now);
+       }
+       
+       // 3. フィルター（高音域を強調し、エネルギー感を出す）
+       const filter = ctx.createBiquadFilter();
+       filter.type = 'lowpass';
+       filter.frequency.setValueAtTime(2000, now);
+       filter.Q.value = 10;
+
+       // 4. LFO（ウネリの生成）
+       // 25Hzで揺らすことでTNG以降のフェイザー特有の「ビームが振動している感じ」を作る
+       const lfo = ctx.createOscillator();
+       lfo.type = 'sine';
+       //lfo.frequency.value = 25;
+       lfo.frequency.value = 20;
+       const lfoGain = ctx.createGain();
+       //lfoGain.gain.value = 150; // 揺らぎの深さ
+       lfoGain.gain.value = 200; // 揺らぎの深さ
+
+       // ルーティング
+       lfo.connect(lfoGain);
+       lfoGain.connect(osc.frequency); // 周波数を揺らす（ビブラート）
+       
+       osc.connect(filter);
+       filter.connect(envelope);
+       envelope.connect(ctx.destination);
+
+       // 再生
+       osc.start(now);
+       lfo.start(now);
+       osc.stop(now + duration);
+       lfo.stop(now + duration);
+     } // playBeamSound()
+     
      // ---------------------------------------------------------
      // クラス定義
      // ---------------------------------------------------------
@@ -1434,6 +1505,8 @@
        beam.lineStyle(4, color, 1);
        beam.lineBetween(srcObj.x, srcObj.y, targetObj.x, targetObj.y);
        scene.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
+
+       playBeamSound(srcObj === g_playerShip);
      } // fireBeam(..)
 
      // ---------------------------------------------------------
