@@ -1440,10 +1440,10 @@
        let cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
        if ( g_playerShip.energy - cost <= PlayerShip.ENERGY_MIN ) {
          if ( target_is_base ) {
-           gameOver("ENGINEERING: Insufficient power for impulse drive.");
+           gameOver("機関部: エネルギーがありません！", "#f00");
            return;
          }
-         setMsg("ENGINEERING: Insufficient power for impulse drive.");
+         setMsg("機関部: エネルビー不足で移動できません", "#ff0");
          return;
        }
 
