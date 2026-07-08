@@ -383,6 +383,13 @@
        el.textContent = msg;
      } // setMsg()
 
+     /**
+      * 距離に応じた武器の威力減衰率（有効度）を計算する
+      */
+     function getWeaponEffectiveness(distance) {
+       return Math.exp(-WEAPON.ALPHA * distance);
+     }
+
      // ---------------------------------------------------------
      // クラス定義
      // ---------------------------------------------------------
@@ -978,7 +985,7 @@
          const dist = Phaser.Math.Distance.Between(
            g_playerShip.x, g_playerShip.y, clickedObj.x, clickedObj.y
          );
-         const hitChance = Math.exp(-WEAPON.ALPHA * dist);
+         const hitChance = getWeaponEffectiveness(dist)
 
          if (hitChance < WEAPON.MAX_THRESHOLD) {
            setMsg(
@@ -1056,19 +1063,11 @@
        const startX = obj.x;
        const startY = obj.y;
 
-       const targets = [];
-       if ( !(obj instanceof PlayerShip) ) targets.push(g_playerShip);
-       if ( obj instanceof EnemyShip ) targets.push(g_starBase);
-       g_enemies.forEach(
-         e => {
-           if (e && e !== obj && e.active) targets.push(e);
-         }
-       );
-       g_stars.forEach(
-         e => {
-           if (e && e !== obj && e.active) targets.push(e);
-         }
-       );
+       const targets = [...g_enemies, ...g_stars].filter(e => e && e.active && e !== obj);
+       // 敵機の場合、playerShip と starBase も障害物として追加する
+       if (obj instanceof EnemyShip) {
+         targets.push(g_playerShip, g_starBase);
+       }
 
        const dx = destX - startX;
        const dy = destY - startY;
@@ -1266,6 +1265,46 @@
      } // dockShip()
 
      /**
+      * ターゲット群に対するステアリングベクトル（斥力・接線力）を計算するコア関数
+      */
+     function calcAvoidanceForce(obj, targets, radiusMultiplier, repulsionWeight, tangentialWeight) {
+       let accX = 0, accY = 0;
+       
+       targets.forEach(t => {
+         if (!t.active || t === obj) return;
+         
+         // オブジェクト自身の半径(r)を基準に回避半径を動的算出
+         const avoidRadius = t.r * radiusMultiplier;
+         let dx = obj.x - t.x;
+         let dy = obj.y - t.y;
+         let dist = Math.hypot(dx, dy);
+         
+         if (dist > 0 && dist < avoidRadius) {
+           let force = 1.0 - (dist / avoidRadius);
+           accX += (dx / dist) * force * repulsionWeight - (dy / dist) * force * tangentialWeight;
+           accY += (dy / dist) * force * repulsionWeight + (dx / dist) * force * tangentialWeight;
+         }
+       });
+       
+       return { x: accX, y: accY };
+     } // calcAvoidanceForce()
+
+     /**
+      * 障害物や他ユニットからの回避・分離ベクトルを算出する（自機・敵機兼用）
+      */
+     function getAvoidanceVector(obj, obstacles) {
+       // 1. 障害物(星・基地)からの反発力 + 回り込み力
+       // (回避半径: 3.5倍, 斥力: 1.5, 接線力: 1.0)
+       let avoid = calcAvoidanceForce(obj, obstacles, 3.5, 1.5, 1.0);
+
+       // 2. 他ユニット(敵)からの反発力（分離）
+       // (回避半径: 2.5倍, 斥力: 2.0, 接線力: 0.0)
+       let sep = calcAvoidanceForce(obj, g_enemies, 2.5, 2.0, 0.0);
+
+       return { x: avoid.x + sep.x, y: avoid.y + sep.y };
+     } // getAvoidanceVector()
+
+     /**
       * 自機の移動処理（敵と同じステアリングロジックを適用）
       */
      function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
@@ -1363,71 +1402,7 @@
          }
        });
        updateStatus();
-     } // getTargetVector()
-
-     /**
-      * ターゲット群に対するステアリングベクトル（斥力・接線力）を計算するコア関数
-      */
-     function calcAvoidanceForce(obj, targets, radiusMultiplier, repulsionWeight, tangentialWeight) {
-       let accX = 0, accY = 0;
-       
-       targets.forEach(t => {
-         if (!t.active || t === obj) return;
-         
-         // オブジェクト自身の半径(r)を基準に回避半径を動的算出
-         const avoidRadius = t.r * radiusMultiplier;
-         let dx = obj.x - t.x;
-         let dy = obj.y - t.y;
-         let dist = Math.hypot(dx, dy);
-         
-         if (dist > 0 && dist < avoidRadius) {
-           let force = 1.0 - (dist / avoidRadius);
-           accX += (dx / dist) * force * repulsionWeight - (dy / dist) * force * tangentialWeight;
-           accY += (dy / dist) * force * repulsionWeight + (dx / dist) * force * tangentialWeight;
-         }
-       });
-       
-       return { x: accX, y: accY };
-     } // calcAvoidanceForce()
-
-     /**
-      * 障害物や他ユニットからの回避・分離ベクトルを算出する（自機・敵機兼用）
-      */
-     function getAvoidanceVector(obj, obstacles) {
-       let avoidX = 0, avoidY = 0;
-       
-       // 1. 障害物(星・基地)からの反発力 + 回り込み力
-       const STAR_AVOID_RADIUS = Star.R * 3.5;
-       obstacles.forEach(s => {
-         if (!s.active || s === obj) return;
-         let dx = obj.x - s.x;
-         let dy = obj.y - s.y;
-         let dist = Math.hypot(dx, dy);
-         if (dist > 0 && dist < STAR_AVOID_RADIUS) {
-           let force = 1.0 - (dist / STAR_AVOID_RADIUS);
-           avoidX += (dx / dist) * force * 1.5 - (dy / dist) * force * 1.0;
-           avoidY += (dy / dist) * force * 1.5 + (dx / dist) * force * 1.0;
-         }
-       });
-
-       // 2. 他ユニット(敵)からの反発力（分離）
-       let sepX = 0, sepY = 0;
-       g_enemies.forEach(other => {
-         if (!other.active || other === obj) return;
-         // 動的に相手のサイズから回避半径を算出
-         const AVOID_RADIUS = other.r * 2.5; 
-         let dx = obj.x - other.x;
-         let dy = obj.y - other.y;
-         let dist = Math.hypot(dx, dy);
-         if (dist > 0 && dist < AVOID_RADIUS) {
-           let force = 1.0 - (dist / AVOID_RADIUS);
-           sepX += (dx / dist) * force * 2.0;
-           sepY += (dy / dist) * force * 2.0;
-         }
-       });
-
-       return { x: avoidX + sepX, y: avoidY + sepY };
-     } // getAvoidanceVector()
+     } // attemptPlayerMove()
 
      /**
       * 敵の目的地計算
@@ -1553,7 +1528,7 @@
      function enemyAttack(scene, enemy, target, distance, gameOverMsg) {
        fireBeam(scene, enemy, target, 0xff00ff);
        
-       const target_damage = Math.floor(WEAPON.ENEMY.POWER * Math.exp(-WEAPON.ALPHA * distance));
+       const target_damage = Math.floor(WEAPON.ENEMY.POWER * getWeaponEffectiveness(distance));
        target.takeDamage(target_damage);
 
        if (target.shield <= 0 && !g_isGameOver) {
