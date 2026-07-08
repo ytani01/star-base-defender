@@ -196,7 +196,7 @@
       <div id="statusPanel">
         <div id="turn">
           Turn
-          <span id="statusStage">1</span>-<span id="statusTurn">1</span>
+          <span id="statusMission">1</span>-<span id="statusTurn">1</span>
           |
           SCORE
           <span id="statusScore">100</span>
@@ -245,7 +245,7 @@
                 <th></th>
                 <th>RANK</th>
                 <th>SCORE</th>
-                <th>STAGE</th>
+                <th>MISSION</th>
                 <th>TURNS</th>
                 <th>DATE</th>
               </tr>
@@ -323,7 +323,7 @@
      let g_stars = [];
      let rangeGraphics, boundaryGraphics;
      let g_turn = 1;
-     let g_curStage = 1;
+     let g_curMission = 1;
      let g_score = SYSTEM.SCORE.INIT;
      let g_isPlayerTurn = true;
      let g_isGameOver = false;
@@ -404,22 +404,20 @@
 
        const ctx = window.audioCtx;
        let now = ctx.currentTime
-       /* if ( ! isPlayer ) {
-        *   now += Math.random() * 0.5;
-        * } */
 
        // ビームの持続時間（SYSTEM.TIMING.BEAM_DURに合わせて500ms）
        let duration = SYSTEM.TIMING.BEAM_DUR / 1000;
        if ( ! isPlayer ) {
-         duration = SYSTEM.TIMING.BEAM_DUR / 1000 / 2;
+         duration = SYSTEM.TIMING.BEAM_DUR / 1000 / 3 * 2;
        }
 
        // 1. エンベロープ用ゲイン（音量の時間変化）
        const envelope = ctx.createGain();
        envelope.gain.setValueAtTime(0, now);
        envelope.gain.linearRampToValueAtTime(0.3, now + 0.02); // 瞬時に立ち上がる
-       envelope.gain.linearRampToValueAtTime(0.2, now + duration - 0.15); // 持続
-       envelope.gain.linearRampToValueAtTime(0.1, now + duration - 0.05); // 持続
+       envelope.gain.linearRampToValueAtTime(0.2, now + duration * 0.3); // 持続
+       envelope.gain.linearRampToValueAtTime(0.1, now + duration * 0.6); // 持続
+       envelope.gain.linearRampToValueAtTime(0.05, now + duration * 0.8); // 持続
        envelope.gain.linearRampToValueAtTime(0, now + duration); // 鋭く遮断
 
        // 2. メインオシレーター（鋸歯状波で厚みのある音色を作る）
@@ -441,11 +439,10 @@
        // 25Hzで揺らすことでTNG以降のフェイザー特有の「ビームが振動している感じ」を作る
        const lfo = ctx.createOscillator();
        lfo.type = 'sine';
-       //lfo.frequency.value = 25;
        lfo.frequency.value = 20;
        const lfoGain = ctx.createGain();
-       //lfoGain.gain.value = 150; // 揺らぎの深さ
-       lfoGain.gain.value = 200; // 揺らぎの深さ
+       lfoGain.gain.value = 150; // 揺らぎの深さ
+       //lfoGain.gain.value = 200; // 揺らぎの深さ
 
        // ルーティング
        lfo.connect(lfoGain);
@@ -1049,7 +1046,7 @@
          }
 
          if (g_playerShip.energy < WEAPON.PLAYER.COST) {
-           setMsg("ENGINEERING: Warning! Warp core power critical.", "#000", "#a00");
+           setMsg("戦術士官: エネルビー不足で攻撃できません！", "#f00");
            return;
          }
 
@@ -1549,13 +1546,13 @@
          console.log("attack base");
          enemyAttack(
            scene, enemy, g_starBase, context.distToBase,
-           "SYSTEM: Starbase critical failure. Core breach imminent..."
+           "STARBASE: シールド消失！！ もちこたえられませ..."
          );
        } else if (context.canAttackPlayer) {
          console.log("attack player");
          enemyAttack(
            scene, enemy, g_playerShip, context.distToPlayer,
-           "SYSTEM: Hull integrity zero. Ship destroyed."
+           "機関部: 船体強度 ゼロ！！ 船が破壊..."
          );
        } else {
          console.log("move");
@@ -1683,7 +1680,7 @@
        g_enemies = g_enemies.filter(e => e.active);
        
        if (g_enemies.length === 0 && !g_isGameOver) {
-         nextStage(scene);
+         nextMission(scene);
          return;
        }
 
@@ -1731,7 +1728,7 @@
        const enemyCount = getActiveEnemyCount();
 
        document.getElementById('statusTurn').textContent = `${g_turn}`;
-       document.getElementById('statusStage').textContent = `${g_curStage}`;
+       document.getElementById('statusMission').textContent = `${g_curMission}`;
        document.getElementById('statusEnemyCount').style.color = "#ff0"
        document.getElementById('statusEnemyCount').textContent = `${enemyCount}`;
        document.getElementById('statusScore').textContent = `${g_score}`;
@@ -1764,28 +1761,28 @@
      /**
       * 次のステージに移行
       */
-     function nextStage(scene) {
-       const clearedStage = g_curStage;
-       let bonus = g_curStage * 100;
+     function nextMission(scene) {
+       const clearedMission = g_curMission;
+       let bonus = g_curMission * 100;
        if ( g_score > 0 ) {
          bonus += g_score;
        }
-       console.log(`nextStage> bonus=${bonus}`);
+       console.log(`nextMission> bonus=${bonus}`);
        g_score += bonus;
 
        const { list, newIdx } = saveHighScore(
-         g_score, g_turn, clearedStage, `STAGE ${clearedStage} CLEARED`, true
+         g_score, g_turn, clearedMission, `MISSION ${clearedMission} CLEARED`, true
        );
 
-       g_curStage++;
+       g_curMission++;
        SYSTEM.N_ENEMY++;
        g_isPlayerTurn = false;
 
        g_pendingScene = scene;
 
-       setMsg(`COMMAND: Sector ${clearedStage} secured. Awaiting new orders.`);
-       showHighScoreOverlay('stageclear', { clearedStage, bonus, list, newIdx });
-     } // nextStage()
+       setMsg(`COMMAND: Sector ${clearedMission} secured. Awaiting new orders.`);
+       showHighScoreOverlay('missionclear', { clearedMission, bonus, list, newIdx });
+     } // nextMission()
 
      /**
       * ゲームオーバー
@@ -1794,7 +1791,7 @@
        g_isGameOver = true;
        g_flagClear = clear;
        g_isPlayerTurn = false;
-       setMsg(msg);
+       setMsg(msg, "#000", "#f00");
        setTimeout(() => showHighScoreOverlay('gameover', { msg }), SYSTEM.TIMING.GAMEOVER);
      } // gameOver()
 
@@ -1807,7 +1804,7 @@
        }
      }
 
-     function saveHighScore(score, turns, stage, result, forceSave = false) {
+     function saveHighScore(score, turns, mission, result, forceSave = false) {
        let list = loadHighScores();
        const now = new Date();
        const dateStr = [
@@ -1817,7 +1814,7 @@
        ].join('/');
        if ( g_flagClear || forceSave ) {
          list.push({
-           score, turns, stage, result,
+           score, turns, mission, result,
            gameid: SYSTEM.GAME_ID, date: dateStr, _new: true
          });
        }
@@ -1850,12 +1847,12 @@
          }
          const rank   = rankLabels[i] || `${i + 1}TH`;
          const prefix = thisGame ? '★' : '';
-         const displayStage = s.stage !== undefined ? s.stage : '-';
+         const displayMission = s.mission !== undefined ? s.mission : '-';
          tr.innerHTML = `
            <td>${prefix}</td>
            <td>${rank}</td>
            <td>${s.score}</td>
-           <td>${displayStage}</td>
+           <td>${displayMission}</td>
            <td>${s.turns}</td>
            <td>${s.date}</td>
          `;
@@ -1865,12 +1862,12 @@
            // スコアを引き継ぐ
            g_score = s.score;
            // 記録されたステージの次からスタートする
-           g_curStage = (s.stage !== undefined ? s.stage : 1) + 1;
+           g_curMission = (s.mission !== undefined ? s.mission : 1) + 1;
            g_turn = 1;
            
            // 敵の初期生成数を、進行するステージに合わせて再計算
            // (初期値3 + ステージ進行分)
-           SYSTEM.N_ENEMY = 3 + (g_curStage - 1);
+           SYSTEM.N_ENEMY = 3 + (g_curMission - 1);
            
            g_isGameOver = false;
            g_flagClear = false;
@@ -1897,14 +1894,14 @@
        const closeBtn   = document.getElementById('hsCloseBtn');
        const restartBtn = document.getElementById('hsRestartBtn');
 
-       if (mode === 'stageclear') {
-         const { clearedStage, bonus, list, newIdx } = data;
+       if (mode === 'missionclear') {
+         const { clearedMission, bonus, list, newIdx } = data;
          resultEl.style.color      = '#0f0';
-         resultEl.textContent      = `✓ STAGE ${clearedStage} CLEARED!`;
-         finalEl.textContent       = `TURNS:${g_turn}, STAGE BONUS:+${bonus}, SCORE: ${g_score}`;
+         resultEl.textContent      = `✓ MISSION ${clearedMission} CLEARED!`;
+         finalEl.textContent       = `TURNS:${g_turn}, MISSION BONUS:+${bonus}, SCORE: ${g_score}`;
          renderHSTable(list);
          closeBtn.style.display    = 'none';
-         restartBtn.textContent    = '▶ NEXT STAGE';
+         restartBtn.textContent    = '▶ NEXT MISSION';
          restartBtn.style.display  = 'inline-block';
 
        } else if (mode === 'gameover') {
@@ -1912,7 +1909,7 @@
          resultEl.style.color      = '#ff0';
          resultEl.textContent      = msg;
          finalEl.textContent       = `MISSION FAILED: SCORE: ${g_score}  ` +
-                                     `STAGE: ${g_curStage}  TURNS: ${g_turn}`;
+                                     `MISSION: ${g_curMission}  TURNS: ${g_turn}`;
          renderHSTable(loadHighScores());
          closeBtn.style.display    = 'none';
          restartBtn.textContent    = '▶ RESTART';
@@ -1922,7 +1919,7 @@
          resultEl.style.color      = '#0ff';
          resultEl.textContent      = '▶ HIGH SCORES ◀';
          finalEl.textContent       = `NOW — SCORE: ${g_score}   ` +
-                                     `STAGE: ${g_curStage}   TURN: ${g_turn}`;
+                                     `MISSION: ${g_curMission}   TURN: ${g_turn}`;
          renderHSTable(loadHighScores());
          closeBtn.style.display    = 'inline-block';
          restartBtn.textContent    = '▶ RESTART';
