@@ -19,7 +19,7 @@
        flex: 0 0 auto;
        border-bottom:2px solid #08f;
        overflow-y:auto;
-       font-size: clamp(22px, 5vw, 30px); 
+       font-size: clamp(14px, 2.5vw, 18px);
        font-family: monospace;
        line-height: 1.1;
      }
@@ -174,7 +174,7 @@
 
      #viewScoresBtn {
        font-family: monospace;
-       font-size: clamp(22px, 2vw, 40px);
+       font-size: clamp(14px, 2.5vw, 18px);
        background: transparent;
        color: #0ff;
        border: 1px solid #0ff;
@@ -988,23 +988,20 @@
          const hitChance = getWeaponEffectiveness(dist)
 
          if (hitChance < WEAPON.MAX_THRESHOLD) {
-           setMsg(
-             "戦術士官: 射程範囲外のため、敵艦にダメージなし。",
-             "#ff0", "#a00"
-           );
+           setMsg("戦術士官: 射程範囲外のため、敵艦にダメージなし。", "#ff0");
            fireBeam(this, g_playerShip, clickedObj, 0x444444);
            endTurn();
            return;
          }
 
          if (isLOSBlocked(g_playerShip, clickedObj, false)) {
-           setMsg("戦術士官: 障害物に遮られ、敵艦にダメージなし。", "#ff0", "#a00");
+           setMsg("戦術士官: 障害物に遮られ、敵艦にダメージなし。", "#ff0");
            fireBeam(this, g_playerShip, clickedObj, 0x444444);
            endTurn();
            return;
          }
 
-         setMsg("戦術士官: 攻撃命中！ 敵艦シールド減少！", "#0ff", "#000");
+         setMsg("戦術士官: 攻撃命中！ 敵艦シールド減少！", "#f80");
          const damage = Math.floor(WEAPON.PLAYER.POWER * hitChance);
          clickedObj.takeDamage(damage);
          fireBeam(this, g_playerShip, clickedObj, 0x00ffff);
