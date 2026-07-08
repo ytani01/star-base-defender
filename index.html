@@ -555,7 +555,7 @@
       */
      class Star extends GameObj {
        static W = 40;
-       static R = 40 / 2 * SYSTEM.SCALE;
+       static R = Star.W / 2 * SYSTEM.SCALE;
        constructor(scene, x, y) {
          super(scene, x, y, 'starImg');
        }
@@ -566,7 +566,7 @@
       */
      class StarBase extends ObjWithShield {
        static W = 60;
-       static R = 60 / 2 * SYSTEM.SCALE;
+       static R = StarBase.W / 2 * SYSTEM.SCALE;
        static SHIELD_MAX = 4000;
        static SHIELD_RECOVERY_RATE = 0.01;
        static SHIELD_COLOR = 0x00ffff;
@@ -586,7 +586,7 @@
       */
      class EnemyShip extends ObjWithShield {
        static W = 60;
-       static R = 60 / 2 * SYSTEM.SCALE;
+       static R = EnemyShip.W / 2 * SYSTEM.SCALE;
        static SPEED = 40 * SYSTEM.SCALE;
        static FEAR_INIT = 0.4;
        static FEAR_STEP = 0.05;
@@ -607,7 +607,7 @@
       */
      class PlayerShip extends ObjWithEnergy {
        static W = 60;
-       static R = 60 / 2 * SYSTEM.SCALE;
+       static R = PlayerShip.W / 2 * SYSTEM.SCALE;
        static SPEED = 120 * SYSTEM.SCALE;
        static SHIELD_MAX = 800;
        static SHIELD_RECOVERY_RATE = 0;
@@ -1104,6 +1104,83 @@
      } // clampDest(..)
 
      /**
+      * ターゲットへの方向ベクトル（追尾・逃走）を算出する（変更なし）
+      */
+     function getTargetVector(e, target, isFleeing) {
+       let dirX = 0, dirY = 0;
+       
+       if (isFleeing && Array.isArray(target)) {
+         target.forEach(t => {
+           let dx = e.x - t.x;
+           let dy = e.y - t.y;
+           let dist = Math.hypot(dx, dy);
+           if (dist > 0.001) {
+             let weight = 1.0 / dist;
+             dirX += (dx / dist) * weight;
+             dirY += (dy / dist) * weight;
+           }
+         });
+         let fDist = Math.hypot(dirX, dirY);
+         if (fDist > 0.000001) {
+           dirX /= fDist;
+           dirY /= fDist;
+         }
+       } else {
+         let dx = target.x - e.x;
+         let dy = target.y - e.y;
+         if (isFleeing) {
+           dx = -dx;
+           dy = -dy;
+         }
+         let dist = Math.hypot(dx, dy);
+         if (dist > 0.001) {
+           dirX = dx / dist;
+           dirY = dy / dist;
+         }
+       }
+       return { x: dirX, y: dirY };
+     } // getTargetVector()
+
+     /**
+      * 障害物や他ユニットからの回避・分離ベクトルを算出する（自機・敵機兼用）
+      */
+     function getAvoidanceVector(obj, obstacles, enemies) {
+       let avoidX = 0, avoidY = 0;
+       
+       // 1. 障害物(星・基地)からの反発力 + 回り込み力
+       const STAR_AVOID_RADIUS = Star.R * 3.5;
+       obstacles.forEach(s => {
+         if (!s.active || s === obj) return;
+         let dx = obj.x - s.x;
+         let dy = obj.y - s.y;
+         let dist = Math.hypot(dx, dy);
+         if (dist > 0 && dist < STAR_AVOID_RADIUS) {
+           let force = 1.0 - (dist / STAR_AVOID_RADIUS);
+           avoidX += (dx / dist) * force * 1.5 - (dy / dist) * force * 1.0;
+           avoidY += (dy / dist) * force * 1.5 + (dx / dist) * force * 1.0;
+         }
+       });
+
+       // 2. 他ユニット(敵)からの反発力（分離）
+       let sepX = 0, sepY = 0;
+       enemies.forEach(other => {
+         if (!other.active || other === obj) return;
+         // 動的に相手のサイズから回避半径を算出
+         const AVOID_RADIUS = other.r * 2.5; 
+         let dx = obj.x - other.x;
+         let dy = obj.y - other.y;
+         let dist = Math.hypot(dx, dy);
+         if (dist > 0 && dist < AVOID_RADIUS) {
+           let force = 1.0 - (dist / AVOID_RADIUS);
+           sepX += (dx / dist) * force * 2.0;
+           sepY += (dy / dist) * force * 2.0;
+         }
+       });
+
+       return { x: avoidX + sepX, y: avoidY + sepY };
+     } // getAvoidanceVector()
+
+     /**
       * 進行方向に障害物がある場合、少しずつ角度をずらして迂回ルートを探す。
       * 完全に接している場合でも滑らかに回り込み、大回りせずに障害物に沿って停止する。
       */
@@ -1189,36 +1266,59 @@
      } // dockShip()
 
      /**
-      *
+      * 自機の移動処理（敵と同じステアリングロジックを適用）
       */
      function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
        let rawDist = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, targetX, targetY);
        if (rawDist < 1) return;
 
        let moveDist = Math.min(rawDist, PlayerShip.SPEED);
-       let ratio = moveDist / rawDist;
-       let destX = g_playerShip.x + (targetX - g_playerShip.x) * ratio;
-       let destY = g_playerShip.y + (targetY - g_playerShip.y) * ratio;
 
+       // 1. 基地がドッキング目的地かどうか判定
        let target_is_base = false;
-       let dist_target_base = Phaser.Math.Distance.Between(
-         targetX, targetY, g_starBase.x, g_starBase.y
-       );
-       if ( dist_target_base <= StarBase.DOCKING_RANGE ) {
+       let dist_target_base = Phaser.Math.Distance.Between(targetX, targetY, g_starBase.x, g_starBase.y);
+       if (dist_target_base <= StarBase.DOCKING_RANGE) {
          target_is_base = true;
        }
 
-       const finalDest = resolveMovement(g_playerShip, destX, destY, moveDist);
-       destX = finalDest.x;
-       destY = finalDest.y;
+       // 2. 障害物リスト構築（ドッキング目的でなければ基地も避ける）
+       let obstacles = [...g_stars];
+       /* if (g_starBase.active && !target_is_base) {
+        *   obstacles.push(g_starBase);
+        * } */
+
+       // 3. クリック地点をターゲットとし、共通関数でベクトルを取得
+       let target = { x: targetX, y: targetY };
+       let targetVec = getTargetVector(g_playerShip, target, false);
+       let avoidVec = getAvoidanceVector(g_playerShip, obstacles);
+
+       // 4. ベクトル合成（敵と全く同じバランス）
+       let finalX = targetVec.x * 1.0 + avoidVec.x;
+       let finalY = targetVec.y * 1.0 + avoidVec.y;
+       let finalDist = Math.hypot(finalX, finalY);
+
+       if (finalDist < 0.001) {
+         let randomAngle = Math.random() * Math.PI * 2;
+         finalX = Math.cos(randomAngle);
+         finalY = Math.sin(randomAngle);
+         finalDist = 1.0;
+       }
+
+       // 5. 正規化した方向に予定距離(moveDist)を掛ける
+       let desiredX = g_playerShip.x + (finalX / finalDist) * moveDist;
+       let desiredY = g_playerShip.y + (finalY / finalDist) * moveDist;
+
+       // 6. 進化したresolveMovementでめり込みと最終的な迂回軌道を解決
+       const finalDest = resolveMovement(g_playerShip, desiredX, desiredY, moveDist);
+       let destX = finalDest.x;
+       let destY = finalDest.y;
 
        let distance = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, destX, destY);
-       if (distance < 1) {
-         let distance = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, destX, destY);
-         return;
-       }
+       if (distance < 1) return;
+       
        setMsg("操舵手: インパルスエンジン、コースセット ... 移動完了");
 
+       // --- 以降は既存のエネルギー消費・ドッキング処理 ---
        let skipAutoDock = false;
        if (g_isDocked) {
          g_isDocked = false;
@@ -1263,54 +1363,45 @@
          }
        });
        updateStatus();
-     } // attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
+     } // getTargetVector()
 
      /**
-      *
+      * ターゲット群に対するステアリングベクトル（斥力・接線力）を計算するコア関数
       */
-     function calcDest(e, target, isFleeing = false) {
-       let dirX = 0, dirY = 0;
+     function calcAvoidanceForce(obj, targets, radiusMultiplier, repulsionWeight, tangentialWeight) {
+       let accX = 0, accY = 0;
+       
+       targets.forEach(t => {
+         if (!t.active || t === obj) return;
+         
+         // オブジェクト自身の半径(r)を基準に回避半径を動的算出
+         const avoidRadius = t.r * radiusMultiplier;
+         let dx = obj.x - t.x;
+         let dy = obj.y - t.y;
+         let dist = Math.hypot(dx, dy);
+         
+         if (dist > 0 && dist < avoidRadius) {
+           let force = 1.0 - (dist / avoidRadius);
+           accX += (dx / dist) * force * repulsionWeight - (dy / dist) * force * tangentialWeight;
+           accY += (dy / dist) * force * repulsionWeight + (dx / dist) * force * tangentialWeight;
+         }
+       });
+       
+       return { x: accX, y: accY };
+     } // calcAvoidanceForce()
 
-       // ターゲットへのベクトル（引力 / 斥力）
-       if (isFleeing && Array.isArray(target)) {
-         // 複数の脅威（自機と基地）から遠ざかるベクトルを合成
-         target.forEach(t => {
-           let dx = e.x - t.x;
-           let dy = e.y - t.y;
-           let dist = Math.hypot(dx, dy);
-           if (dist > 0.001) {
-             let weight = 1.0 / dist;
-             dirX += (dx / dist) * weight;
-             dirY += (dy / dist) * weight;
-           }
-         });
-         let fDist = Math.hypot(dirX, dirY); // = Math.sqrt(dirX * dirX + dirY * dirY);
-         if (fDist > 0.000001) {
-           dirX /= fDist;
-           dirY /= fDist;
-         }
-       } else {
-         // 通常の追従または単一ターゲットからの退却
-         let targetDx = target.x - e.x;
-         let targetDy = target.y - e.y;
-         if (isFleeing) {
-           targetDx = -targetDx;
-           targetDy = -targetDy;
-         }
-         let targetDist = Math.hypot(targetDx, targetDy);
-         if (targetDist > 0.001) {
-           dirX = targetDx / targetDist;
-           dirY = targetDy / targetDist;
-         }
-       } // if ()
-
-       // 2. 障害物(星)からの反発力 + 回り込み力
+     /**
+      * 障害物や他ユニットからの回避・分離ベクトルを算出する（自機・敵機兼用）
+      */
+     function getAvoidanceVector(obj, obstacles) {
        let avoidX = 0, avoidY = 0;
+       
+       // 1. 障害物(星・基地)からの反発力 + 回り込み力
        const STAR_AVOID_RADIUS = Star.R * 3.5;
-       g_stars.forEach(s => {
-         // if (!s.active) return;
-         let dx = e.x - s.x;
-         let dy = e.y - s.y;
+       obstacles.forEach(s => {
+         if (!s.active || s === obj) return;
+         let dx = obj.x - s.x;
+         let dy = obj.y - s.y;
          let dist = Math.hypot(dx, dy);
          if (dist > 0 && dist < STAR_AVOID_RADIUS) {
            let force = 1.0 - (dist / STAR_AVOID_RADIUS);
@@ -1319,29 +1410,37 @@
          }
        });
 
-       // 3. 他の敵からの反発力（分離）
+       // 2. 他ユニット(敵)からの反発力（分離）
        let sepX = 0, sepY = 0;
-       const ENEMY_AVOID_RADIUS = EnemyShip.R * 2.5;
        g_enemies.forEach(other => {
-         if (!other.active || other === e) return;
-         let dx = e.x - other.x;
-         let dy = e.y - other.y;
+         if (!other.active || other === obj) return;
+         // 動的に相手のサイズから回避半径を算出
+         const AVOID_RADIUS = other.r * 2.5; 
+         let dx = obj.x - other.x;
+         let dy = obj.y - other.y;
          let dist = Math.hypot(dx, dy);
-         if (dist > 0 && dist < ENEMY_AVOID_RADIUS) {
-           let force = 1.0 - (dist / ENEMY_AVOID_RADIUS);
+         if (dist > 0 && dist < AVOID_RADIUS) {
+           let force = 1.0 - (dist / AVOID_RADIUS);
            sepX += (dx / dist) * force * 2.0;
            sepY += (dy / dist) * force * 2.0;
          }
        });
+
+       return { x: avoidX + sepX, y: avoidY + sepY };
+     } // getAvoidanceVector()
+
+     /**
+      * 敵の目的地計算
+      */
+     function calcDest(e, target, isFleeing = false) {
+       let targetVec = getTargetVector(e, target, isFleeing);
+       // 敵は星だけを障害物として避ける
+       let avoidVec = getAvoidanceVector(e, g_stars);
        
-       // 4. ベクトルを合成
-       let finalX = dirX * 1.0 + avoidX + sepX;
-       let finalY = dirY * 1.0 + avoidY + sepY;
+       let finalX = targetVec.x * 1.0 + avoidVec.x;
+       let finalY = targetVec.y * 1.0 + avoidVec.y;
 
        let finalDist = Math.hypot(finalX, finalY);
-       
-       // もし全方向からの力が完璧に釣り合ってゼロになってしまった場合（完全なスタック）
-       // ランダムな方向に微小な力を与えて均衡を崩し、その場にとどまるのを防ぐ
        if (finalDist < 0.001) {
          let randomAngle = Math.random() * Math.PI * 2;
          finalX = Math.cos(randomAngle);
@@ -1349,13 +1448,9 @@
          finalDist = 1.0;
        }
 
-       finalX = (finalX / finalDist) * EnemyShip.SPEED;
-       finalY = (finalY / finalDist) * EnemyShip.SPEED;
+       let desiredX = e.x + (finalX / finalDist) * EnemyShip.SPEED;
+       let desiredY = e.y + (finalY / finalDist) * EnemyShip.SPEED;
 
-       let desiredX = e.x + finalX;
-       let desiredY = e.y + finalY;
-
-       // 単純なクランプではなく、ルート走査による回避解決を適用
        return resolveMovement(e, desiredX, desiredY, EnemyShip.SPEED);
      } // calcDest(e, target, isFleeing = false)
 
