@@ -277,8 +277,8 @@
        N_ENEMY: 3,
        TIMING: {
          BEAM_DUR: 400,
-         TURN_DELAY: 500,
-         TURN_MARGIN: 100,
+         TURN_DELAY: 400,
+         TURN_MARGIN: 10,
          GAMEOVER: 4000
        }
      };
@@ -404,9 +404,10 @@
 
        const ctx = window.audioCtx;
        let now = ctx.currentTime
-       if ( ! isPlayer ) {
-         now += Math.random() * 0.5;
-       }
+       /* if ( ! isPlayer ) {
+        *   now += Math.random() * 0.5;
+        * } */
+
        // ビームの持続時間（SYSTEM.TIMING.BEAM_DURに合わせて500ms）
        let duration = SYSTEM.TIMING.BEAM_DUR / 1000;
        if ( ! isPlayer ) {
@@ -1513,18 +1514,21 @@
      // 敵ターンの処理
      // ---------------------------------------------------------
      /**
-      * 1. 敵ターン全体の制御（エントリーポイント）
+      * 敵ターン全体の制御（エントリーポイント）
       */
      function enemyTurn(scene) {
        if (g_isGameOver) return;
 
+       const MAX_DELAY = 400;
+
        // 各敵の行動を処理
        g_enemies.forEach(enemy => {
-         scene.time.delayedCall(0, () => execEnemyAction(scene, enemy));
+         const startDelay = Math.random() * MAX_DELAY;
+         scene.time.delayedCall(startDelay, () => execEnemyAction(scene, enemy));
        });
 
        // 敵フェーズ終了後の処理（次ターン準備）
-       const totalDelay = SYSTEM.TIMING.TURN_DELAY + SYSTEM.TIMING.TURN_MARGIN;
+       const totalDelay = SYSTEM.TIMING.TURN_DELAY + SYSTEM.TIMING.TURN_MARGIN + MAX_DELAY;
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
      }
 
@@ -1680,36 +1684,41 @@
        
        if (g_enemies.length === 0 && !g_isGameOver) {
          nextStage(scene);
-       } else if (!g_isGameOver) {
-         g_turn++;
-         g_score--;
-
-         // 増援の出現
-         if (g_turn % SYSTEM.NEW_ENEMY_INTERVAL === 0) {
-           const p = getSafeRandPos(0.8, 0.95);
-           g_enemies.push(new EnemyShip(scene, p.x, p.y));
-           // fear_mind
-           g_enemies.forEach(e => {
-             e.fear_mind = Math.max(0.2, e.fear_mind - EnemyShip.FEAR_STEP);
-             console.log(`e.fear_mind=${e.fear_mind}`);
-           });
-
-           setMsg("戦術士官: 新たな敵が出現しました！", "#ff0", "#000")
-         }
-
-         // 基地の回復
-         if ( g_starBase.shield < StarBase.SHIELD_MAX ) {
-           const prev_starbase_shield = g_starBase.shield;
-           g_starBase.shield = Math.floor(Math.min(
-             StarBase.SHIELD_MAX,
-             g_starBase.shield + (StarBase.SHIELD_MAX * StarBase.SHIELD_RECOVERY_RATE)
-           ));
-           console.log(`g_starBase: ${prev_starbase_shield} --> ${g_starBase.shield}`);
-         }
-
-         updateStatus(); 
-         g_isPlayerTurn = true;
+         return;
        }
+
+       if ( g_isGameOver ) {
+         return;
+       }
+
+       g_turn++;
+       g_score--;
+
+       // 増援の出現
+       if (g_turn % SYSTEM.NEW_ENEMY_INTERVAL === 0) {
+         const p = getSafeRandPos(0.8, 0.95);
+         g_enemies.push(new EnemyShip(scene, p.x, p.y));
+         // fear_mind
+         g_enemies.forEach(e => {
+           e.fear_mind = Math.max(0.2, e.fear_mind - EnemyShip.FEAR_STEP);
+           console.log(`e.fear_mind=${e.fear_mind}`);
+         });
+
+         setMsg("戦術士官: 新たな敵が出現しました！", "#ff0", "#000")
+       }
+
+       // 基地の回復
+       if ( g_starBase.shield < StarBase.SHIELD_MAX ) {
+         const prev_starbase_shield = g_starBase.shield;
+         g_starBase.shield = Math.floor(Math.min(
+           StarBase.SHIELD_MAX,
+           g_starBase.shield + (StarBase.SHIELD_MAX * StarBase.SHIELD_RECOVERY_RATE)
+         ));
+         console.log(`g_starBase: ${prev_starbase_shield} --> ${g_starBase.shield}`);
+       }
+
+       updateStatus(); 
+       g_isPlayerTurn = true;
      } // finalizeEnemyTurn()
 
      /**
