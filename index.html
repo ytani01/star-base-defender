@@ -279,7 +279,8 @@
          BEAM_DUR: 400,
          TURN_DELAY: 400,
          TURN_MARGIN: 10,
-         GAMEOVER: 4000
+         ENEMY_DELAY_MAX: 500, // 敵艦の動作のズレ
+         GAMEOVER: 3000,
        }
      };
      SYSTEM.GAME_ID = Phaser.Utils.String.UUID();
@@ -295,23 +296,6 @@
      };
      let CurZoom = 1.0;
 
-
-     const WEAPON = {
-       PLAYER: {
-         POWER: 100,
-         COST: 100,
-       },
-       ENEMY: {
-         POWER: 90,
-       },
-       ALPHA: 0.0075 / SYSTEM.SCALE,
-       EFFECTIVE_THRESHOLD: 0.45,
-       MAX_THRESHOLD: 0.2
-     };
-     WEAPON.PLAYER.MAX_RANGE = Math.floor(-Math.log(WEAPON.MAX_THRESHOLD) / WEAPON.ALPHA);
-     WEAPON.PLAYER.EFFECTIVE_RANGE = Math.floor(-Math.log(WEAPON.EFFECTIVE_THRESHOLD) / WEAPON.ALPHA);
-     WEAPON.ENEMY.EFFECTIVE_RANGE = Math.floor(-Math.log(WEAPON.EFFECTIVE_THRESHOLD) / WEAPON.ALPHA);
-
      const HIGHSCORE = {
        MAX_ENTRIES: 5,
        STORAGE_KEY: 'starbaseDefenderScores'
@@ -321,7 +305,7 @@
      let g_starBase;
      let g_enemies = [];
      let g_stars = [];
-     let rangeGraphics, boundaryGraphics;
+
      let g_turn = 1;
      let g_curMission = 1;
      let g_score = SYSTEM.SCORE.INIT;
@@ -331,6 +315,8 @@
      let g_pendingScene = null;
      let g_isDocked = false;     
      let g_curScene = null;
+
+     let rangeGraphics, boundaryGraphics;
 
      // ---------------------------------------------------------
      // グローバルメソッド
@@ -382,13 +368,6 @@
        el.style.backgroundColor = bg;
        el.textContent = msg;
      } // setMsg()
-
-     /**
-      * 距離に応じた武器の威力減衰率（有効度）を計算する
-      */
-     function getWeaponEffectiveness(distance) {
-       return Math.exp(-WEAPON.ALPHA * distance);
-     }
 
      /**
       * 艦載フェイザーアレイ 照射音ジェネレーター
@@ -462,6 +441,33 @@
      // ---------------------------------------------------------
      // クラス定義
      // ---------------------------------------------------------
+     /**
+      * 兵器クラス
+      */
+     class Weapon {
+       static ALPHA = 0.0075 / SYSTEM.SCALE;
+       static E_THRESHOLD = 0.45; // effective threshold
+       static MAX_THRESHOLD = 0.2;
+
+       static EffectiveRange() {
+         return Math.floor(Math.log(this.E_THRESHOLD) / this.ALPHA) * -1;
+       }
+       static MaxRange() {
+         return Math.floor(Math.log(this.MAX_THRESHOLD) / this.ALPHA) * -1;
+       }
+
+       /**
+        * 距離に応じた武器の威力減衰率（有効度）を計算する
+        */
+       static Effectiveness(distance) {
+         return Math.exp(this.ALPHA * distance * -1.0);
+       }
+
+       static CalcDamage(max_power, distance) {
+         return Math.floor(max_power * this.Effectiveness(distance));
+       }
+     } // class Weapon
+
      /**
       *
       */
@@ -664,12 +670,16 @@
        static W = 60;
        static R = EnemyShip.W / 2 * SYSTEM.SCALE;
        static SPEED = 40 * SYSTEM.SCALE;
+
        static FEAR_INIT = 0.4;
        static FEAR_STEP = 0.05;
        static FEAR_RECOVERY = 0.005;
+
        static SHIELD_MAX = 300;
        static SHIELD_RECOVERY_RATE = 0.01;
        static SHIELD_COLOR = 0xff8800;
+
+       static WEAPON_POWER = 90;
 
        constructor(scene, x, y) {
          super(scene, x, y, 'enemyImg', EnemyShip.SHIELD_MAX, EnemyShip.SHIELD_COLOR);
@@ -694,6 +704,9 @@
        static ENERGY_COLOR = 0xffff00;
 
        static MOVE_COST_RATE = 0.3;
+
+       static WEAPON_POWER = 100;
+       static WEAPON_COST = 100;
 
        constructor(scene, x, y) {
          super(
@@ -769,7 +782,6 @@
        // Base
        const base_color = 0x88ffff;
        g.fillStyle(0x0000,.3);
-       g.fillCircle(30,30,30);
        g.fillStyle(base_color);
        g.fillEllipse(30,30,24,53);
        g.lineStyle(5, base_color ,1);
@@ -836,7 +848,7 @@
        });
 
        //changeZoom(this, -1);
-     }
+     } // create()
 
      /**
       * ズーム倍率変更
@@ -873,23 +885,18 @@
        rangeGraphics.strokeCircle(g_starBase.x, g_starBase.y, StarBase.DOCKING_RANGE+1);
 
        // 射程範囲
-       [g_playerShip, ...g_enemies].forEach(
-         (obj, i)=>{
-           if(!obj.active) {
-             return;
-           }
-           let color = (i===0) ? 0x00ffff : 0xffff00;
-           if ( i == 0 ) {  
-             rangeGraphics.lineStyle(1, color, 0.3);
-             rangeGraphics.strokeCircle(obj.x, obj.y, WEAPON.PLAYER.MAX_RANGE);
-             rangeGraphics.lineStyle(1, color, 0.5);
-             rangeGraphics.strokeCircle(obj.x, obj.y, WEAPON.PLAYER.EFFECTIVE_RANGE);
-           } else {
-             rangeGraphics.lineStyle(1, color, 0.5);
-             rangeGraphics.strokeCircle(obj.x, obj.y, WEAPON.ENEMY.EFFECTIVE_RANGE);
-           }
+       [g_playerShip, ...g_enemies].forEach((obj, i) => {
+         if(!obj.active) {
+           return;
          }
-       ); // forEach()
+         let color = ( obj === g_playerShip ) ? 0x00ffff : 0xffff00;
+         rangeGraphics.lineStyle(1, color, 0.5);
+         rangeGraphics.strokeCircle(obj.x, obj.y, Weapon.EffectiveRange());
+         if ( obj === g_playerShip ) {  
+           rangeGraphics.lineStyle(1, color, 0.3);
+           rangeGraphics.strokeCircle(obj.x, obj.y, Weapon.MaxRange());
+         }
+       }); // forEach
 
        if (g_playerShip) {
          g_playerShip.updateGauge();
@@ -1045,18 +1052,17 @@
            return;
          }
 
-         if (g_playerShip.energy < WEAPON.PLAYER.COST) {
+         if (g_playerShip.energy < PlayerShip.WEAPON_COST) {
            setMsg("戦術士官: エネルビー不足で攻撃できません！", "#f00");
            return;
          }
 
-         g_playerShip.energy -= WEAPON.PLAYER.COST;
+         g_playerShip.energy -= PlayerShip.WEAPON_COST;
          const dist = Phaser.Math.Distance.Between(
            g_playerShip.x, g_playerShip.y, clickedObj.x, clickedObj.y
          );
-         const hitChance = getWeaponEffectiveness(dist)
 
-         if (hitChance < WEAPON.MAX_THRESHOLD) {
+         if (dist > Weapon.MaxRange()) {
            setMsg("戦術士官: 射程範囲外のため、敵艦にダメージなし。", "#ff0");
            fireBeam(this, g_playerShip, clickedObj, 0x444444);
            endTurn();
@@ -1071,7 +1077,7 @@
          }
 
          setMsg("戦術士官: 攻撃命中！ 敵艦シールド減少！", "#f80");
-         const damage = Math.floor(WEAPON.PLAYER.POWER * hitChance);
+         const damage = Weapon.CalcDamage(PlayerShip.WEAPON_POWER, dist);
          clickedObj.takeDamage(damage);
          fireBeam(this, g_playerShip, clickedObj, 0x00ffff);
 
@@ -1205,45 +1211,6 @@
        }
        return { x: dirX, y: dirY };
      } // getTargetVector()
-
-     /**
-      * 障害物や他ユニットからの回避・分離ベクトルを算出する（自機・敵機兼用）
-      */
-     function getAvoidanceVector(obj, obstacles, enemies) {
-       let avoidX = 0, avoidY = 0;
-       
-       // 1. 障害物(星・基地)からの反発力 + 回り込み力
-       const STAR_AVOID_RADIUS = Star.R * 3.5;
-       obstacles.forEach(s => {
-         if (!s.active || s === obj) return;
-         let dx = obj.x - s.x;
-         let dy = obj.y - s.y;
-         let dist = Math.hypot(dx, dy);
-         if (dist > 0 && dist < STAR_AVOID_RADIUS) {
-           let force = 1.0 - (dist / STAR_AVOID_RADIUS);
-           avoidX += (dx / dist) * force * 1.5 - (dy / dist) * force * 1.0;
-           avoidY += (dy / dist) * force * 1.5 + (dx / dist) * force * 1.0;
-         }
-       });
-
-       // 2. 他ユニット(敵)からの反発力（分離）
-       let sepX = 0, sepY = 0;
-       enemies.forEach(other => {
-         if (!other.active || other === obj) return;
-         // 動的に相手のサイズから回避半径を算出
-         const AVOID_RADIUS = other.r * 2.5; 
-         let dx = obj.x - other.x;
-         let dy = obj.y - other.y;
-         let dist = Math.hypot(dx, dy);
-         if (dist > 0 && dist < AVOID_RADIUS) {
-           let force = 1.0 - (dist / AVOID_RADIUS);
-           sepX += (dx / dist) * force * 2.0;
-           sepY += (dy / dist) * force * 2.0;
-         }
-       });
-
-       return { x: avoidX + sepX, y: avoidY + sepY };
-     } // getAvoidanceVector()
 
      /**
       * 進行方向に障害物がある場合、少しずつ角度をずらして迂回ルートを探す。
@@ -1437,10 +1404,10 @@
        let cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
        if ( g_playerShip.energy - cost <= PlayerShip.ENERGY_MIN ) {
          if ( target_is_base ) {
-           gameOver("機関部: エネルギーがありません！", "#f00");
+           gameOver("機関部: エネルギー消失！ 全システムダウン！");
            return;
          }
-         setMsg("機関部: エネルビー不足で移動できません", "#ff0");
+         setMsg("機関部: エネルビー不足で移動できません");
          return;
        }
 
@@ -1516,16 +1483,16 @@
      function enemyTurn(scene) {
        if (g_isGameOver) return;
 
-       const MAX_DELAY = 400;
-
        // 各敵の行動を処理
        g_enemies.forEach(enemy => {
-         const startDelay = Math.random() * MAX_DELAY;
+         const startDelay = Math.random() * SYSTEM.TIMING.ENEMY_DELAY_MAX;
          scene.time.delayedCall(startDelay, () => execEnemyAction(scene, enemy));
        });
 
        // 敵フェーズ終了後の処理（次ターン準備）
-       const totalDelay = SYSTEM.TIMING.TURN_DELAY + SYSTEM.TIMING.TURN_MARGIN + MAX_DELAY;
+       const totalDelay = (
+         SYSTEM.TIMING.TURN_DELAY + SYSTEM.TIMING.TURN_MARGIN + SYSTEM.TIMING.ENEMY_DELAY_MAX
+       );
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
      }
 
@@ -1573,14 +1540,14 @@
        );
 
        // プレイヤーへの攻撃可否
-       const isPlayerInRange = distToPlayer <= WEAPON.ENEMY.EFFECTIVE_RANGE;
+       const isPlayerInRange = distToPlayer <= Weapon.EffectiveRange();
        const canAttackPlayer = !isFleeing &&
                                !g_isDocked && 
                                isPlayerInRange && 
                                !isLOSBlocked(enemy, g_playerShip);
 
        // 基地への攻撃可否
-       const isBaseInRange = distToBase <= WEAPON.ENEMY.EFFECTIVE_RANGE;
+       const isBaseInRange = distToBase <= Weapon.EffectiveRange();
        const canAttackBase = !isFleeing &&
                              g_starBase.active && 
                              isBaseInRange && 
@@ -1599,8 +1566,8 @@
      function enemyAttack(scene, enemy, target, distance, gameOverMsg) {
        fireBeam(scene, enemy, target, 0xff00ff);
        
-       const target_damage = Math.floor(WEAPON.ENEMY.POWER * getWeaponEffectiveness(distance));
-       target.takeDamage(target_damage);
+       const damage = Weapon.CalcDamage(EnemyShip.WEAPON_POWER, distance);
+       target.takeDamage(damage);
 
        if (target.shield <= 0 && !g_isGameOver) {
          updateStatus();
@@ -1771,7 +1738,7 @@
        g_score += bonus;
 
        const { list, newIdx } = saveHighScore(
-         g_score, g_turn, clearedMission, `MISSION ${clearedMission} CLEARED`, true
+         g_score, g_turn, clearedMission, `MISSION #${clearedMission} CLEARED`, true
        );
 
        g_curMission++;
@@ -1780,7 +1747,7 @@
 
        g_pendingScene = scene;
 
-       setMsg(`COMMAND: Sector ${clearedMission} secured. Awaiting new orders.`);
+       setMsg(`司令部: ミッション #${clearedMission} 成功`);
        showHighScoreOverlay('missionclear', { clearedMission, bonus, list, newIdx });
      } // nextMission()
 
