@@ -303,6 +303,7 @@
 
      let g_playerShip;
      let g_starBase;
+     let g_federationShip;
      let g_enemies = [];
      let g_stars = [];
 
@@ -313,7 +314,6 @@
      let g_isGameOver = false;
      let g_flagClear = false;
      let g_pendingScene = null;
-     let g_isDocked = false;     
      let g_curScene = null;
 
      let rangeGraphics, boundaryGraphics;
@@ -449,6 +449,12 @@
        static E_THRESHOLD = 0.45; // effective threshold
        static MAX_THRESHOLD = 0.2;
 
+       constructor(max_power, e_threshold, max_threshold) {
+         this.max_power = max_power;
+         this.e_threshold = e_threshold;
+         this.max_threshold = max_threshold;
+       }
+       
        static EffectiveRange() {
          return Math.floor(Math.log(this.E_THRESHOLD) / this.ALPHA) * -1;
        }
@@ -539,11 +545,12 @@
          this.gauge_h = this.constructor.GAUGE_H * scale;
          this.gauge_y = this.h + this.constructor.GAUGE_Y_OFFSET * scale;
          this.gauge_w = this.w;
+
          this.shield_gauge = this.scene.add.graphics();
          this.shield_circle = this.scene.add.graphics();
        }
 
-       updateGauge() {
+       update() {
          if (! this.active ) {
            if (this.shield_gauge) {
              this.shield_gauge.destroy();
@@ -574,7 +581,7 @@
            this.shield / this.constructor.SHIELD_MAX,
            this.shield_gauge_color
          );
-       } // updateGauge()
+       } // update()
 
        /**
         *
@@ -620,8 +627,8 @@
          this.energy_gauge = this.scene.add.graphics();
        }
 
-       updateGauge() {
-         super.updateGauge();
+       update() {
+         super.update();
          drawGauge(
            this.energy_gauge,
            this.x, this.y + (this.gauge_y * this.scale) + this.gauge_h + 1,
@@ -647,12 +654,12 @@
       *
       */
      class StarBase extends ObjWithShield {
-       static W = 60;
+       static W = 100;
        static R = StarBase.W / 2 * SYSTEM.SCALE;
        static SHIELD_MAX = 4000;
        static SHIELD_RECOVERY_RATE = 0.01;
        static SHIELD_COLOR = 0x00ffff;
-       static DOCKING_RANGE = 35 * SYSTEM.SCALE;
+       static DOCKING_RANGE = 50 * SYSTEM.SCALE;
 
        constructor(scene, x, y) {
          super(scene, x, y, 'baseImg', StarBase.SHIELD_MAX, StarBase.SHIELD_COLOR);
@@ -672,6 +679,7 @@
        static SPEED = 40 * SYSTEM.SCALE;
 
        static FEAR_INIT = 0.4;
+       static FEAR_MAX = 0.8;
        static FEAR_STEP = 0.05;
        static FEAR_RECOVERY = 0.005;
 
@@ -687,6 +695,32 @@
          this.fear_mind = EnemyShip.FEAR_INIT;
        }
      } // class EnemyShip
+
+     /**
+      *
+      */
+     class FederationShip extends ObjWithShield {
+       static W = 60;
+       static R = FederationShip.W / 2 * SYSTEM.SCALE;
+       static SPEED = 60 * SYSTEM.SCALE;
+
+       static FEAR_INIT = 0.4;
+       static FEAR_MAX = 0.8;
+       static FEAR_STEP = 0.05;
+       static FEAR_RECOVERY = 0.005;
+
+       static SHIELD_MAX = 500;
+       static SHIELD_RECOVERY_RATE = 0.02;
+       static SHIELD_COLOR = 0xff8800;
+
+       static WEAPON_POWER = 90;
+
+       constructor(scene, x, y) {
+         super(scene, x, y, 'PlayerImg', FederationShip.SHIELD_MAX, FederationShip.SHIELD_COLOR);
+
+         this.fear_mind = FederationShip.FEAR_INIT;
+       }
+     } // class FederationShip
 
      /**
       *
@@ -715,6 +749,8 @@
            PlayerShip.ENERGY_MAX, PlayerShip.ENERGY_COLOR
          );
 
+         this.is_docked = false;
+         
          this.sprite.setDepth(10);
          this.shield_gauge.setDepth(10);
        }
@@ -780,13 +816,15 @@
        g.clear();
 
        // Base
+       const CX_STARBASE = StarBase.W / 2;
+       const CY_STARBASE = StarBase.W / 2;
        const base_color = 0x88ffff;
        g.fillStyle(0x0000,.3);
        g.fillStyle(base_color);
-       g.fillEllipse(30,30,24,53);
+       g.fillEllipse(CX_STARBASE, CY_STARBASE, 24, 53);
        g.lineStyle(5, base_color ,1);
-       g.strokeEllipse(30,30,48,25);
-       g.generateTexture('baseImg',60,60);
+       g.strokeEllipse(CX_STARBASE, CY_STARBASE, 48, 25);
+       g.generateTexture('baseImg', StarBase.W, StarBase.W);
 
        g.clear();
 
@@ -830,6 +868,10 @@
        // Player Ship
        let pp = getSafeRandPos(0.1, 0.3);
        g_playerShip = new PlayerShip(this, pp.x, pp.y);
+
+       // FederationShip
+       //pp = getSafeRandPos(0.3, 0.6);
+       //g_federationShip = new FederationShip(this, pp.x, pp.y);
 
        // Camera
        this.cameras.main.setBounds(0, 0, SYSTEM.PLAY_AREA_WIDTH, SYSTEM.PLAY_AREA_HEIGHT);
@@ -878,18 +920,18 @@
        rangeGraphics.clear();
 
        // ドッキング状態
-       rangeGraphics.lineStyle(0, 0x00ffff, 0.5);
-       if ( g_isDocked ) {
+       if ( g_playerShip.is_docked ) {
          rangeGraphics.lineStyle(3, 0x00ffff, 1);
+         rangeGraphics.strokeCircle(g_starBase.x, g_starBase.y, StarBase.DOCKING_RANGE+1);
        }
-       rangeGraphics.strokeCircle(g_starBase.x, g_starBase.y, StarBase.DOCKING_RANGE+1);
 
        // 射程範囲
-       [g_playerShip, ...g_enemies].forEach((obj, i) => {
-         if(!obj.active) {
+       [g_playerShip, g_federationShip, ...g_enemies].forEach((obj, i) => {
+         if(obj === undefined || !obj.active) {
            return;
          }
          let color = ( obj === g_playerShip ) ? 0x00ffff : 0xffff00;
+
          rangeGraphics.lineStyle(1, color, 0.5);
          rangeGraphics.strokeCircle(obj.x, obj.y, Weapon.EffectiveRange());
          if ( obj === g_playerShip ) {  
@@ -898,13 +940,16 @@
          }
        }); // forEach
 
-       if (g_playerShip) {
-         g_playerShip.updateGauge();
+       if ( g_playerShip ) {
+         g_playerShip.update();
        }
-       if (g_starBase) {
-         g_starBase.updateGauge();
+       if ( g_federationShip ) {
+         g_federationShip.update();
        }
-       g_enemies.forEach(e => e.updateGauge());
+       if ( g_starBase ) {
+         g_starBase.update();
+       }
+       g_enemies.forEach(e => e.update());
      } // update()
 
      /**
@@ -1030,7 +1075,7 @@
        // クラス定義やインスタンスを利用してスッキリと切り分ける
        if (clickedObj === g_starBase) {
          // --- 基地に対するアクション ---
-         if (g_isDocked) {
+         if (g_playerShip.is_docked) {
            setMsg("STARBASE: ドッキング中。エネルギー補給完了してます。いつでも出航できます。");
            endTurn();
            return;
@@ -1039,24 +1084,29 @@
          const distToBase = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, g_starBase.x, g_starBase.y);
          console.log(`distToBase=${distToBase}`);
          if (distToBase <= StarBase.DOCKING_RANGE) {
+           // ドッキング
            dockShip(this);
            endTurn();
-         } else {
-           attemptPlayerMove(this, g_starBase.x, g_starBase.y, SYSTEM.TIMING.TURN_DELAY);
          }
+         
+         attemptPlayerMove(this, g_starBase.x, g_starBase.y, SYSTEM.TIMING.TURN_DELAY);
 
+         if (g_playerShip.energy < PlayerShip.ENERGY_MIN && !g_playerShip.is_docked) {
+           updateStatus();
+           gameOver("艦内コンピュータ: パワー障害。生命維持装置ダウン...");
+         }
        } else if (clickedObj instanceof EnemyShip) {
          // --- 敵に対するアクション ---
-         if (g_isDocked) {
+         if (g_playerShip.is_docked) {
            setMsg("戦術士官: ドッキング中のため、兵器は使用できません。", "#a00");
            return;
          }
-
          if (g_playerShip.energy < PlayerShip.WEAPON_COST) {
            setMsg("戦術士官: エネルビー不足で攻撃できません！", "#f00");
            return;
          }
 
+         // 発射
          g_playerShip.energy -= PlayerShip.WEAPON_COST;
          const dist = Phaser.Math.Distance.Between(
            g_playerShip.x, g_playerShip.y, clickedObj.x, clickedObj.y
@@ -1068,7 +1118,6 @@
            endTurn();
            return;
          }
-
          if (isLOSBlocked(g_playerShip, clickedObj, false)) {
            setMsg("戦術士官: 障害物に遮られ、敵艦にダメージなし。", "#ff0");
            fireBeam(this, g_playerShip, clickedObj, 0x444444);
@@ -1076,6 +1125,7 @@
            return;
          }
 
+         // 命中
          setMsg("戦術士官: 攻撃命中！ 敵艦シールド減少！", "#f80");
          const damage = Weapon.CalcDamage(PlayerShip.WEAPON_POWER, dist);
          clickedObj.takeDamage(damage);
@@ -1120,7 +1170,7 @@
          // --- 空間に対するアクション（移動） ---
          attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
 
-         if (g_playerShip.energy < PlayerShip.ENERGY_MIN && !g_isDocked) {
+         if (g_playerShip.energy < PlayerShip.ENERGY_MIN && !g_playerShip.is_docked) {
            updateStatus();
            gameOver("艦内コンピュータ: パワー障害。生命維持装置ダウン...");
          }
@@ -1135,10 +1185,23 @@
        const startX = obj.x;
        const startY = obj.y;
 
-       const targets = [...g_enemies, ...g_stars].filter(e => e && e.active && e !== obj);
-       // 敵機の場合、playerShip と starBase も障害物として追加する
+       const targets = [g_starBase, ...g_enemies, ...g_stars].filter(
+         e => e && e.active && e !== obj
+       );
+
+       if (obj instanceof PlayerShip) {
+         if (g_federationShip) {
+           targets.push(g_federationShip);
+         }
+       }
+       if (obj instanceof FederationShip) {
+         targets.push(g_playerShip);
+       }
        if (obj instanceof EnemyShip) {
-         targets.push(g_playerShip, g_starBase);
+         targets.push(g_playerShip);
+         if ( g_federationShip && g_federationShip.active ) {
+           targets.push(g_federationShip);
+         }
        }
 
        const dx = destX - startX;
@@ -1175,7 +1238,7 @@
      } // clampDest(..)
 
      /**
-      * ターゲットへの方向ベクトル（追尾・逃走）を算出する（変更なし）
+      * ターゲットへの方向ベクトル（追尾・逃走）を算出する
       */
      function getTargetVector(e, target, isFleeing) {
        let dirX = 0, dirY = 0;
@@ -1274,8 +1337,8 @@
            if (moveDistSq >= (adjustedSpeed * 0.95)**2) {
              break; 
            }
-         }
-       }
+         } // for ()
+       } // for () 
        
        return bestDest;
      } //  resolveMovement(..)
@@ -1284,7 +1347,7 @@
       *
       */
      function dockShip(scene) {
-       g_isDocked = true;
+       g_playerShip.is_docked = true;
        g_playerShip.shield = PlayerShip.SHIELD_MAX;
        g_playerShip.energy = PlayerShip.ENERGY_MAX;
        scene.tweens.add({
@@ -1293,7 +1356,7 @@
          duration: 200,
          ease: 'Sine.easeInOut'
        });
-       setMsg("STARBASE: ドッキング完了。エネルギーを補給しました。", "#220", "#0ff");
+       setMsg("STARBASE: ドッキング完了", "#220", "#0ff");
        updateStatus();
      } // dockShip()
 
@@ -1341,10 +1404,15 @@
       * 自機の移動処理（敵と同じステアリングロジックを適用）
       */
      function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
+       console.log(`targetX=${targetX}, targetY=${targetY}`);
        let rawDist = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, targetX, targetY);
-       if (rawDist < 1) return;
+       console.log(`rawDist=${rawDist}`);
+       if (rawDist < 1) {
+         return;
+       }
 
        let moveDist = Math.min(rawDist, PlayerShip.SPEED);
+       console.log(`moveDist=${rawDist}`);
 
        // 1. 基地がドッキング目的地かどうか判定
        let target_is_base = false;
@@ -1352,19 +1420,17 @@
        if (dist_target_base <= StarBase.DOCKING_RANGE) {
          target_is_base = true;
        }
+       console.log(`target_is_base=${target_is_base}`);
 
-       // 2. 障害物リスト構築（ドッキング目的でなければ基地も避ける）
-       let obstacles = [...g_stars];
-       /* if (g_starBase.active && !target_is_base) {
-        *   obstacles.push(g_starBase);
-        * } */
-
-       // 3. クリック地点をターゲットとし、共通関数でベクトルを取得
        let target = { x: targetX, y: targetY };
        let targetVec = getTargetVector(g_playerShip, target, false);
-       let avoidVec = getAvoidanceVector(g_playerShip, obstacles);
+       console.log(`targetVec=(${targetVec.x},${targetVec.y})`);
 
-       // 4. ベクトル合成（敵と全く同じバランス）
+       let obstacles = [...g_stars];
+       let avoidVec = getAvoidanceVector(g_playerShip, obstacles);
+       console.log(`avoidVec=(${avoidVec.x}, ${avoidVec.y})`);
+
+       // ベクトル合成（敵と全く同じバランス）
        let finalX = targetVec.x * 1.0 + avoidVec.x;
        let finalY = targetVec.y * 1.0 + avoidVec.y;
        let finalDist = Math.hypot(finalX, finalY);
@@ -1392,8 +1458,8 @@
 
        // --- 以降は既存のエネルギー消費・ドッキング処理 ---
        let skipAutoDock = false;
-       if (g_isDocked) {
-         g_isDocked = false;
+       if (g_playerShip.is_docked) {
+         g_playerShip.is_docked = false;
          skipAutoDock = true;
          g_playerShip.shield = PlayerShip.SHIELD_MAX;
          setMsg("STARBASE: ドッキング解除");
@@ -1421,7 +1487,7 @@
            if (!skipAutoDock) {
              const dockDist = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, g_starBase.x, g_starBase.y);
              if (
-               !g_isDocked && dockDist <= StarBase.DOCKING_RANGE
+               !g_playerShip.is_docked && dockDist <= StarBase.DOCKING_RANGE
                && g_starBase.active && g_starBase.shield > 0
                && target_is_base
              ) {
@@ -1442,7 +1508,6 @@
       */
      function calcDest(e, target, isFleeing = false) {
        let targetVec = getTargetVector(e, target, isFleeing);
-       // 敵は星だけを障害物として避ける
        let avoidVec = getAvoidanceVector(e, g_stars);
        
        let finalX = targetVec.x * 1.0 + avoidVec.x;
@@ -1456,12 +1521,13 @@
          finalDist = 1.0;
        }
 
-       let desiredX = e.x + (finalX / finalDist) * EnemyShip.SPEED;
-       let desiredY = e.y + (finalY / finalDist) * EnemyShip.SPEED;
+       const speed = e.constructor.SPEED; // 実行元インスタンスのクラスから速度を動的取得
+       let desiredX = e.x + (finalX / finalDist) * speed;
+       let desiredY = e.y + (finalY / finalDist) * speed;
 
-       return resolveMovement(e, desiredX, desiredY, EnemyShip.SPEED);
-     } // calcDest(e, target, isFleeing = false)
-
+       return resolveMovement(e, desiredX, desiredY, speed);
+     }
+     
      /**
       *
       */
@@ -1478,168 +1544,204 @@
      // 敵ターンの処理
      // ---------------------------------------------------------
      /**
-      * 敵ターン全体の制御（エントリーポイント）
+      * NPCターン全体の制御（エントリーポイント）
       */
      function enemyTurn(scene) {
        if (g_isGameOver) return;
 
-       // 各敵の行動を処理
-       g_enemies.forEach(enemy => {
+       // 敵艦と連邦艦をひとつの配列にまとめて処理する
+       const npcs = [...g_enemies];
+       if (typeof g_federationShip !== 'undefined' && g_federationShip && g_federationShip.active) {
+         npcs.push(g_federationShip);
+       }
+
+       npcs.forEach(npc => {
          const startDelay = Math.random() * SYSTEM.TIMING.ENEMY_DELAY_MAX;
-         scene.time.delayedCall(startDelay, () => execEnemyAction(scene, enemy));
+         scene.time.delayedCall(startDelay, () => execNPCAction(scene, npc));
        });
 
-       // 敵フェーズ終了後の処理（次ターン準備）
-       const totalDelay = (
-         SYSTEM.TIMING.TURN_DELAY + SYSTEM.TIMING.TURN_MARGIN + SYSTEM.TIMING.ENEMY_DELAY_MAX
-       );
+       const totalDelay = SYSTEM.TIMING.TURN_DELAY + SYSTEM.TIMING.TURN_MARGIN + SYSTEM.TIMING.ENEMY_DELAY_MAX;
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
-     }
+     } // enemyTurn()
 
      /**
-      * 敵1体の具体的な行動（思考と実行）
+      * NPC1体の具体的な行動（思考と実行）
       */
-     function execEnemyAction(scene, enemy) {
-       if (g_isGameOver || !enemy.active) return;
+     function execNPCAction(scene, npc) {
+       if (g_isGameOver || !npc.active) return;
+       const context = evalNPCTacticalSituation(npc);
 
-       // 状況を評価し、コンテキスト（距離や攻撃可能フラグなど）を取得
-       const context = evalTacticalSituation(enemy);
-
-       // 評価結果に基づいてアクションを分岐
        if (context.isFleeing) {
-         console.log("fleeing");
-         enemyMove(scene, enemy, context);
-       } else if (context.canAttackBase) {
-         console.log("attack base");
-         enemyAttack(
-           scene, enemy, g_starBase, context.distToBase,
-           "STARBASE: シールド消失！！ もちこたえられませ..."
-         );
-       } else if (context.canAttackPlayer) {
-         console.log("attack player");
-         enemyAttack(
-           scene, enemy, g_playerShip, context.distToPlayer,
-           "機関部: 船体強度 ゼロ！！ 船が破壊..."
-         );
+         npcMove(scene, npc, context);
+       } else if (context.canAttack) {
+         npcAttack(scene, npc, context.target, context.distToTarget);
        } else {
-         console.log("move");
-         enemyMove(scene, enemy, context);
+         npcMove(scene, npc, context);
        }
-     } // execEnemyAction
+     } // execNPCAction()
 
      /**
-      * 戦況の評価（距離計算、攻撃可否、逃走判断）
+      * クラス(所属)に応じた戦況の評価
       */
-     function evalTacticalSituation(enemy) {
-       const isFleeing = enemy.fear_mind > (enemy.shield / EnemyShip.SHIELD_MAX);
-       const distToPlayer = Phaser.Math.Distance.Between(
-         enemy.x, enemy.y, g_playerShip.x, g_playerShip.y
-       );
-       const distToBase = Phaser.Math.Distance.Between(
-         enemy.x, enemy.y, g_starBase.x, g_starBase.y
-       );
+     function evalNPCTacticalSituation(npc) {
+       const isFleeing = npc.fear_mind > (npc.shield / npc.constructor.SHIELD_MAX);
+       let target = null;
+       let distToTarget = Infinity;
+       let canAttack = false;
 
-       // プレイヤーへの攻撃可否
-       const isPlayerInRange = distToPlayer <= Weapon.EffectiveRange();
-       const canAttackPlayer = !isFleeing &&
-                               !g_isDocked && 
-                               isPlayerInRange && 
-                               !isLOSBlocked(enemy, g_playerShip);
+       if (npc instanceof EnemyShip) {
+         // 敵艦から見たターゲット候補リスト
+         let potentialTargets = [g_playerShip, g_starBase];
+         if (typeof g_federationShip !== 'undefined' && g_federationShip && g_federationShip.active) {
+           potentialTargets.push(g_federationShip);
+         }
 
-       // 基地への攻撃可否
-       const isBaseInRange = distToBase <= Weapon.EffectiveRange();
-       const canAttackBase = !isFleeing &&
-                             g_starBase.active && 
-                             isBaseInRange && 
-                             !isLOSBlocked(enemy, g_starBase, false);
+         let bestAttackableTarget = null;
+         let bestAttackableDist = Infinity;
+         let closestTarget = null;
+         let closestDist = Infinity;
 
-       console.log(
-         `enemy.shield=${enemy.shield}/${EnemyShip.SHIELD_MAX}, isFleeing=${isFleeing}`
-       );
+         potentialTargets.forEach(t => {
+           if (!t || !t.active) return;
+           if (t === g_playerShip && g_playerShip.is_docked) {
+             return;
+           }
 
-       return { distToBase, distToPlayer, canAttackBase, canAttackPlayer, isFleeing };
-     } // evalTacticalSituation()
+           let d = Phaser.Math.Distance.Between(npc.x, npc.y, t.x, t.y);
+           
+           // 最短距離の対象を記録（攻撃不可の場合の追跡目標）
+           if (d < closestDist) {
+             closestDist = d;
+             closestTarget = t;
+           }
+
+           // 攻撃可能な対象を評価
+           if (!isFleeing && d <= Weapon.EffectiveRange()) {
+             let checkBaseObstacle = (t !== g_starBase);
+             if (!isLOSBlocked(npc, t, checkBaseObstacle)) {
+               if (d < bestAttackableDist) {
+                 bestAttackableDist = d;
+                 bestAttackableTarget = t;
+               }
+             }
+           }
+         });
+
+         if (bestAttackableTarget) {
+           target = bestAttackableTarget;
+           distToTarget = bestAttackableDist;
+           canAttack = true;
+         } else {
+           target = closestTarget;
+           distToTarget = closestDist;
+           canAttack = false;
+         }
+
+       } else if (npc instanceof FederationShip) {
+         // 連邦艦は最も近い敵を探す
+         g_enemies.forEach(e => {
+           if (!e.active) return;
+           let d = Phaser.Math.Distance.Between(npc.x, npc.y, e.x, e.y);
+           if (d < distToTarget) { distToTarget = d; target = e; }
+         });
+         
+         if (target && !isFleeing) {
+           canAttack = (distToTarget <= Weapon.EffectiveRange()) && !isLOSBlocked(npc, target, true);
+         }
+       }
+
+       return { target, distToTarget, canAttack, isFleeing };
+     } // evalNPCTacticalSituation()
 
      /**
-      * 攻撃処理
+      * 攻撃処理（共通）
       */
-     function enemyAttack(scene, enemy, target, distance, gameOverMsg) {
-       fireBeam(scene, enemy, target, 0xff00ff);
+     function npcAttack(scene, npc, target, distance) {
+       const beamColor = npc instanceof FederationShip ? 0x0088ff : 0xff00ff;
+       fireBeam(scene, npc, target, beamColor);
        
-       const damage = Weapon.CalcDamage(EnemyShip.WEAPON_POWER, distance);
+       const damage = Weapon.CalcDamage(npc.constructor.WEAPON_POWER, distance);
        target.takeDamage(damage);
 
-       if (target.shield <= 0 && !g_isGameOver) {
-         updateStatus();
-         gameOver(gameOverMsg);
+       if (npc instanceof EnemyShip) {
+         if (target.shield <= 0 && !g_isGameOver) {
+           updateStatus();
+           // 対象に応じた正確な死亡処理への分岐
+           if (target === g_starBase) {
+             gameOver("STARBASE: シールド消失！！ もちこたえられませ...");
+           } else if (target === g_playerShip) {
+             gameOver("機関部: 船体強度 ゼロ！！ 船が破壊...");
+           } else if (target === g_federationShip) {
+             setMsg("通信士: 連邦艦の反応が消失しました...", "#f00");
+           }
+         }
+       } else if (npc instanceof FederationShip) {
+         if (!target.active) {
+           g_enemies = g_enemies.filter(e => e !== target);
+           setMsg("通信士: 連邦艦が敵艦を撃破しました！", "#0f0");
+         }
        }
-     } // enemyAttack()
+     } // npcAttack()
 
      /**
-      * 移動処理とシールド回復
+      * 移動処理とシールド回復（共通）
       */
-     function enemyMove(scene, enemy, context) {
+     function npcMove(scene, npc, context) {
        let targetDest;
+       let moveAsFleeing = context.isFleeing;
 
        if (context.isFleeing) {
-         // プレイヤーと基地の両方から逃げる
-         targetDest = [
-           { x: g_playerShip.x, y: g_playerShip.y },
-           { x: g_starBase.x, y: g_starBase.y }
-         ];
+         // 逃走時は、全敵艦の配列をターゲットとして渡す
+         // 既存の getTargetVector(e, targetArray, true) が自動的にこれらから遠ざかるベクトルを計算します
+         const threats = g_enemies.filter(e => e.active);
+         targetDest = threats.map(t => ({ x: t.x, y: t.y }));
+         moveAsFleeing = true; // 逃走フラグを維持して反転計算させる
        } else {
-         // より近い方を追跡する
-         targetDest = (context.distToBase < context.distToPlayer) 
-                    ? { x: g_starBase.x, y: g_starBase.y } 
-                    : { x: g_playerShip.x, y: g_playerShip.y };
+         // 逃走中でない場合：ターゲットがいれば追跡、いなければ基地へ向かう
+         targetDest = context.target ? { x: context.target.x, y: context.target.y } : { x: g_starBase.x, y: g_starBase.y };
+         moveAsFleeing = false;
        }
 
-       const dest = calcDest(enemy, targetDest, context.isFleeing);
+       const dest = calcDest(npc, targetDest, moveAsFleeing);
 
        scene.tweens.add({
-         targets: enemy,
+         targets: npc,
          x: dest.x, y: dest.y,
          duration: SYSTEM.TIMING.TURN_DELAY,
          onComplete: () => {
            const distFromCenter = Phaser.Math.Distance.Between(
-             enemy.x, enemy.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y
+             npc.x, npc.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y
            );
            if (distFromCenter > SYSTEM.R_AREA) {
-             // 領域外へ出たら消滅
-             enemy.die();
-             // fear_mind
-             g_enemies.forEach(e => {
-               e.fear_mind = Math.min(0.8, e.fear_mind + EnemyShip.FEAR_STEP);
-               console.log(`e.fear_mind=${e.fear_mind.toFixed(3)}`);
-             });
-
-             if ( !g_isGameOver ) {
-               const remaining = getActiveEnemyCount();
-               setMsg(
-                 `副長: 敵艦が退却。残存敵数、${remaining}隻`,
-                 "#0f0", "#222"
-               );
+             npc.die();
+             if (npc instanceof EnemyShip) {
+               g_enemies.forEach(e => {
+                 e.fear_mind = Math.min(e.FEAR_MAX, e.fear_mind + EnemyShip.FEAR_STEP);
+               });
+               if (!g_isGameOver) {
+                 setMsg(`副長: 敵艦が退却。残存敵数、${getActiveEnemyCount()}隻`, "#0f0", "#222");
+               }
+             } else if (npc instanceof FederationShip) {
+               setMsg("通信士: 連邦艦が宙域から離脱しました。", "#88f");
              }
            }
          }
        });
 
-       enemy.x = Math.floor(enemy.x);
-       enemy.y = Math.floor(enemy.y);
+       npc.x = Math.floor(npc.x);
+       npc.y = Math.floor(npc.y);
 
-       // シールド回復する
-       enemy.shield = Math.min(
-         EnemyShip.SHIELD_MAX,
-         enemy.shield + (EnemyShip.SHIELD_MAX * EnemyShip.SHIELD_RECOVERY_RATE)
+       // ステータス回復処理
+       npc.shield = Math.min(
+         npc.constructor.SHIELD_MAX,
+         npc.shield + (npc.constructor.SHIELD_MAX * npc.constructor.SHIELD_RECOVERY_RATE)
        );
-
-       // fear_mind 回復
-       enemy.fear_mind = Math.max(
-         EnemyShip.FEAR_INIT,
-         (enemy.fear_mind - EnemyShip.FEAR_RECOVERY)
+       npc.fear_mind = Math.max(
+         npc.constructor.FEAR_INIT,
+         (npc.fear_mind - npc.constructor.FEAR_RECOVERY)
        );
-     } // enemyMove()
-
+     } // npcMove()
+     
      /**
       * ターン終了処理と次ターンへの準備
       */
@@ -1719,7 +1821,7 @@
        // Base Shield
        let baseShieldRatio = baseShield / StarBase.SHIELD_MAX;
        let baseShieldColor = baseShieldRatio < 0.3 ? "#f00" : "#0f0";
-           document.getElementById('statusBaseShield').style.color = baseShieldColor;
+       document.getElementById('statusBaseShield').style.color = baseShieldColor;
        document.getElementById('statusBaseShield').textContent = baseShield;
        document.getElementById('gaugeBaseShield').style.width = (baseShieldRatio * 100) + '%';
        document.getElementById('gaugeBaseShield').style.background = baseShieldColor;
