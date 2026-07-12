@@ -1146,13 +1146,13 @@
        } else if (clickedObj === g_playerShip) {
          // --- 自機のシールド強化
          const d_shield = PlayerShip.SHIELD_MAX - g_playerShip.shield;
-         console.log(`d_shield=${d_shield}, g_playerShip.energe=${g_playerShip.energy}`);
+         console.log(`d_shield=${d_shield}, g_playerShip.energy=${g_playerShip.energy}`);
          if ( d_shield <= 0 ) {
            setMsg("機関部: シールドはすでに最大です。", "#fff", "#111");
            return;
          }
 
-         // d_shileld > 0
+         // d_shield > 0
          const energy_supply = Math.min(g_playerShip.energy - PlayerShip.ENERGY_MIN, d_shield);
          console.log(`energy_supply=${energy_supply}`);
          if ( energy_supply <= 0 ) {
