@@ -273,7 +273,7 @@
          DESTROY_PENALTY: 50,
        },
        NEW_ENEMY_INTERVAL: 40,
-       N_STAR: 15,
+       N_STAR: 30,
        N_ENEMY: 3,
        TIMING: {
          BEAM_DUR: 400,
@@ -645,6 +645,10 @@
      class Star extends GameObj {
        static W = 40;
        static R = Star.W / 2 * SYSTEM.SCALE;
+       static RANGE = {
+         MIN: 0.15,
+         MAX: 0.85,
+       };
        constructor(scene, x, y) {
          super(scene, x, y, 'starImg');
        }
@@ -858,7 +862,7 @@
        // Stars
        g_stars = [];
        for(let i=0; i < SYSTEM.N_STAR; i++) {
-         let p = getSafeRandPos(0.2, 0.8);
+         let p = getSafeRandPos(Star.RANGE.MIN, Star.RANGE.MAX);
          g_stars.push(new Star(this, p.x, p.y));
        }
 
