@@ -1164,10 +1164,10 @@
          g_playerShip.shield += energy_supply;
          console.log(`energy=${g_playerShip.energy}, shield=${g_playerShip.shield}`)
 
-         const shiled_p = Math.floor(g_playerShip.shield / PlayerShip.SHIELD_MAX * 100);
+         const shield_p = Math.floor(g_playerShip.shield / PlayerShip.SHIELD_MAX * 100);
          const energy_p = Math.floor(g_playerShip.energy / PlayerShip.ENERGY_MAX * 100);
          setMsg(
-           `機関部: シールド ${shiled_p}% に増強。エネルギー残量 ${energy_p}。`,
+           `機関部: シールド ${shield_p}% に増強。エネルギー残量 ${energy_p}。`,
            "#fff", "#111"
          );
          endTurn();
