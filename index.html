@@ -1030,15 +1030,18 @@
        return { x, y };
      } // getSafeRandPos()
 
-     function hasObstacleOnPath(ax,ay,bx,by,cx,cy,r) {
-       const dx = bx - ax, dy = by - ay;
+     /**
+      *
+      */
+     function hasObstacleOnPath(src, dst, obj) {
+       const dx = dst.x - src.x, dy = dst.y - src.y;
        const a = dx * dx + dy * dy;
        if (a < 0.001) {
          return false;
        }
-       const fx = ax - cx, fy = ay - cy;
+       const fx = src.x - obj.x, fy = src.y - obj.y;
        const b = 2*(fx * dx + fy * dy);
-       const c = fx*fx + fy*fy - r*r;
+       const c = fx*fx + fy*fy - obj.r * obj.r;
        const disc = b*b-4*a*c;
        if ( disc < 0 ) {
          return false;
@@ -1047,25 +1050,19 @@
        const t2 = (-b+Math.sqrt(disc)) / (2*a);
 
        return (t1 > 0.05 && t1 < 0.95) || (t2 > 0.05 && t2 < 0.95);
-     }
+     } // hasObstacleOnPath()
 
      /**
       * LOS(Line of Sight、射線)がブロックされてないか？
       */
      function isLOSBlocked(srcObj, targetObj, checkBase = true) {
        // 1. 星（障害物）による遮蔽の判定
-       let hitStar = g_stars.some(s => 
-         s.active && hasObstacleOnPath(
-           srcObj.x, srcObj.y, targetObj.x, targetObj.y, s.x, s.y, Star.R
-         )
-       );
+       let hitStar = g_stars.some(s => s.active && hasObstacleOnPath(srcObj, targetObj, s));
        if (hitStar) return true;
 
        // 2. 基地による遮蔽の判定（基地の見た目のサイズで正確に判定）
        if (checkBase && g_starBase && g_starBase.active && g_starBase.shield > 0) {
-         if (hasObstacleOnPath(
-           srcObj.x, srcObj.y, targetObj.x, targetObj.y, g_starBase.x, g_starBase.y, StarBase.R
-         )) {
+         if (hasObstacleOnPath(srcObj, targetObj, g_starBase)) {
            return true;
          }
        }
@@ -1107,7 +1104,9 @@
            return;
          }
 
-         const distToBase = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, g_starBase.x, g_starBase.y);
+         const distToBase = Phaser.Math.Distance.Between(
+           g_playerShip.x, g_playerShip.y, g_starBase.x, g_starBase.y
+         );
          console.log(`distToBase=${distToBase}`);
 
          if (canDock()) {
@@ -1388,12 +1387,7 @@
        for (const s of g_stars) {
          if (!s.active) continue;
 
-         if (hasObstacleOnPath(
-           g_playerShip.x, g_playerShip.y,
-           g_starBase.x, g_starBase.y,
-           s.x, s.y,
-           s.r
-         )) {
+         if (hasObstacleOnPath(g_playerShip, g_starBase, s)) {
            return false;
          }
        }
@@ -1402,25 +1396,14 @@
        for (const e of g_enemies) {
          if (!e.active) continue;
 
-         if (hasObstacleOnPath(
-           g_playerShip.x, g_playerShip.y,
-           g_starBase.x, g_starBase.y,
-           e.x, e.y,
-           e.r
-         )) {
+         if (hasObstacleOnPath(g_playerShip,g_starBase, e)) {
            return false;
          }
        }
 
        // 連邦艦
        if (g_federationShip && g_federationShip.active) {
-         if (hasObstacleOnPath(
-           g_playerShip.x, g_playerShip.y,
-           g_starBase.x, g_starBase.y,
-           g_federationShip.x,
-           g_federationShip.y,
-           g_federationShip.r
-         )) {
+         if (hasObstacleOnPath(g_playerShip, g_starBase, g_federationShip)) {
            return false;
          }
        }
@@ -1608,8 +1591,8 @@
              }
            }
            scene.time.delayedCall(delayBeforeEnemyTurn, () => enemyTurn(scene));
-         }
-       });
+         } // onComplete
+       }); // scene.tweens.add
        updateStatus();
      } // attemptPlayerMove()
 
@@ -1657,11 +1640,15 @@
       * NPCターン全体の制御（エントリーポイント）
       */
      function enemyTurn(scene) {
-       if (g_isGameOver) return;
+       if (g_isGameOver) {
+         return;
+       }
 
        // 敵艦と連邦艦をひとつの配列にまとめて処理する
        const npcs = [...g_enemies];
-       if (typeof g_federationShip !== 'undefined' && g_federationShip && g_federationShip.active) {
+       if (
+         typeof g_federationShip !== 'undefined' && g_federationShip && g_federationShip.active
+       ) {
          npcs.push(g_federationShip);
        }
 
@@ -1670,7 +1657,9 @@
          scene.time.delayedCall(startDelay, () => execNPCAction(scene, npc));
        });
 
-       const totalDelay = SYSTEM.TIMING.TURN_DELAY + SYSTEM.TIMING.TURN_MARGIN + SYSTEM.TIMING.ENEMY_DELAY_MAX;
+       const totalDelay = (
+         SYSTEM.TIMING.TURN_DELAY + SYSTEM.TIMING.TURN_MARGIN + SYSTEM.TIMING.ENEMY_DELAY_MAX
+       );
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
      } // enemyTurn()
 
