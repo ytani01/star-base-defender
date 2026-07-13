@@ -683,17 +683,17 @@
        static R = EnemyShip.W / 2 * SYSTEM.SCALE;
        static SPEED = 40 * SYSTEM.SCALE;
 
-       static FEAR_INIT = 0.5;
-       static FEAR_MIN = 0.1;
-       static FEAR_MAX = 0.9;
-       static FEAR_STEP = 0.05;
-       static FEAR_RECOVERY = 0.0;
-
        static SHIELD_MAX = 300;
        static SHIELD_RECOVERY_RATE = 0.01;
        static SHIELD_COLOR = 0xff8800;
 
        static WEAPON_POWER = 90;
+
+       static FEAR_INIT = 0.5;
+       static FEAR_MIN = 0.1;
+       static FEAR_MAX = 0.9;
+       static FEAR_STEP = 0.05;
+       static FEAR_RECOVERY = 0.0;
 
        constructor(scene, x, y) {
          super(scene, x, y, 'enemyImg', EnemyShip.SHIELD_MAX, EnemyShip.SHIELD_COLOR);
@@ -710,12 +710,6 @@
        static W = 60;
        static R = FederationShip.W / 2 * SYSTEM.SCALE;
        static SPEED = 60 * SYSTEM.SCALE;
-
-       static FEAR_INIT = 0.4;
-       static FEAR_MIN = 0.2;
-       static FEAR_MAX = 0.8;
-       static FEAR_STEP = 0.05;
-       static FEAR_RECOVERY = 0.005;
 
        static SHIELD_MAX = 500;
        static SHIELD_RECOVERY_RATE = 0.02;
@@ -746,10 +740,10 @@
        static ENERGY_MIN = 10;
        static ENERGY_COLOR = 0xffff00;
 
-       static MOVE_COST_RATE = 0.3;
-
        static WEAPON_POWER = 100;
        static WEAPON_COST = 100;
+
+       static MOVE_COST_RATE = 0.3;
 
        constructor(scene, x, y) {
          super(
