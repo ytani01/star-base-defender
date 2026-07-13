@@ -445,10 +445,9 @@
       * 兵器クラス
       */
      class Weapon {
-       static ALPHA = 0.0075 / SYSTEM.SCALE;
-       static E_THRESHOLD = 0.45; // effective threshold
-       static MAX_THRESHOLD = 0.2;
-
+       static HALF_DAMAGE_RANGE = 80;  // ダメージが50%になる距離(px)
+       static MAX_DAMAGE_RATIO = 0.2;  // 最大ダメージに対する最低有効ダメージ比率
+       
        constructor(max_power, e_threshold, max_threshold) {
          this.max_power = max_power;
          this.e_threshold = e_threshold;
@@ -456,17 +455,19 @@
        }
        
        static EffectiveRange() {
-         return Math.floor(Math.log(this.E_THRESHOLD) / this.ALPHA) * -1;
+         return this.HALF_DAMAGE_RANGE;
        }
+       
        static MaxRange() {
-         return Math.floor(Math.log(this.MAX_THRESHOLD) / this.ALPHA) * -1;
+         return Math.floor(this.HALF_DAMAGE_RANGE * Math.sqrt(1 / this.MAX_DAMAGE_RATIO - 1));
        }
 
        /**
         * 距離に応じた武器の威力減衰率（有効度）を計算する
         */
        static Effectiveness(distance) {
-         return Math.exp(this.ALPHA * distance * -1.0);
+         const x = distance / this.HALF_DAMAGE_RANGE;
+         return 1 / (1 + x * x);
        }
 
        static CalcDamage(max_power, distance) {
