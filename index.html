@@ -272,15 +272,15 @@
          INIT: 100,
          DESTROY_PENALTY: 50,
        },
-       NEW_ENEMY_INTERVAL: 40,
+       NEW_ENEMY_INTERVAL: 30,
        N_STAR: 30,
        N_ENEMY: 3,
        TIMING: {
          BEAM_DUR: 400,
          TURN_DELAY: 400,
          TURN_MARGIN: 10,
+         MISSION_OVER: 3000,
          ENEMY_DELAY_MAX: 500, // 敵艦の動作のズレ
-         GAMEOVER: 3000,
        }
      };
      SYSTEM.GAME_ID = Phaser.Utils.String.UUID();
@@ -708,7 +708,7 @@
          this.weapon = new Weapon(this.constructor.WEAPON.POWER, this.constructor.WEAPON.AREA_R);
 
          this.fear_mind = EnemyShip.FEAR.INIT;
-         console.log(`fear_mind=${this.fear_mind.toFixed(3)}`);
+         console.log(`EnemyShip> fear_mind=${this.fear_mind.toFixed(3)}`);
        }
      } // class EnemyShip
 
@@ -735,7 +735,7 @@
          this.weapon = new Weapon(this.WEAPON.POWER, this.WEAPON.AREA_R);
 
          this.fear_mind = FederationShip.FEAR.INIT;
-         console.log(`fear_mind=${this.fear_mind}`);
+         console.log(`FedrationShip> fear_mind=${this.fear_mind}`);
        }
      } // class FederationShip
 
@@ -1537,7 +1537,7 @@
        // resolveMovementでめり込みと最終的な迂回軌道を解決
        //const ignoreObjs = target_is_base && canDock() ? [g_starBase]: [];
        const ignoreObjs = [g_starBase];
-       console.log(`ignoreObjs=${ignoreObjs}`);
+       //console.log(`ignoreObjs=${ignoreObjs}`);
        const finalDest = resolveMovement(
          g_playerShip, desiredX, desiredY, moveDist, ignoreObjs
        );
@@ -1657,9 +1657,10 @@
          scene.time.delayedCall(startDelay, () => execNPCAction(scene, npc));
        });
 
-       const totalDelay = (
+       let totalDelay = (
          SYSTEM.TIMING.TURN_DELAY + SYSTEM.TIMING.TURN_MARGIN + SYSTEM.TIMING.ENEMY_DELAY_MAX
        );
+       console.log(`enemyTurn> g_enemies.length=${g_enemies.length}, totalDelay=${totalDelay}`);
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
      } // enemyTurn()
 
@@ -1701,7 +1702,9 @@
          let closestDist = Infinity;
 
          potentialTargets.forEach(t => {
-           if (!t || !t.active) return;
+           if (!t || !t.active) {
+             return;
+           }
            if (t === g_playerShip && g_playerShip.is_docked) {
              return;
            }
@@ -1715,9 +1718,10 @@
            }
 
            // 攻撃可能な対象を評価
-           if (!isFleeing && d <= npc.weapon.EffectiveRange()) {
-             let checkBaseObstacle = (t !== g_starBase);
-             if (!isLOSBlocked(npc, t, checkBaseObstacle)) {
+           //if (!isFleeing && d <= npc.weapon.EffectiveRange()) {
+           if (!isFleeing && d <= npc.weapon.MaxRange() * npc.fear_mind) {
+               let checkBaseObstacle = (t !== g_starBase);
+               if (!isLOSBlocked(npc, t, checkBaseObstacle)) {
                if (d < bestAttackableDist) {
                  bestAttackableDist = d;
                  bestAttackableTarget = t;
@@ -1798,7 +1802,11 @@
          moveAsFleeing = true; // 逃走フラグを維持して反転計算させる
        } else {
          // 逃走中でない場合：ターゲットがいれば追跡、いなければ基地へ向かう
-         targetDest = context.target ? { x: context.target.x, y: context.target.y } : { x: g_starBase.x, y: g_starBase.y };
+         if ( context.target ) {
+           targetDest = { x: context.target.x, y: context.target.y };
+         } else {
+           targetDest = { x: g_starBase.x, y: g_starBase.y };
+         }
          moveAsFleeing = false;
        }
 
@@ -1817,17 +1825,19 @@
              if (npc instanceof EnemyShip) {
                g_enemies.forEach(e => {
                  e.fear_mind = Math.min(EnemyShip.FEAR.MAX, e.fear_mind + EnemyShip.FEAR.STEP);
-                 console.log(`fear_mind up: ${e.fear_mind.toFixed(3)}`);
+                 console.log(`npcMove> fear_mind up: ${e.fear_mind.toFixed(3)}`);
                });
                if (!g_isGameOver) {
-                 setMsg(`副長: 敵艦が退却。残存敵数、${getActiveEnemyCount()}隻`, "#0f0", "#222");
+                 setMsg(
+                   `副長: 敵艦、宇宙域外へ離脱。あと、${getActiveEnemyCount()}隻です。`, "#0f0"
+                 );
                }
              } else if (npc instanceof FederationShip) {
                setMsg("通信士: 連邦艦が宙域から離脱しました。", "#88f");
              }
            }
          }
-       });
+       });  // scene.tweens.add()
 
        npc.x = Math.floor(npc.x);
        npc.y = Math.floor(npc.y);
@@ -1842,7 +1852,7 @@
            npc.constructor.FEAR.MIN,
            (npc.fear_mind - npc.constructor.FEAR.RECOVERY)
          );
-         console.log(`fear_mind recover: ${npc.fear_mind.toFixed(3)}`);
+         console.log(`npcMove> fear_mind recover: ${npc.fear_mind.toFixed(3)}`);
        }
      } // npcMove()
      
@@ -1871,10 +1881,10 @@
          // fear_mind
          g_enemies.forEach(e => {
            e.fear_mind = Math.max(EnemyShip.FEAR.MIN, e.fear_mind - EnemyShip.FEAR.STEP);
-           console.log(`e.fear_mind down: ${e.fear_mind.toFixed(3)}`);
+           console.log(`finalizeEnemyTurn> e.fear_mind down: ${e.fear_mind.toFixed(3)}`);
          });
 
-         setMsg("戦術士官: 新たな敵が出現しました！", "#ff0", "#000")
+         setMsg("戦術士官: 新たな敵が出現しました！", "#ff0")
        }
 
        // 基地の回復
@@ -1954,7 +1964,11 @@
        g_pendingScene = scene;
 
        setMsg(`司令部: ミッション #${clearedMission} 成功`);
-       showHighScoreOverlay('missionclear', { clearedMission, bonus, list, newIdx });
+       scene.time.delayedCall(
+         SYSTEM.TIMING.MISSION_OVER, () => showHighScoreOverlay(
+           'missionclear', { clearedMission, bonus, list, newIdx }
+         )
+       );
      } // nextMission()
 
      /**
@@ -1965,7 +1979,7 @@
        g_flagClear = clear;
        g_isPlayerTurn = false;
        setMsg(msg, "#000", "#f00");
-       setTimeout(() => showHighScoreOverlay('gameover', { msg }), SYSTEM.TIMING.GAMEOVER);
+       setTimeout(() => showHighScoreOverlay('gameover', { msg }), SYSTEM.TIMING.MISSION_OVER);
      } // gameOver()
 
      function loadHighScores() {
