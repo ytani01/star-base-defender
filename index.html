@@ -279,7 +279,9 @@
        STAR: 30,
        ENEMY: 3,
      };
+
      const NEW_ENEMY_INTERVAL = 35;
+     const NEW_FEDERATION_INTERVAL = 3;  // TBD
 
      const SCALE = 0.5;
 
@@ -312,7 +314,7 @@
 
      let g_playerShip;
      let g_starBase;
-     let g_federationShip;
+     let g_federationShip = [];
      let g_enemies = [];
      let g_stars = [];
 
@@ -684,6 +686,16 @@
          this.sprite.setDepth(1);
          this.shield_gauge.setDepth(1);
        }
+
+       update() {
+         super.update();
+
+         // ドッキング状態
+         if ( g_playerShip.is_docked ) {
+           rangeGraphics.lineStyle(5, 0x02ffff, 1);
+           rangeGraphics.strokeCircle(g_starBase.x, g_starBase.y, StarBase.DOCKING_RANGE - 3);
+         }
+       }
      }
 
      /**
@@ -727,21 +739,29 @@
      class FederationShip extends ObjWithShield {
        static W = 60;
        static R = FederationShip.W / 2 * SCALE;
-       static SPEED = 60 * SCALE;
+       static SPEED = 100 * SCALE;
 
-       static SHIELD_MAX = 500;
-       static SHIELD_RECOVERY_RATE = 0.02;
-       static SHIELD_COLOR = 0xff8800;
+       static SHIELD_MAX = 600;
+       static SHIELD_RECOVERY_RATE = 0.05;
+       static SHIELD_COLOR = 0xffffff;
 
        static WEAPON = {
          POWER: 90,
          AREA_R: 60,
        };
 
+       static FEAR = {
+         INIT: 0.5,
+         MIN: 0.1,
+         MAX: 0.8,
+         STEP: -0.00,  // 敵艦が退却・出現したときの変化量
+         RECOVERY: 0.01,  // 移動時の回復量
+       };
+
        constructor(scene, x, y) {
          super(scene, x, y, 'PlayerImg', FederationShip.SHIELD_MAX, FederationShip.SHIELD_COLOR);
 
-         this.weapon = new Weapon(this.WEAPON.POWER, this.WEAPON.AREA_R);
+         this.weapon = new Weapon(this.constructor.WEAPON.POWER, this.constructor.WEAPON.AREA_R);
 
          this.fear_mind = FederationShip.FEAR.INIT;
          console.log(`FedrationShip> fear_mind=${this.fear_mind}`);
@@ -755,6 +775,7 @@
        static W = 60;
        static R = PlayerShip.W / 2 * SCALE;
        static SPEED = 120 * SCALE;
+       
        static SHIELD_MAX = 800;
        static SHIELD_RECOVERY_RATE = 0;
        static SHIELD_COLOR = 0xffffff;
@@ -888,25 +909,29 @@
 
        // Stars
        g_stars = [];
-       for(let i=0; i < QTY.STAR; i++) {
+       for (let i=0; i < QTY.STAR; i++) {
          let p = getSafeRandPos(Star.RANGE.MIN, Star.RANGE.MAX);
          g_stars.push(new Star(this, p.x, p.y));
        }
 
        // Enemies
        g_enemies = [];
-       for(let i=0; i<QTY.ENEMY; i++){
+       for (let i=0; i<QTY.ENEMY; i++) {
          let p = getSafeRandPos(0.6, 0.9);
          g_enemies.push(new EnemyShip(this, p.x, p.y));
        }
 
+       // FederationShip
+       g_federationShip = [];
+       for (let i=0; i < 0; i++) {  // XXX TBD
+         let p = getSafeRandPos(0.3, 0.6);
+         console.log(`p=${p}`);
+         g_federationShip.push(new FederationShip(this, p.x, p.y));
+       }
+       
        // Player Ship
        let pp = getSafeRandPos(0.1, 0.3);
        g_playerShip = new PlayerShip(this, pp.x, pp.y);
-
-       // FederationShip
-       //pp = getSafeRandPos(0.3, 0.6);
-       //g_federationShip = new FederationShip(this, pp.x, pp.y);
 
        // Camera
        this.cameras.main.setBounds(0, 0, PLAY_AREA.WIDTH, PLAY_AREA.HEIGHT);
@@ -946,7 +971,7 @@
          duration: 250,
          ease: 'Sine.easeInOut'
        });
-     }
+     } // changeZoom()
 
      /**
       * フレーム更新
@@ -954,18 +979,13 @@
      function update() {
        rangeGraphics.clear();
 
-       // ドッキング状態
-       if ( g_playerShip.is_docked ) {
-         rangeGraphics.lineStyle(5, 0x02ffff, 1);
-         rangeGraphics.strokeCircle(g_starBase.x, g_starBase.y, StarBase.DOCKING_RANGE - 3);
-       }
-
        // 射程範囲
-       [g_playerShip, g_federationShip, ...g_enemies].forEach((obj, i) => {
+       [g_playerShip, ...g_federationShip, ...g_enemies].forEach((obj, i) => {
          if(obj === undefined || !obj.active) {
            return;
          }
-         let color = ( obj === g_playerShip ) ? 0x00ffff : 0xffff00;
+         //console.log(`AAA ${obj.weapon.EffectiveRange()}`);
+         let color = (obj === g_playerShip || obj instanceof FederationShip) ? 0x00ffff : 0xffff00;
 
          rangeGraphics.lineStyle(1, color, 0.5);
          rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.EffectiveRange());
@@ -978,12 +998,10 @@
        if ( g_playerShip ) {
          g_playerShip.update();
        }
-       if ( g_federationShip ) {
-         g_federationShip.update();
-       }
        if ( g_starBase ) {
          g_starBase.update();
        }
+       g_federationShip.forEach(e => e.update());
        g_enemies.forEach(e => e.update());
      } // update()
 
@@ -997,45 +1015,26 @@
        
        // オブジェクト同士が重ならないための最低距離
        const MIN_SPAWN_DIST = PlayerShip.R * 3.5;
-       // console.log(`MIN_SPAWN_DIST=${MIN_SPAWN_DIST}`);
        
        while(!safe && attempts < 100) {
-         x = Phaser.Math.Between(
-           AREA_CENTER.X - AREA_R, AREA_CENTER.X + AREA_R
-         );
-         y = Phaser.Math.Between(
-           AREA_CENTER.Y - AREA_R, AREA_CENTER.Y + AREA_R
-         );
+         x = Phaser.Math.Between(AREA_CENTER.X - AREA_R, AREA_CENTER.X + AREA_R);
+         y = Phaser.Math.Between(AREA_CENTER.Y - AREA_R, AREA_CENTER.Y + AREA_R);
          distToCenter = Phaser.Math.Distance.Between(x, y, AREA_CENTER.X, AREA_CENTER.Y);
          
-         if ( distToCenter < AREA_R * minDist ) {
-           continue;
-         }
-         if ( distToCenter > AREA_R * maxDist ) {
+         if ( distToCenter < AREA_R * minDist || distToCenter > AREA_R * maxDist ) {
            continue;
          }
          
          safe = true;
 
-         for(let s of g_stars) {
-           if (
-             s.active && Phaser.Math.Distance.Between(x, y, s.x, s.y) < MIN_SPAWN_DIST
-           ) {
+         for(let s of [...g_stars, ...g_federationShip, ...g_enemies]) {
+           if (s.active && Phaser.Math.Distance.Between(x, y, s.x, s.y) < MIN_SPAWN_DIST) {
              safe = false;
              break;
            }
          }
-         if(!safe) continue;
-
-         for(let e of g_enemies) {
-           if (
-             e.active && Phaser.Math.Distance.Between(x, y, e.x, e.y) < MIN_SPAWN_DIST
-           ) {
-             safe = false; break;
-           }
-         }
          attempts++;
-       }
+       } // while
        return { x, y };
      } // getSafeRandPos()
 
@@ -1229,23 +1228,15 @@
        const startX = obj.x;
        const startY = obj.y;
 
-       const targets = [g_starBase, ...g_enemies, ...g_stars].filter(
+       const targets = [g_starBase, ...g_federationShip, ...g_enemies, ...g_stars].filter(
          e => e && e.active && e !== obj && !ignoreObjs.includes(e)
        );
 
-       if (obj instanceof PlayerShip) {
-         if (g_federationShip) {
-           targets.push(g_federationShip);
-         }
-       }
        if (obj instanceof FederationShip) {
          targets.push(g_playerShip);
        }
        if (obj instanceof EnemyShip) {
          targets.push(g_playerShip);
-         if ( g_federationShip && g_federationShip.active ) {
-           targets.push(g_federationShip);
-         }
        }
 
        const dx = destX - startX;
@@ -1615,11 +1606,14 @@
      } // attemptPlayerMove()
 
      /**
-      * 敵の目的地計算
+      * 目的地計算
       */
-     function calcDest(e, target, isFleeing = false) {
-       let targetVec = getTargetVector(e, target, isFleeing);
-       let avoidVec = getAvoidanceVector(e, g_stars);
+     function calcDest(npc, target, isFleeing = false) {
+       let targetVec = getTargetVector(npc, target, isFleeing);
+       let avoidVec = getAvoidanceVector(npc, g_stars);
+       if ( npc instanceof FederationShip ) {
+         console.log(`targetVec=${targetVec}, avoidVec=${avoidVec}`);
+       }
        
        let finalX = targetVec.x * 1.0 + avoidVec.x;
        let finalY = targetVec.y * 1.0 + avoidVec.y;
@@ -1632,11 +1626,11 @@
          finalDist = 1.0;
        }
 
-       const speed = e.constructor.SPEED; // 実行元インスタンスのクラスから速度を動的取得
-       let desiredX = e.x + (finalX / finalDist) * speed;
-       let desiredY = e.y + (finalY / finalDist) * speed;
+       const speed = npc.constructor.SPEED; // 実行元インスタンスのクラスから速度を動的取得
+       let desiredX = npc.x + (finalX / finalDist) * speed;
+       let desiredY = npc.y + (finalY / finalDist) * speed;
 
-       return resolveMovement(e, desiredX, desiredY, speed);
+       return resolveMovement(npc, desiredX, desiredY, speed);
      }
      
      /**
@@ -1648,7 +1642,7 @@
        beam.lineBetween(srcObj.x, srcObj.y, targetObj.x, targetObj.y);
        scene.time.delayedCall(TIMING.BEAM_DUR, () => beam.destroy());
 
-       playBeamSound(srcObj === g_playerShip);
+       playBeamSound(srcObj === g_playerShip || srcObj instanceof FederationShip);
      } // fireBeam(..)
 
      // ---------------------------------------------------------
@@ -1663,12 +1657,7 @@
        }
 
        // 敵艦と連邦艦をひとつの配列にまとめて処理する
-       const npcs = [...g_enemies];
-       if (
-         typeof g_federationShip !== 'undefined' && g_federationShip && g_federationShip.active
-       ) {
-         npcs.push(g_federationShip);
-       }
+       const npcs = [...g_federationShip, ...g_enemies];
 
        npcs.forEach(npc => {
          const startDelay = Math.random() * TIMING.ENEMY_DELAY_MAX;
@@ -1707,68 +1696,60 @@
        let distToTarget = Infinity;
        let canAttack = false;
 
+       let potentialTargets = [];
        if (npc instanceof EnemyShip) {
-         // 敵艦から見たターゲット候補リスト
-         let potentialTargets = [g_playerShip, g_starBase];
-         if (typeof g_federationShip !== 'undefined' && g_federationShip && g_federationShip.active) {
-           potentialTargets.push(g_federationShip);
+         potentialTargets = [g_playerShip, g_starBase, ...g_federationShip];
+       } else if (npc instanceof FederationShip) {
+         potentialTargets = [...g_enemies];
+       }
+
+       let bestAttackableTarget = null;
+       let bestAttackableDist = Infinity;
+       let closestTarget = null;
+       let closestDist = Infinity;
+
+       potentialTargets.forEach(t => {
+         if (!t || !t.active) {
+           return;
+         }
+         if (t === g_playerShip && g_playerShip.is_docked) {
+           return;
+         }
+         if ( npc instanceof FederationShip ) {
+           //console.log(`${t}, ${t.shield}, ${EnemyShip.SHIELD_MAX}`);
+           if ( t instanceof EnemyShip && t.shield < EnemyShip.SHIELD_MAX * 0.3 ) {
+             return;
+           }
          }
 
-         let bestAttackableTarget = null;
-         let bestAttackableDist = Infinity;
-         let closestTarget = null;
-         let closestDist = Infinity;
+         let d = Phaser.Math.Distance.Between(npc.x, npc.y, t.x, t.y);
+         
+         // 最短距離の対象を記録（攻撃不可の場合の追跡目標）
+         if (d < closestDist) {
+           closestDist = d;
+           closestTarget = t;
+         }
 
-         potentialTargets.forEach(t => {
-           if (!t || !t.active) {
-             return;
-           }
-           if (t === g_playerShip && g_playerShip.is_docked) {
-             return;
-           }
-
-           let d = Phaser.Math.Distance.Between(npc.x, npc.y, t.x, t.y);
-           
-           // 最短距離の対象を記録（攻撃不可の場合の追跡目標）
-           if (d < closestDist) {
-             closestDist = d;
-             closestTarget = t;
-           }
-
-           // 攻撃可能な対象を評価
-           //if (!isFleeing && d <= npc.weapon.EffectiveRange()) {
-           if (!isFleeing && d <= npc.weapon.MaxRange() * npc.fear_mind) {
-             let checkBaseObstacle = (t !== g_starBase);
-             if (!isLOSBlocked(npc, t, checkBaseObstacle)) {
-               if (d < bestAttackableDist) {
-                 bestAttackableDist = d;
-                 bestAttackableTarget = t;
-               }
+         // 攻撃可能な対象を評価
+         if (!isFleeing && d <= npc.weapon.MaxRange() * npc.fear_mind) {
+           let checkBaseObstacle = (t !== g_starBase);
+           if (!isLOSBlocked(npc, t, checkBaseObstacle)) {
+             if (d < bestAttackableDist) {
+               bestAttackableDist = d;
+               bestAttackableTarget = t;
              }
            }
-         });
-
-         if (bestAttackableTarget) {
-           target = bestAttackableTarget;
-           distToTarget = bestAttackableDist;
-           canAttack = true;
-         } else {
-           target = closestTarget;
-           distToTarget = closestDist;
-           canAttack = false;
          }
+       });
 
-       } else if (npc instanceof FederationShip) {
-         // 連邦艦は最も近い敵を探す
-         g_enemies.forEach(e => {
-           if (!e.active) return;
-           let d = Phaser.Math.Distance.Between(npc.x, npc.y, e.x, e.y);
-           if (d < distToTarget) { distToTarget = d; target = e; }
-         });
-         
-         if (target && !isFleeing) {
-           canAttack = (distToTarget <= npc.weapon.EffectiveRange()) && !isLOSBlocked(npc, target, true);
-         }
+       if (bestAttackableTarget) {
+         target = bestAttackableTarget;
+         distToTarget = bestAttackableDist;
+         canAttack = true;
+       } else {
+         target = closestTarget;
+         distToTarget = closestDist;
+         canAttack = false;
        }
 
        return { target, distToTarget, canAttack, isFleeing };
@@ -1813,7 +1794,7 @@
 
        if (context.isFleeing) {
          let threats = [g_playerShip, g_starBase];
-         if ( npc === g_federationShip ) {
+         if ( npc instanceof FederationShip ) {
            threats = g_enemies.filter(e => e.active && e !== npc);
          }
          targetDest = threats.map(t => ({ x: t.x, y: t.y }));
@@ -1901,9 +1882,14 @@
            e.fear_mind = Math.max(EnemyShip.FEAR.MIN, e.fear_mind - EnemyShip.FEAR.STEP);
            console.log(`finalizeEnemyTurn> e.fear_mind down: ${e.fear_mind.toFixed(3)}`);
          });
-
          setMsg("戦術士官: 新たな敵が出現しました！", "#ff0")
        }
+       if ( g_turn % NEW_FEDERATION_INTERVAL == 0 ) {
+         const p = getSafeRandPos(0.8, 0.95);
+         g_federationShip.push(new FederationShip(scene, p.x, p.y));
+         setMsg("戦術士官: 味方の援軍が到着しました！", "#0f0", "#444");
+       }
+       
 
        // 基地の回復
        if ( g_starBase.shield < StarBase.SHIELD_MAX ) {
