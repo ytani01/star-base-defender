@@ -265,29 +265,34 @@
      // ---------------------------------------------------------
      // 設定・定数の定義
      // ---------------------------------------------------------
-     const SYSTEM = {
-       SCALE: 0.5,
-       R_AREA: 300,
-       SCORE: {
-         INIT: 100,
-         DESTROY_PENALTY: 50,
-       },
-       NEW_ENEMY_INTERVAL: 35,
-       N_STAR: 30,
-       N_ENEMY: 3,
-       TIMING: {
-         BEAM_DUR: 400,
-         TURN_DELAY: 400,
-         TURN_MARGIN: 0,
-         MISSION_OVER: 3000,
-         ENEMY_DELAY_MAX: 500, // 敵艦の動作のズレ
-       }
+     const GAME_ID = Phaser.Utils.String.UUID();
+
+     const TIMING = {
+       BEAM_DUR: 400,
+       TURN_DELAY: 400,
+       TURN_MARGIN: 0,
+       MISSION_OVER: 3000,
+       ENEMY_DELAY_MAX: 500, // 敵艦の動作のズレ
      };
-     SYSTEM.GAME_ID = Phaser.Utils.String.UUID();
-     SYSTEM.PLAY_AREA_WIDTH = SYSTEM.R_AREA * 2 + 30;
-     SYSTEM.PLAY_AREA_HEIGHT = SYSTEM.PLAY_AREA_WIDTH; 
-     SYSTEM.CENTER_X = SYSTEM.PLAY_AREA_WIDTH / 2;
-     SYSTEM.CENTER_Y = SYSTEM.PLAY_AREA_HEIGHT / 2;
+
+     const QTY = {
+       STAR: 30,
+       ENEMY: 3,
+     };
+     const NEW_ENEMY_INTERVAL = 35;
+
+     const SCALE = 0.5;
+
+     const AREA_R = 300;
+
+     const PLAY_AREA = {
+       WIDTH: AREA_R * 2 + 30,
+       HEIGHT: AREA_R * 2 + 30,
+     };
+     AREA_CENTER = {
+       X: PLAY_AREA.WIDTH / 2,
+       Y: PLAY_AREA.HEIGHT / 2,
+     };
 
      const CAMERA = {
        ZOOM_MIN: 1.0,
@@ -296,6 +301,10 @@
      };
      let CurZoom = 1.0;
 
+     const SCORE = {
+       INIT: 100,
+       DESTROY_PENALTY: 50,
+     };
      const HIGHSCORE = {
        MAX_ENTRIES: 5,
        STORAGE_KEY: 'starbaseDefenderScores'
@@ -309,7 +318,7 @@
 
      let g_turn = 1;
      let g_curMission = 1;
-     let g_score = SYSTEM.SCORE.INIT;
+     let g_score = SCORE.INIT;
      let g_isPlayerTurn = true;
      let g_isGameOver = false;
      let g_flagClear = false;
@@ -356,7 +365,7 @@
      function drawBoundary(){
        boundaryGraphics.clear();
        boundaryGraphics.lineStyle(2, 0x0088ff, 1);
-       boundaryGraphics.strokeCircle(SYSTEM.CENTER_X, SYSTEM.CENTER_Y, SYSTEM.R_AREA);
+       boundaryGraphics.strokeCircle(AREA_CENTER.X, AREA_CENTER.Y, AREA_R);
      } // drawBoundary()
 
      /**
@@ -384,10 +393,10 @@
        const ctx = window.audioCtx;
        let now = ctx.currentTime
 
-       // ビームの持続時間（SYSTEM.TIMING.BEAM_DURに合わせて500ms）
-       let duration = SYSTEM.TIMING.BEAM_DUR / 1000;
+       // ビームの持続時間（TIMING.BEAM_DURに合わせて500ms）
+       let duration = TIMING.BEAM_DUR / 1000;
        if ( ! isPlayer ) {
-         duration = SYSTEM.TIMING.BEAM_DUR / 1000 / 3 * 2;
+         duration = TIMING.BEAM_DUR / 1000 / 3 * 2;
        }
 
        // 1. エンベロープ用ゲイン（音量の時間変化）
@@ -481,7 +490,7 @@
       *
       */
      class GameObj {
-       constructor(scene, x, y, texture, scale=SYSTEM.SCALE) {
+       constructor(scene, x, y, texture, scale=SCALE) {
          this.scene = scene;
          this.scale = scale;
          this.sprite = scene.add.image(x, y, texture).setScale(scale);
@@ -539,7 +548,7 @@
        constructor(
          scene, x, y, texture,
          shield, shield_gauge_color,
-         scale=SYSTEM.SCALE
+         scale=SCALE
        ) {
          super(scene, x, y, texture, scale);
          this.shield = shield;
@@ -592,7 +601,7 @@
        takeDamage(amount) {
          this.shield -= amount;
          if (this.shield <= 0) {
-           g_score -= SYSTEM.SCORE.DESTROY_PENALTY;
+           g_score -= SCORE.DESTROY_PENALTY;
            this.die();
          }
        } // takeDamage()
@@ -621,7 +630,7 @@
          scene, x, y, texture,
          shield, gauge_color,
          energy, energy_color,
-         scale=SYSTEM.SCALE
+         scale=SCALE
        ) {
          super(scene, x, y, texture, shield, gauge_color, scale);
          this.energy = energy;
@@ -647,7 +656,7 @@
       */
      class Star extends GameObj {
        static W = 40;
-       static R = Star.W / 2 * SYSTEM.SCALE;
+       static R = Star.W / 2 * SCALE;
        static RANGE = {
          MIN: 0.15,
          MAX: 0.85,
@@ -662,11 +671,11 @@
       */
      class StarBase extends ObjWithShield {
        static W = 100;
-       static R = StarBase.W / 2 * SYSTEM.SCALE;
+       static R = StarBase.W / 2 * SCALE;
        static SHIELD_MAX = 4000;
        static SHIELD_RECOVERY_RATE = 0.01;
        static SHIELD_COLOR = 0x00ffff;
-       static DOCKING_RANGE = 50 * SYSTEM.SCALE;
+       static DOCKING_RANGE = 50 * SCALE;
 
        constructor(scene, x, y) {
          super(scene, x, y, 'baseImg', StarBase.SHIELD_MAX, StarBase.SHIELD_COLOR);
@@ -682,8 +691,8 @@
       */
      class EnemyShip extends ObjWithShield {
        static W = 60;
-       static R = EnemyShip.W / 2 * SYSTEM.SCALE;
-       static SPEED = 40 * SYSTEM.SCALE;
+       static R = EnemyShip.W / 2 * SCALE;
+       static SPEED = 40 * SCALE;
 
        static SHIELD_MAX = 300;
        static SHIELD_RECOVERY_RATE = 0.01;
@@ -717,8 +726,8 @@
       */
      class FederationShip extends ObjWithShield {
        static W = 60;
-       static R = FederationShip.W / 2 * SYSTEM.SCALE;
-       static SPEED = 60 * SYSTEM.SCALE;
+       static R = FederationShip.W / 2 * SCALE;
+       static SPEED = 60 * SCALE;
 
        static SHIELD_MAX = 500;
        static SHIELD_RECOVERY_RATE = 0.02;
@@ -744,8 +753,8 @@
       */
      class PlayerShip extends ObjWithEnergy {
        static W = 60;
-       static R = PlayerShip.W / 2 * SYSTEM.SCALE;
-       static SPEED = 120 * SYSTEM.SCALE;
+       static R = PlayerShip.W / 2 * SCALE;
+       static SPEED = 120 * SCALE;
        static SHIELD_MAX = 800;
        static SHIELD_RECOVERY_RATE = 0;
        static SHIELD_COLOR = 0xffffff;
@@ -792,8 +801,8 @@
        scale: {
          mode: Phaser.Scale.FIT,
          autoCenter: Phaser.Scale.CENTER_HORIZONTALLY,
-         width: SYSTEM.PLAY_AREA_WIDTH,
-         height: SYSTEM.PLAY_AREA_HEIGHT
+         width: PLAY_AREA.WIDTH,
+         height: PLAY_AREA.HEIGHT
        },
        scene: { preload, create, update }
      };
@@ -875,18 +884,18 @@
        boundaryGraphics = this.add.graphics();
        drawBoundary();
        
-       g_starBase = new StarBase(this, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
+       g_starBase = new StarBase(this, AREA_CENTER.X, AREA_CENTER.Y);
 
        // Stars
        g_stars = [];
-       for(let i=0; i < SYSTEM.N_STAR; i++) {
+       for(let i=0; i < QTY.STAR; i++) {
          let p = getSafeRandPos(Star.RANGE.MIN, Star.RANGE.MAX);
          g_stars.push(new Star(this, p.x, p.y));
        }
 
        // Enemies
        g_enemies = [];
-       for(let i=0; i<SYSTEM.N_ENEMY; i++){
+       for(let i=0; i<QTY.ENEMY; i++){
          let p = getSafeRandPos(0.6, 0.9);
          g_enemies.push(new EnemyShip(this, p.x, p.y));
        }
@@ -900,7 +909,7 @@
        //g_federationShip = new FederationShip(this, pp.x, pp.y);
 
        // Camera
-       this.cameras.main.setBounds(0, 0, SYSTEM.PLAY_AREA_WIDTH, SYSTEM.PLAY_AREA_HEIGHT);
+       this.cameras.main.setBounds(0, 0, PLAY_AREA.WIDTH, PLAY_AREA.HEIGHT);
        this.cameras.main.startFollow(g_playerShip.sprite, true, 0.08, 0.08);
 
        updateStatus();
@@ -992,17 +1001,17 @@
        
        while(!safe && attempts < 100) {
          x = Phaser.Math.Between(
-           SYSTEM.CENTER_X - SYSTEM.R_AREA, SYSTEM.CENTER_X + SYSTEM.R_AREA
+           AREA_CENTER.X - AREA_R, AREA_CENTER.X + AREA_R
          );
          y = Phaser.Math.Between(
-           SYSTEM.CENTER_Y - SYSTEM.R_AREA, SYSTEM.CENTER_Y + SYSTEM.R_AREA
+           AREA_CENTER.Y - AREA_R, AREA_CENTER.Y + AREA_R
          );
-         distToCenter = Phaser.Math.Distance.Between(x, y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y);
+         distToCenter = Phaser.Math.Distance.Between(x, y, AREA_CENTER.X, AREA_CENTER.Y);
          
-         if ( distToCenter < SYSTEM.R_AREA * minDist ) {
+         if ( distToCenter < AREA_R * minDist ) {
            continue;
          }
-         if ( distToCenter > SYSTEM.R_AREA * maxDist ) {
+         if ( distToCenter > AREA_R * maxDist ) {
            continue;
          }
          
@@ -1075,6 +1084,15 @@
      function handlePointerDown(pointer) {
        if (g_isGameOver || !g_isPlayerTurn) return;
 
+       // 宇宙域外は無視
+       if (
+         Phaser.Math.Distance.Between(
+           pointer.worldX, pointer.worldY, AREA_CENTER.X, AREA_CENTER.Y
+         ) >= AREA_R
+       ) {
+         return;
+       }
+
        // 1. 判定対象をまとめ、クリックされたオブジェクトを特定
        // 配列の先頭から評価されるため、重なっている場合は g_enemies が優先される
        const clickables = [...g_enemies, g_starBase, g_playerShip];
@@ -1090,7 +1108,7 @@
        const endTurn = () => {
          g_isPlayerTurn = false;
 
-         this.time.delayedCall(SYSTEM.TIMING.TURN_DELAY, () => enemyTurn(this));
+         this.time.delayedCall(TIMING.TURN_DELAY, () => enemyTurn(this));
          updateStatus();
        };
 
@@ -1115,7 +1133,7 @@
            return;
          }
 
-         attemptPlayerMove(this, g_starBase.x, g_starBase.y, SYSTEM.TIMING.TURN_DELAY);
+         attemptPlayerMove(this, g_starBase.x, g_starBase.y, TIMING.TURN_DELAY);
 
          if (g_playerShip.energy < PlayerShip.ENERGY_MIN && !g_playerShip.is_docked) {
            updateStatus();
@@ -1194,7 +1212,7 @@
          endTurn();
        } else {
          // --- 空間に対するアクション（移動） ---
-         attemptPlayerMove(this, pointer.worldX, pointer.worldY, SYSTEM.TIMING.TURN_DELAY);
+         attemptPlayerMove(this, pointer.worldX, pointer.worldY, TIMING.TURN_DELAY);
 
          if (g_playerShip.energy < PlayerShip.ENERGY_MIN && !g_playerShip.is_docked) {
            updateStatus();
@@ -1575,7 +1593,7 @@
        scene.tweens.add({
          targets: g_playerShip,
          x: destX, y: destY,
-         duration: SYSTEM.TIMING.TURN_DELAY,
+         duration: TIMING.TURN_DELAY,
          onComplete: () => {
            if (!skipAutoDock) {
              const dockDist = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, g_starBase.x, g_starBase.y);
@@ -1628,7 +1646,7 @@
        const beam = scene.add.graphics();
        beam.lineStyle(4, color, 1);
        beam.lineBetween(srcObj.x, srcObj.y, targetObj.x, targetObj.y);
-       scene.time.delayedCall(SYSTEM.TIMING.BEAM_DUR, () => beam.destroy());
+       scene.time.delayedCall(TIMING.BEAM_DUR, () => beam.destroy());
 
        playBeamSound(srcObj === g_playerShip);
      } // fireBeam(..)
@@ -1653,12 +1671,12 @@
        }
 
        npcs.forEach(npc => {
-         const startDelay = Math.random() * SYSTEM.TIMING.ENEMY_DELAY_MAX;
+         const startDelay = Math.random() * TIMING.ENEMY_DELAY_MAX;
          scene.time.delayedCall(startDelay, () => execNPCAction(scene, npc));
        });
 
        let totalDelay = (
-         SYSTEM.TIMING.TURN_DELAY + SYSTEM.TIMING.TURN_MARGIN + SYSTEM.TIMING.ENEMY_DELAY_MAX
+         TIMING.TURN_DELAY + TIMING.TURN_MARGIN + TIMING.ENEMY_DELAY_MAX
        );
        console.log(`enemyTurn> g_enemies.length=${g_enemies.length}, totalDelay=${totalDelay}`);
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
@@ -1720,8 +1738,8 @@
            // 攻撃可能な対象を評価
            //if (!isFleeing && d <= npc.weapon.EffectiveRange()) {
            if (!isFleeing && d <= npc.weapon.MaxRange() * npc.fear_mind) {
-               let checkBaseObstacle = (t !== g_starBase);
-               if (!isLOSBlocked(npc, t, checkBaseObstacle)) {
+             let checkBaseObstacle = (t !== g_starBase);
+             if (!isLOSBlocked(npc, t, checkBaseObstacle)) {
                if (d < bestAttackableDist) {
                  bestAttackableDist = d;
                  bestAttackableTarget = t;
@@ -1815,12 +1833,12 @@
        scene.tweens.add({
          targets: npc,
          x: dest.x, y: dest.y,
-         duration: SYSTEM.TIMING.TURN_DELAY,
+         duration: TIMING.TURN_DELAY,
          onComplete: () => {
            const distFromCenter = Phaser.Math.Distance.Between(
-             npc.x, npc.y, SYSTEM.CENTER_X, SYSTEM.CENTER_Y
+             npc.x, npc.y, AREA_CENTER.X, AREA_CENTER.Y
            );
-           if (distFromCenter > SYSTEM.R_AREA) {
+           if (distFromCenter > AREA_R) {
              npc.die();
              if (npc instanceof EnemyShip) {
                g_enemies.forEach(e => {
@@ -1875,7 +1893,7 @@
        g_score--;
 
        // 増援の出現
-       if (g_turn % SYSTEM.NEW_ENEMY_INTERVAL === 0) {
+       if (g_turn % NEW_ENEMY_INTERVAL === 0) {
          const p = getSafeRandPos(0.8, 0.95);
          g_enemies.push(new EnemyShip(scene, p.x, p.y));
          // fear_mind
@@ -1958,14 +1976,14 @@
        );
 
        g_curMission++;
-       SYSTEM.N_ENEMY++;
+       QTY.ENEMY++;
        g_isPlayerTurn = false;
 
        g_pendingScene = scene;
 
        setMsg(`司令部: ミッション #${clearedMission} 成功`);
        scene.time.delayedCall(
-         SYSTEM.TIMING.MISSION_OVER, () => showHighScoreOverlay(
+         TIMING.MISSION_OVER, () => showHighScoreOverlay(
            'missionclear', { clearedMission, bonus, list, newIdx }
          )
        );
@@ -1979,7 +1997,7 @@
        g_flagClear = clear;
        g_isPlayerTurn = false;
        setMsg(msg, "#000", "#f00");
-       setTimeout(() => showHighScoreOverlay('gameover', { msg }), SYSTEM.TIMING.MISSION_OVER);
+       setTimeout(() => showHighScoreOverlay('gameover', { msg }), TIMING.MISSION_OVER);
      } // gameOver()
 
      function loadHighScores() {
@@ -2002,7 +2020,7 @@
        if ( g_flagClear || forceSave ) {
          list.push({
            score, turns, mission, result,
-           gameid: SYSTEM.GAME_ID, date: dateStr, _new: true
+           gameid: GAME_ID, date: dateStr, _new: true
          });
        }
        list.sort((a, b) => b.score - a.score);
@@ -2028,7 +2046,7 @@
        const rankLabels = ['1ST', '2ND', '3RD', '4TH', '5TH'];
        list.forEach((s, i) => {
          const tr = document.createElement('tr');
-         const thisGame = (s.gameid == SYSTEM.GAME_ID);
+         const thisGame = (s.gameid == GAME_ID);
          if ( thisGame ) {
            tr.className = 'hs-new';
          }
@@ -2054,7 +2072,7 @@
            
            // 敵の初期生成数を、進行するステージに合わせて再計算
            // (初期値3 + ステージ進行分)
-           SYSTEM.N_ENEMY = 3 + (g_curMission - 1);
+           QTY.ENEMY = 3 + (g_curMission - 1);
            
            g_isGameOver = false;
            g_flagClear = false;
