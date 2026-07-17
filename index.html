@@ -374,7 +374,7 @@
      /**
       * メッセージの表示
       */
-     function setMsg(msg, fg="#0ff", bg="transparent") {
+     function setMsg(msg, fg="#0ff", bg="#444") {
        const el = document.getElementById('logStatus')
        el.style.color = fg;
        el.style.backgroundColor = bg;
@@ -729,8 +729,8 @@
 
          this.weapon = new Weapon(this.constructor.WEAPON.POWER, this.constructor.WEAPON.AREA_R);
 
-         this.fear_mind = EnemyShip.FEAR.INIT;
-         console.log(`EnemyShip> fear_mind=${this.fear_mind.toFixed(3)}`);
+         this.fear = EnemyShip.FEAR.INIT;
+         console.log(`EnemyShip> fear=${this.fear.toFixed(3)}`);
        }
      } // class EnemyShip
 
@@ -764,8 +764,8 @@
 
          this.weapon = new Weapon(this.constructor.WEAPON.POWER, this.constructor.WEAPON.AREA_R);
 
-         this.fear_mind = FederationShip.FEAR.INIT;
-         console.log(`FedrationShip> fear_mind=${this.fear_mind}`);
+         this.fear = FederationShip.FEAR.INIT;
+         console.log(`FedrationShip> fear=${this.fear}`);
        }
      } // class FederationShip
 
@@ -1126,7 +1126,7 @@
        if (clickedObj === g_starBase) {
          // --- 基地に対するアクション ---
          if (g_playerShip.is_docked) {
-           setMsg("STARBASE: ドッキング中。いつでも出撃できます。");
+           setMsg("基地司令部: ドッキング中。いつでも出撃できます。");
            endTurn();
            return;
          }
@@ -1196,7 +1196,7 @@
          const d_shield = PlayerShip.SHIELD_MAX - g_playerShip.shield;
          console.log(`d_shield=${d_shield}, g_playerShip.energy=${g_playerShip.energy}`);
          if ( d_shield <= 0 ) {
-           setMsg("機関部: シールドはすでに最大です。", "#fff", "#111");
+           setMsg("機関部: シールドはすでに最大です。", "#fff");
            return;
          }
 
@@ -1214,10 +1214,7 @@
 
          const shield_p = Math.floor(g_playerShip.shield / PlayerShip.SHIELD_MAX * 100);
          const energy_p = Math.floor(g_playerShip.energy / PlayerShip.ENERGY_MAX * 100);
-         setMsg(
-           `機関部: シールド ${shield_p}% に増強。エネルギー残量 ${energy_p}。`,
-           "#fff", "#111"
-         );
+         setMsg(`機関部: シールド回復！エネルギー残り ${energy_p}%`, "#fff");
          endTurn();
        } else {
          // --- 空間に対するアクション（移動） ---
@@ -1461,7 +1458,7 @@
          duration: 200,
          ease: 'Sine.easeInOut'
        });
-       setMsg("STARBASE: ドッキング完了", "#220", "#0ff");
+       setMsg("基地司令部: ドッキング完了", "#0ff");
        updateStatus();
      } // dockShip()
 
@@ -1563,10 +1560,21 @@
        let destX = finalDest.x;
        let destY = finalDest.y;
 
-       let distance = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, destX, destY);
-       if (distance < 1) return;
+       const actualDist = Phaser.Math.Distance.Between(
+         g_playerShip.x, g_playerShip.y, destX, destY
+       );
+       if (actualDist < 1) return;
+
+       const speed_p = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
+       console.log(`actualDist=${actualDist.toFixed(1)}, ${speed_p}`);
        
-       setMsg("操舵手: インパルスエンジン、コースセット ... 移動完了");
+       let cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
+       if ( g_playerShip.energy - cost <= PlayerShip.ENERGY_MIN ) {
+         setMsg("機関部: エネルギー不足で移動できません", '#ff0');
+         return;
+       }
+
+       setMsg(`操舵手: インパルスエンジン、出力 ${speed_p}%`);
 
        // --- 以降は既存のエネルギー消費・ドッキング処理 ---
        let skipAutoDock = false;
@@ -1574,19 +1582,8 @@
          g_playerShip.is_docked = false;
          skipAutoDock = true;
          g_playerShip.shield = PlayerShip.SHIELD_MAX;
-         setMsg("STARBASE: ドッキング解除");
+         setMsg("基地司令部: ドッキング・クランプ解除");
          updateStatus();
-       }
-
-       const actualDist = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, destX, destY);
-       let cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
-       if ( g_playerShip.energy - cost <= PlayerShip.ENERGY_MIN ) {
-         if ( target_is_base ) {
-           gameOver("機関部: エネルギー消失！ 全システムダウン！");
-           return;
-         }
-         setMsg("機関部: エネルギー不足で移動できません");
-         return;
        }
 
        g_playerShip.energy -= cost;
@@ -1597,16 +1594,18 @@
          duration: TIMING.TURN_DELAY,
          onComplete: () => {
            if (!skipAutoDock) {
-             const dockDist = Phaser.Math.Distance.Between(g_playerShip.x, g_playerShip.y, g_starBase.x, g_starBase.y);
-             if (
-               !g_playerShip.is_docked && dockDist <= StarBase.DOCKING_RANGE
-               && g_starBase.active && g_starBase.shield > 0
+             const dockDist = Phaser.Math.Distance.Between(
+               g_playerShip.x, g_playerShip.y, g_starBase.x, g_starBase.y
+             );
+             const canDock = (
+               !g_playerShip.is_docked 
+               && dockDist <= StarBase.DOCKING_RANGE 
+               && g_starBase.active 
+               && g_starBase.shield > 0 
                && target_is_base
-             ) {
+             );
+             if (canDock) {
                dockShip(scene);
-               scene.time.delayedCall(220, () =>
-                 scene.time.delayedCall(delayBeforeEnemyTurn, () => npcTurn(scene)));
-               return;
              }
            }
            scene.time.delayedCall(delayBeforeEnemyTurn, () => npcTurn(scene));
@@ -1701,7 +1700,7 @@
       * クラス(所属)に応じた戦況の評価
       */
      function evalNPCTacticalSituation(npc) {
-       const isFleeing = npc.fear_mind > (npc.shield / npc.constructor.SHIELD_MAX);
+       const isFleeing = npc.fear > (npc.shield / npc.constructor.SHIELD_MAX);
        let target = null;
        let distToTarget = Infinity;
        let canAttack = false;
@@ -1730,7 +1729,7 @@
              if ( t.shield < EnemyShip.SHIELD_MAX * 0.3 ) {
                return;
              }
-             if ( t.fear_mind > (t.shield / t.constructor.SHIELD_MAX) ) {
+             if ( t.fear > (t.shield / t.constructor.SHIELD_MAX) ) {
                return;
              }
            }
@@ -1745,7 +1744,7 @@
          }
 
          // 攻撃可能な対象を評価
-         if (!isFleeing && d <= npc.weapon.MaxRange() * npc.fear_mind) {
+         if (!isFleeing && d <= npc.weapon.MaxRange() * npc.fear) {
            let checkBaseObstacle = (t !== g_starBase);
            if (!isLOSBlocked(npc, t, checkBaseObstacle)) {
              if (d < bestAttackableDist) {
@@ -1770,7 +1769,7 @@
      } // evalNPCTacticalSituation()
 
      /**
-      * 攻撃処理（共通）
+      * NPC 攻撃処理
       */
      function npcAttack(scene, npc, target, distance) {
        const beamColor = npc instanceof FederationShip ? 0x0088ff : 0xff00ff;
@@ -1779,28 +1778,50 @@
        const damage = npc.weapon.CalcDamage(distance);
        target.takeDamage(damage);
 
-       if (npc instanceof EnemyShip) {
-         if (target.shield <= 0 && !g_isGameOver) {
-           updateStatus();
-           // 対象に応じた正確な死亡処理への分岐
-           if (target === g_starBase) {
-             gameOver("STARBASE: シールド消失！！ もちこたえられませ...");
-           } else if (target === g_playerShip) {
-             gameOver("機関部: 船体強度 ゼロ！！ 船が破壊...");
-           } else if (target === g_federationShip) {
-             setMsg("通信士: 連邦艦の反応が消失しました...", "#f00");
-           }
-         }
-       } else if (npc instanceof FederationShip) {
+       const t_shield_p = Math.floor(target.shield / target.constructor.SHIELD_MAX * 100);
+       console.log(`t_shield_p=${t_shield_p}`);
+
+       if (npc instanceof FederationShip) {
          if (!target.active) {
            g_enemies = g_enemies.filter(e => e !== target);
-           setMsg("通信士: 連邦艦が敵艦を撃破しました！", "#0f0");
+           setMsg("通信士: 連邦艦が敵艦を撃破しました！", "#f40");
+           updateStatus();
+         }
+         return;
+       } // if FederationShip
+
+       // npc is EnemyShip
+
+       // TBD: ここの条件分岐が汚い
+       if (target == g_playerShip && t_shield_p < 60) {
+         setMsg(`機関部: シールド ${t_shield_p}%`, "#ff0");
+         if ( t_shield_p <= 30 ) {
+           setMsg(`機関部: シールド ${t_shield_p}%、危険です！`, "#f00");
+         }
+         updateStatus();
+       }
+       if (target == g_starBase && t_shield_p < 60) {
+         setMsg(`基地司令部: シールド ${t_shield_p}%、至急救援を求む！`, "#ff0");
+         if ( t_shield_p <= 30 ) {
+           setMsg(`基地司令部: シールド ${t_shield_p}%、至急救援を求む！`, "#f00");
+         }
+         updateStatus();
+       }
+       if (target.shield <= 0 && !g_isGameOver) {
+         // 対象に応じた正確な死亡処理への分岐
+         if (target === g_starBase) {
+           gameOver("基地司令部: シールド消失！！ 基地が崩壊...");
+         } else if (target === g_playerShip) {
+           gameOver("機関部: シールド消失！！ 船体が崩壊...");
+         } else if (target === g_federationShip) {
+           setMsg("通信士: 味方の艦の反応が 1隻消えました...", "#f00");
+           updateStatus();
          }
        }
      } // npcAttack()
 
      /**
-      * 移動処理とシールド回復（共通）
+      * NPC 移動処理とシールド回復
       */
      function npcMove(scene, npc, context) {
        let targetDest;
@@ -1837,8 +1858,8 @@
              npc.die();
              if (npc instanceof EnemyShip) {
                g_enemies.forEach(e => {
-                 e.fear_mind = Math.min(EnemyShip.FEAR.MAX, e.fear_mind + EnemyShip.FEAR.STEP);
-                 console.log(`npcMove> fear_mind up: ${e.fear_mind.toFixed(3)}`);
+                 e.fear = Math.min(EnemyShip.FEAR.MAX, e.fear + EnemyShip.FEAR.STEP);
+                 console.log(`npcMove> fear up: ${e.fear.toFixed(3)}`);
                });
                if (!g_isGameOver) {
                  setMsg(
@@ -1861,11 +1882,11 @@
          npc.shield + (npc.constructor.SHIELD_MAX * npc.constructor.SHIELD_RECOVERY_RATE)
        );
        if ( context.isFleeing ) {
-         npc.fear_mind = Math.max(
+         npc.fear = Math.max(
            npc.constructor.FEAR.MIN,
-           (npc.fear_mind - npc.constructor.FEAR.RECOVERY)
+           (npc.fear - npc.constructor.FEAR.RECOVERY)
          );
-         console.log(`npcMove> fear_mind recover: ${npc.fear_mind.toFixed(3)}`);
+         console.log(`npcMove> fear recover: ${npc.fear.toFixed(3)}`);
        }
      } // npcMove()
      
@@ -1891,17 +1912,17 @@
        if (g_turn % NEW_ENEMY_INTERVAL === 0) {
          const p = getSafeRandPos(0.8, 0.95);
          g_enemies.push(new EnemyShip(scene, p.x, p.y));
-         // fear_mind
-         g_enemies.forEach(e => {
-           e.fear_mind = Math.max(EnemyShip.FEAR.MIN, e.fear_mind - EnemyShip.FEAR.STEP);
-           console.log(`finalizeEnemyTurn> e.fear_mind down: ${e.fear_mind.toFixed(3)}`);
+         // fear
+         g_enemies.forEach(obj => {
+           obj.fear = Math.max(EnemyShip.FEAR.MIN, obj.fear - EnemyShip.FEAR.STEP);
+           console.log(`finalizeEnemyTurn> obj.fear down: ${obj.fear.toFixed(3)}`);
          });
          setMsg("戦術士官: 新たな敵が出現しました！", "#ff0")
        }
        if ( g_turn % NEW_FEDERATION_INTERVAL == 0 ) {
          const p = getSafeRandPos(0.8, 0.95);
          g_federationShip.push(new FederationShip(scene, p.x, p.y));
-         setMsg("戦術士官: 味方の援軍が到着しました！", "#0f0", "#444");
+         setMsg("戦術士官: 味方の援軍が到着しました！", "#0f0");
        }
        
 
@@ -1996,7 +2017,8 @@
        g_isGameOver = true;
        g_flagClear = clear;
        g_isPlayerTurn = false;
-       setMsg(msg, "#000", "#f00");
+       setMsg('', "#000");
+       updateStatus();
        setTimeout(() => showHighScoreOverlay('gameover', { msg }), TIMING.MISSION_OVER);
      } // gameOver()
 
