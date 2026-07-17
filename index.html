@@ -52,7 +52,7 @@
      #zoomUI {
        position: absolute;
        top: 10px;
-       left: 30px;
+       left: 10px;
        display: flex;
        flex-direction: column;
        gap: 10px;
@@ -229,6 +229,7 @@
         <div id="zoomUI">
           <button id="zoomIn">＋</button>
           <button id="zoomOut">－</button>
+          <button id="misc">*</button>
         </div>
       </div>
     </div>
@@ -333,6 +334,7 @@
      // ---------------------------------------------------------
      // グローバルメソッド
      // ---------------------------------------------------------
+
      /**
       *
       */
@@ -716,10 +718,10 @@
          AREA_R: 60,
        };
 
-       static FEAR = {
+       static SPIRIT = {
          INIT: 0.5,
-         MIN: 0.1,
-         MAX: 0.9,
+         MIN: 0.2,
+         MAX: 0.8,
          STEP: 0.05,  // 敵艦が退却・出現したときの変化量
          RECOVERY: 0.005,  // 移動時の回復量
        };
@@ -729,8 +731,8 @@
 
          this.weapon = new Weapon(this.constructor.WEAPON.POWER, this.constructor.WEAPON.AREA_R);
 
-         this.fear = EnemyShip.FEAR.INIT;
-         console.log(`EnemyShip> fear=${this.fear.toFixed(3)}`);
+         this.spirit = EnemyShip.SPIRIT.INIT;
+         console.log(`EnemyShip> spirit=${this.spirit.toFixed(3)}`);
        }
      } // class EnemyShip
 
@@ -751,12 +753,12 @@
          AREA_R: 80,
        };
 
-       static FEAR = {
+       static SPIRIT = {
          INIT: 0.5,
-         MIN: 0.1,
+         MIN: 0.2,
          MAX: 0.8,
          STEP: -0.00,  // 敵艦が退却・出現したときの変化量
-         RECOVERY: 0.01,  // 移動時の回復量
+         RECOVERY: 0.00,  // 移動時の回復量
        };
 
        constructor(scene, x, y) {
@@ -764,8 +766,8 @@
 
          this.weapon = new Weapon(this.constructor.WEAPON.POWER, this.constructor.WEAPON.AREA_R);
 
-         this.fear = FederationShip.FEAR.INIT;
-         console.log(`FedrationShip> fear=${this.fear}`);
+         this.spirit = FederationShip.SPIRIT.INIT;
+         console.log(`FedrationShip> spirit=${this.spirit}`);
        }
      } // class FederationShip
 
@@ -830,6 +832,15 @@
      };
 
      new Phaser.Game(config);
+
+     /**
+      *
+      */
+     function newShip(scene) {
+       let p = getSafeRandPos(0.3, 0.6);
+       console.log(`p=${p}`);
+       g_federationShip.push(new FederationShip(scene, p.x, p.y));
+     } // newShip()
 
      /**
       * 画像の生成
@@ -904,7 +915,7 @@
        g.generateTexture('starImg', W_STAR, W_STAR);
 
        g.destroy();
-     }
+     } // preload()
 
      /**
       * 初期画面表示
@@ -953,6 +964,8 @@
 
        document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
        document.getElementById('zoomOut').onclick = () => changeZoom(this, -CAMERA.STEP);
+       document.getElementById('misc').onclick = () => newShip(this);
+
 
        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
          let zoomAmount = deltaY > 0 ? -CAMERA.STEP : CAMERA.STEP;
@@ -1621,7 +1634,11 @@
        let targetVec = getTargetVector(npc, target, isFleeing);
        let avoidVec = getAvoidanceVector(npc, g_stars);
        if ( npc instanceof FederationShip ) {
-         console.log(`targetVec=${targetVec}, avoidVec=${avoidVec}`);
+         console.log(
+           `targetVec=(${targetVec.x.toFixed(2)},${targetVec.y.toFixed(2)}` +
+           ', '  +
+           `avoidVec=(${avoidVec.x.toFixed(2)},${avoidVec.y.toFixed(2)})`
+         );
        }
        
        let finalX = targetVec.x * 1.0 + avoidVec.x;
@@ -1684,6 +1701,7 @@
       * NPC1体の具体的な行動（思考と実行）
       */
      function execNPCAction(scene, npc) {
+       console.log(`=== execNPCAction: ${npc.constructor.name} ===`);
        if (g_isGameOver || !npc.active) return;
        const context = evalNPCTacticalSituation(npc);
 
@@ -1700,7 +1718,7 @@
       * クラス(所属)に応じた戦況の評価
       */
      function evalNPCTacticalSituation(npc) {
-       const isFleeing = npc.fear > (npc.shield / npc.constructor.SHIELD_MAX);
+       const isFleeing = (npc.shield / npc.constructor.SHIELD_MAX) <  (1.0 - npc.spirit);
        let target = null;
        let distToTarget = Infinity;
        let canAttack = false;
@@ -1725,13 +1743,11 @@
            return;
          }
          if ( npc instanceof FederationShip ) {
-           if ( t instanceof EnemyShip ) {
-             if ( t.shield < EnemyShip.SHIELD_MAX * 0.3 ) {
-               return;
-             }
-             if ( t.fear > (t.shield / t.constructor.SHIELD_MAX) ) {
-               return;
-             }
+           if ( t.shield < EnemyShip.SHIELD_MAX * 0.3 ) {
+             return;
+           }
+           if ( t.shield / t.constructor.SHIELD_MAX < (1.0 - t.spirit) ) {
+             return;
            }
          }
 
@@ -1744,7 +1760,7 @@
          }
 
          // 攻撃可能な対象を評価
-         if (!isFleeing && d <= npc.weapon.MaxRange() * npc.fear) {
+         if (!isFleeing && d <= npc.weapon.MaxRange() * (1.0 - npc.spirit)) {
            let checkBaseObstacle = (t !== g_starBase);
            if (!isLOSBlocked(npc, t, checkBaseObstacle)) {
              if (d < bestAttackableDist) {
@@ -1756,10 +1772,12 @@
        });
 
        if (bestAttackableTarget) {
+         // Attack
          target = bestAttackableTarget;
          distToTarget = bestAttackableDist;
          canAttack = true;
        } else {
+         // Move
          target = closestTarget;
          distToTarget = closestDist;
          canAttack = false;
@@ -1855,11 +1873,13 @@
              npc.x, npc.y, AREA_CENTER.X, AREA_CENTER.Y
            );
            if (distFromCenter > AREA_R) {
+             // 宇宙域外に撤退
              npc.die();
              if (npc instanceof EnemyShip) {
+               // 仲間の spirit に影響
                g_enemies.forEach(e => {
-                 e.fear = Math.min(EnemyShip.FEAR.MAX, e.fear + EnemyShip.FEAR.STEP);
-                 console.log(`npcMove> fear up: ${e.fear.toFixed(3)}`);
+                 e.spirit = Math.max(EnemyShip.SPIRIT.MIN, e.spirit - EnemyShip.SPIRIT.STEP);
+                 console.log(`npcMove> spirit down: ${e.spirit.toFixed(3)}`);
                });
                if (!g_isGameOver) {
                  setMsg(
@@ -1882,11 +1902,11 @@
          npc.shield + (npc.constructor.SHIELD_MAX * npc.constructor.SHIELD_RECOVERY_RATE)
        );
        if ( context.isFleeing ) {
-         npc.fear = Math.max(
-           npc.constructor.FEAR.MIN,
-           (npc.fear - npc.constructor.FEAR.RECOVERY)
+         npc.spirit = Math.min(
+           npc.constructor.SPIRIT.MAX,
+           (npc.spirit + npc.constructor.SPIRIT.RECOVERY)
          );
-         console.log(`npcMove> fear recover: ${npc.fear.toFixed(3)}`);
+         console.log(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
        }
      } // npcMove()
      
@@ -1912,10 +1932,10 @@
        if (g_turn % NEW_ENEMY_INTERVAL === 0) {
          const p = getSafeRandPos(0.8, 0.95);
          g_enemies.push(new EnemyShip(scene, p.x, p.y));
-         // fear
+         // spirit
          g_enemies.forEach(obj => {
-           obj.fear = Math.max(EnemyShip.FEAR.MIN, obj.fear - EnemyShip.FEAR.STEP);
-           console.log(`finalizeEnemyTurn> obj.fear down: ${obj.fear.toFixed(3)}`);
+           obj.spirit = Math.min(EnemyShip.SPIRIT.MAX, obj.spirit + EnemyShip.SPIRIT.STEP);
+           console.log(`finalizeEnemyTurn> obj.spirit up: ${obj.spirit.toFixed(3)}`);
          });
          setMsg("戦術士官: 新たな敵が出現しました！", "#ff0")
        }
@@ -2164,7 +2184,8 @@
          const s = g_pendingScene;
          g_pendingScene = null;
          g_isPlayerTurn = true;
-         g_qty_federationShip = g_federationShip.length;
+         // g_qty_federationShip = g_federationShip.length;
+         g_qty_federationShip = 0;
          console.log(`g_qty_federationShip=${g_qty_federationShip}`);
          s.scene.restart();
        } else {
