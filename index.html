@@ -281,7 +281,7 @@
      };
 
      const NEW_ENEMY_INTERVAL = 20;
-     const NEW_FEDERATION_INTERVAL = 25;  // TBD
+     const NEW_FEDERATION_INTERVAL = 250;  // TBD
 
      const SCALE = 0.5;
 
@@ -315,6 +315,7 @@
      let g_playerShip;
      let g_starBase;
      let g_federationShip = [];
+     let g_qty_federationShip = 0;
      let g_enemies = [];
      let g_stars = [];
 
@@ -660,7 +661,7 @@
        static W = 40;
        static R = Star.W / 2 * SCALE;
        static RANGE = {
-         MIN: 0.15,
+         MIN: 0.20,
          MAX: 0.85,
        };
        constructor(scene, x, y) {
@@ -759,7 +760,7 @@
        };
 
        constructor(scene, x, y) {
-         super(scene, x, y, 'PlayerImg', FederationShip.SHIELD_MAX, FederationShip.SHIELD_COLOR);
+         super(scene, x, y, 'FederationImg', FederationShip.SHIELD_MAX, FederationShip.SHIELD_COLOR);
 
          this.weapon = new Weapon(this.constructor.WEAPON.POWER, this.constructor.WEAPON.AREA_R);
 
@@ -838,35 +839,44 @@
 
        // PlayerShip
        g.fillStyle(0x4488ff);
-       g.fillRect(27,25,8,24);
-       g.fillStyle(0x4488ff);
-       g.fillRect(10,30,10,22);
-       g.fillRect(40,30,10,22);
-       g.fillStyle(0x4488ff);
-       g.fillEllipse(30,17,35,30);
+       g.fillRect(20,36,20,6);
+       g.fillRect(26,25,8,20);
+       g.fillRect(13,32,7,19);
+       g.fillRect(40,32,7,19);
+       g.fillEllipse(30,18,34,28);
        g.generateTexture('PlayerImg',60,60);
        
        g.clear();
 
+       // FederationShip
+       g.fillStyle(0x4488ff);
+       g.fillRect(20,40,20,9);
+       g.fillRect(25,34,10,18);
+       g.fillRect(15,36,6,16);
+       g.fillRect(39,36,6,16);
+       g.fillEllipse(30,20,28,31);
+       g.generateTexture('FederationImg',60,60);
+       
+       g.clear();
+
        // Enemy
-       g.fillStyle(0x228822);
+       g.fillStyle(0x008800);
        g.beginPath();
-       g.moveTo(31,57);
-       g.lineTo(55,40);
-       g.lineTo(55,20);
-       g.lineTo(50,20);
+       g.moveTo(32,55);
+       g.lineTo(54,40);
+       g.lineTo(54,21);
+       g.lineTo(50,21);
        g.lineTo(50,32);
        g.lineTo(31,41);
        g.lineTo(30,41);
        g.lineTo(10,32);
-       g.lineTo(10,20);
-       g.lineTo(5,20);
-       g.lineTo(5,25);
-       g.lineTo(5,40);
-       g.moveTo(30,57);
+       g.lineTo(10,21);
+       g.lineTo(6,21);
+       g.lineTo(6,40);
+       g.lineTo(28,55);
        g.fillPath();
        g.fillRect(26,10,8,35)
-       g.fillEllipse(30,13,18,17);
+       g.fillEllipse(30,15,18,19);
        g.generateTexture('enemyImg',60,60);
 
        g.clear();
@@ -923,7 +933,7 @@
 
        // FederationShip
        g_federationShip = [];
-       for (let i=0; i < 0; i++) {  // XXX TBD
+       for (let i=0; i < g_qty_federationShip; i++) {  // XXX TBD
          let p = getSafeRandPos(0.3, 0.6);
          console.log(`p=${p}`);
          g_federationShip.push(new FederationShip(this, p.x, p.y));
@@ -1107,7 +1117,7 @@
        const endTurn = () => {
          g_isPlayerTurn = false;
 
-         this.time.delayedCall(TIMING.TURN_DELAY, () => enemyTurn(this));
+         this.time.delayedCall(TIMING.TURN_DELAY, () => npcTurn(this));
          updateStatus();
        };
 
@@ -1595,11 +1605,11 @@
              ) {
                dockShip(scene);
                scene.time.delayedCall(220, () =>
-                 scene.time.delayedCall(delayBeforeEnemyTurn, () => enemyTurn(scene)));
+                 scene.time.delayedCall(delayBeforeEnemyTurn, () => npcTurn(scene)));
                return;
              }
            }
-           scene.time.delayedCall(delayBeforeEnemyTurn, () => enemyTurn(scene));
+           scene.time.delayedCall(delayBeforeEnemyTurn, () => npcTurn(scene));
          } // onComplete
        }); // scene.tweens.add
        updateStatus();
@@ -1651,7 +1661,7 @@
      /**
       * NPCターン全体の制御（エントリーポイント）
       */
-     function enemyTurn(scene) {
+     function npcTurn(scene) {
        if (g_isGameOver) {
          return;
        }
@@ -1667,9 +1677,9 @@
        let totalDelay = (
          TIMING.TURN_DELAY + TIMING.TURN_MARGIN + TIMING.ENEMY_DELAY_MAX
        );
-       console.log(`enemyTurn> g_enemies.length=${g_enemies.length}, totalDelay=${totalDelay}`);
+       console.log(`npcTurn> g_enemies.length=${g_enemies.length}, totalDelay=${totalDelay}`);
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
-     } // enemyTurn()
+     } // npcTurn()
 
      /**
       * NPC1体の具体的な行動（思考と実行）
@@ -1716,9 +1726,13 @@
            return;
          }
          if ( npc instanceof FederationShip ) {
-           //console.log(`${t}, ${t.shield}, ${EnemyShip.SHIELD_MAX}`);
-           if ( t instanceof EnemyShip && t.shield < EnemyShip.SHIELD_MAX * 0.3 ) {
-             return;
+           if ( t instanceof EnemyShip ) {
+             if ( t.shield < EnemyShip.SHIELD_MAX * 0.3 ) {
+               return;
+             }
+             if ( t.fear_mind > (t.shield / t.constructor.SHIELD_MAX) ) {
+               return;
+             }
            }
          }
 
@@ -2094,7 +2108,6 @@
          closeBtn.style.display    = 'none';
          restartBtn.textContent    = '▶ NEXT MISSION';
          restartBtn.style.display  = 'inline-block';
-
        } else if (mode === 'gameover') {
          const { msg } = data;
          resultEl.style.color      = '#ff0';
@@ -2105,7 +2118,6 @@
          closeBtn.style.display    = 'none';
          restartBtn.textContent    = '▶ RESTART';
          restartBtn.style.display  = 'inline-block';
-
        } else {
          resultEl.style.color      = '#0ff';
          resultEl.textContent      = '▶ HIGH SCORES ◀';
@@ -2130,6 +2142,8 @@
          const s = g_pendingScene;
          g_pendingScene = null;
          g_isPlayerTurn = true;
+         g_qty_federationShip = g_federationShip.length;
+         console.log(`g_qty_federationShip=${g_qty_federationShip}`);
          s.scene.restart();
        } else {
          location.reload();
