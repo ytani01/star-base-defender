@@ -230,7 +230,7 @@
         <div id="zoomUI">
           <button id="zoomIn">＋</button>
           <button id="zoomOut">－</button>
-          <button id="misc2">??</button>
+          <!-- <button id="misc2">??</button> -->
         </div>
       </div>
     </div>
@@ -974,7 +974,7 @@
 
        document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
        document.getElementById('zoomOut').onclick = () => changeZoom(this, -CAMERA.STEP);
-       document.getElementById('misc2').onclick = () => newShip(this);
+       //document.getElementById('misc2').onclick = () => newShip(this);
 
 
        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
@@ -1670,13 +1670,13 @@
      function calcDest(npc, target, isFleeing = false) {
        let targetVec = getTargetVector(npc, target, isFleeing);
        let avoidVec = getAvoidanceVector(npc, g_stars);
-       if ( npc instanceof FederationShip ) {
-         console.log(
-           `targetVec=(${targetVec.x.toFixed(2)},${targetVec.y.toFixed(2)}` +
-           ', '  +
-           `avoidVec=(${avoidVec.x.toFixed(2)},${avoidVec.y.toFixed(2)})`
-         );
-       }
+       /* if ( npc instanceof FederationShip ) {
+        *   console.log(
+        *     `targetVec=(${targetVec.x.toFixed(2)},${targetVec.y.toFixed(2)}` +
+        *     ', '  +
+        *     `avoidVec=(${avoidVec.x.toFixed(2)},${avoidVec.y.toFixed(2)})`
+        *   );
+        * } */
        
        let finalX = targetVec.x * 1.0 + avoidVec.x;
        let finalY = targetVec.y * 1.0 + avoidVec.y;
@@ -1738,7 +1738,7 @@
       * NPC1体の具体的な行動（思考と実行）
       */
      function execNPCAction(scene, npc) {
-       console.log(`=== execNPCAction: ${npc.constructor.name} ===`);
+       //console.log(`=== execNPCAction: ${npc.constructor.name} ===`);
        if (g_isGameOver || !npc.active) return;
        const context = evalNPCTacticalSituation(npc);
 
@@ -1755,7 +1755,8 @@
       * クラス(所属)に応じた戦況の評価
       */
      function evalNPCTacticalSituation(npc) {
-       const isFleeing = (npc.shield / npc.constructor.SHIELD_MAX) <  (1.0 - npc.spirit);
+       //const isFleeing = (npc.shield / npc.constructor.SHIELD_MAX) <  (1.0 - npc.spirit);
+       const isFleeing = npc.isFleeing();
        let target = null;
        let distToTarget = Infinity;
        let canAttack = false;
@@ -1834,7 +1835,7 @@
        target.takeDamage(damage);
 
        const t_shield_p = Math.floor(target.shield / target.constructor.SHIELD_MAX * 100);
-       console.log(`t_shield_p=${t_shield_p}`);
+       //console.log(`t_shield_p=${t_shield_p}`);
 
        if (npc instanceof FederationShip) {
          if (!target.active) {
