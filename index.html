@@ -720,7 +720,7 @@
        static SPEED = 40 * SCALE;
 
        static SHIELD_MAX = 300;
-       static SHIELD_RECOVERY_RATE = 0.02;
+       static SHIELD_RECOVERY_RATE = 0.01;
        static SHIELD_COLOR = 0xff8800;
 
        static WEAPON = {
@@ -733,7 +733,7 @@
          MIN: 0.3,
          MAX: 0.7,
          STEP: 0.05,  // 敵艦が退却・出現したときの変化量
-         RECOVERY: 0.01,  // 移動時の回復量
+         RECOVERY: 0.005,  // 移動時の回復量
        };
 
        constructor(scene, x, y) {
