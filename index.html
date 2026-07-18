@@ -984,7 +984,36 @@
          this.spirit = this.constructor.SPIRIT.INIT;
          console.log(`${this.constructor.name}> spirit=${Number(this.spirit).toFixed(3)}`);
        }
-     }
+
+       /**
+        * ビームの色（子クラスでオーバーライド）
+        */
+       getBeamColor() {
+         return 0xffffff; 
+       }
+       
+       /**
+        * 攻撃実行の共通処理
+        */
+       attack(target, distance) {
+         // 自身の scene と getBeamColor() を使用してビームを描画
+         fireBeam(this.scene, this, target, this.getBeamColor());
+         
+         const damage = this.weapon.CalcDamage(distance);
+         target.takeDamage(damage);
+
+         // 艦種ごとの攻撃後処理（メッセージ通知や撃破判定）を呼び出し
+         this.onAfterAttack(target);
+       } // attack()
+
+       /**
+        * 攻撃後の派生処理用フック（子クラスで実装）
+        */
+       onAfterAttack(target) {
+         // デフォルトは何もしない
+       }
+
+     } // class NPCShip
 
      /**
       *
@@ -1057,10 +1086,12 @@
          // ドッキング状態
          if ( spaceContext.player.is_docked ) {
            rangeGraphics.lineStyle(5, 0x02ffff, 1);
-           rangeGraphics.strokeCircle(spaceContext.starBase.x, spaceContext.starBase.y, StarBase.DOCKING_RANGE - 3);
+           rangeGraphics.strokeCircle(
+             spaceContext.starBase.x, spaceContext.starBase.y, StarBase.DOCKING_RANGE - 3
+           );
          }
-       }
-     }
+       } // update()
+     } // class StarBase
 
      /**
       *
@@ -1094,6 +1125,41 @@
            EnemyShip.WEAPON.POWER, EnemyShip.WEAPON.AREA_R
          );
        }
+
+       getBeamColor() {
+         return 0xff00ff;
+       }
+
+       // --- 追加: 敵艦が攻撃した後の処理 ---
+       onAfterAttack(target) {
+         const t_shield_p = Math.floor(target.shield / target.constructor.SHIELD_MAX * 100);
+
+         if (target === spaceContext.player && t_shield_p < 60) {
+           setMsg(`機関部: シールド ${t_shield_p}%`, "#ff0");
+           if (t_shield_p <= 30) {
+             setMsg(`機関部: シールド ${t_shield_p}%、危険です！`, "#f00");
+           }
+           updateStatus();
+         }
+         if (target === spaceContext.starBase && t_shield_p < 60) {
+           setMsg(`基地司令部: シールド ${t_shield_p}%、至急救援を求む！`, "#ff0");
+           if (t_shield_p <= 30) {
+             setMsg(`基地司令部: シールド ${t_shield_p}%、至急救援を求む！`, "#f00");
+           }
+           updateStatus();
+         }
+         if (target.shield <= 0 && !g_isGameOver) {
+           if (target === spaceContext.starBase) {
+             gameOver("基地司令部: シールド消失！！ 基地が崩壊...");
+           } else if (target === spaceContext.player) {
+             gameOver("機関部: シールド消失！！ 船体が崩壊...");
+           } else if (target instanceof FederationShip) { // 【修正】配列比較のバグを解消
+             setMsg("通信士: 味方の艦の反応が 1隻消えました...", "#f00");
+             updateStatus();
+           }
+         }
+       } // onAfterAttack()
+
      } // class EnemyShip
 
      /**
@@ -1128,6 +1194,25 @@
            FederationShip.WEAPON.POWER, FederationShip.WEAPON.AREA_R
          );
        }
+
+       /**
+        * override
+        */
+       getBeamColor() {
+         return 0x0088ff;
+       }
+
+       /**
+        * override
+        */
+       onAfterAttack(target) {
+         if (!target.active) {
+           spaceContext.enemies = spaceContext.enemies.filter(e => e !== target);
+           setMsg("通信士: 連邦艦が敵艦を撃破しました！", "#f40");
+           updateStatus();
+         }
+       } // onAfterAttack()
+
      } // class FederationShip
 
      /**
@@ -1812,7 +1897,7 @@
        if (context.isFleeing) {
          npcMove(scene, npc, context);
        } else if (context.canAttack) {
-         npcAttack(scene, npc, context.target, context.distToTarget);
+         npc.attack(context.target, context.distToTarget);
        } else {
          npcMove(scene, npc, context);
        }
@@ -1886,59 +1971,6 @@
 
        return { target, distToTarget, canAttack, isFleeing };
      } // evalNPCTacticalSituation()
-
-     /**
-      * NPC 攻撃処理
-      */
-     function npcAttack(scene, npc, target, distance) {
-       const beamColor = npc instanceof FederationShip ? 0x0088ff : 0xff00ff;
-       fireBeam(scene, npc, target, beamColor);
-       
-       const damage = npc.weapon.CalcDamage(distance);
-       target.takeDamage(damage);
-
-       const t_shield_p = Math.floor(target.shield / target.constructor.SHIELD_MAX * 100);
-       //console.log(`t_shield_p=${t_shield_p}`);
-
-       if (npc instanceof FederationShip) {
-         if (!target.active) {
-           spaceContext.enemies = spaceContext.enemies.filter(e => e !== target);
-           setMsg("通信士: 連邦艦が敵艦を撃破しました！", "#f40");
-           updateStatus();
-         }
-         return;
-       } // if FederationShip
-
-       //
-       // 以降、EnemyShip
-       // 
-       // TBD: ここの条件分岐が汚い
-       if (target == spaceContext.player && t_shield_p < 60) {
-         setMsg(`機関部: シールド ${t_shield_p}%`, "#ff0");
-         if ( t_shield_p <= 30 ) {
-           setMsg(`機関部: シールド ${t_shield_p}%、危険です！`, "#f00");
-         }
-         updateStatus();
-       }
-       if (target == spaceContext.starBase && t_shield_p < 60) {
-         setMsg(`基地司令部: シールド ${t_shield_p}%、至急救援を求む！`, "#ff0");
-         if ( t_shield_p <= 30 ) {
-           setMsg(`基地司令部: シールド ${t_shield_p}%、至急救援を求む！`, "#f00");
-         }
-         updateStatus();
-       }
-       if (target.shield <= 0 && !g_isGameOver) {
-         // 対象に応じた正確な死亡処理への分岐
-         if (target === spaceContext.starBase) {
-           gameOver("基地司令部: シールド消失！！ 基地が崩壊...");
-         } else if (target === spaceContext.player) {
-           gameOver("機関部: シールド消失！！ 船体が崩壊...");
-         } else if (target === spaceContext.federationShips) {
-           setMsg("通信士: 味方の艦の反応が 1隻消えました...", "#f00");
-           updateStatus();
-         }
-       }
-     } // npcAttack()
 
      /**
       * NPC 移動処理とシールド回復
