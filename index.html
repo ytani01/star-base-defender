@@ -5,40 +5,57 @@
     <title>Starbase Defender</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-     body {
-       margin:0; background:#000; padding:0; overflow:hidden; font-family: Arial, sans-serif;
+     :root {
+       --color-primary: #0ff;
+       --color-accent: #08f;
+       --color-bg-dark: #111;
+       --font-mono: monospace;
      }
+     body {
+       margin:0;
+       padding:0;
+       background:#000;
+       overflow:hidden;
+       font-family: Arial, sans-serif;
+     }
+     button {
+       font-family: inherit;
+       cursor: pointer;
+     }
+
      #gameContainer {
        display: flex; flex-direction: column; height: 100vh;
      }
      
      #statusPanel {
-       background:#111;
-       color:#0ff;
+       background: var(--color-bg-dark);
+       color: var(--color-primary);
        padding:15px;
        flex: 0 0 auto;
-       border-bottom:2px solid #08f;
+       border-bottom:2px solid var(--color-accent);
        overflow-y:auto;
        font-size: clamp(14px, 2.5vw, 20px);
-       font-family: monospace;
+       font-family: var(--font-mono);
        line-height: 1.1;
      }
-     #statusPanel div { margin: 1px 5px; }
+     #statusPanel div {
+       margin: 1px 5px;
+     }
      #statusPanel .status-gauge {
        display: inline-block;
        width: 60px;
        height: clamp(12px, 2.5vw, 18px);
        background: #222;
-       border: 1px solid #08f;
-       margin: 0 0 0 8px; /* 上・右・下を0、左のみ8pxに指定 */
+       border: 1px solid var(--color-accent);
+       margin-left: 8px;
        vertical-align: middle;
      }
      #statusPanel .status-gauge-fill {
        height: 100%;
-       background: #0f0;
        width: 100%;
+       background: #0f0;
        transition: width 0.2s ease, background-color 0.2s ease;
-       margin: 0; /* 枠と中身のズレの原因となるマージンを無効化 */
+       margin: 0;
      }
      
      #logStatus {
@@ -46,8 +63,15 @@
        line-height: 1.1;
      }
 
-     #gameWrapper { position: relative; flex: 1; min-height: 0; }
-     #gameCanvas { width: 100%; height: 100%; }
+     #gameWrapper {
+       position: relative;
+       flex: 1;
+       min-height: 0;
+     }
+     #gameCanvas {
+       width: 100%;
+       height: 100%;
+     }
 
      #zoomUI {
        position: absolute;
@@ -64,13 +88,28 @@
        font-size: 48px;
        background: rgba(0, 136, 255, 0.5);
        color: #fff;
-       border: 2px solid #0ff;
+       border: 2px solid var(--color-primary);
        border-radius: 30px;
-       cursor: pointer;
        user-select: none;
      }
      #zoomUI button:active {
        background: rgba(0, 255, 255, 0.8);
+       color: #000;
+     }
+
+     .panel-btn {
+       font-size: clamp(14px, 2.5vw, 18px);
+       background: transparent;
+       color: var(--color-primary);
+       border: 1px solid var(--color-primary);
+       padding: 3px 8px;
+       border-radius: 3px;
+       margin-left: 10px;
+       vertical-align: middle;
+       transition: background 0.12s, color 0.12s;
+     }
+     .panel-btn:hover {
+       background: var(--color-primary);
        color: #000;
      }
 
@@ -82,10 +121,10 @@
        z-index: 9999;
        align-items: center;
        justify-content: center;
-       font-family: monospace;
+       font-family: var(--font-mono);
      }
      #hsPanel {
-       border: 2px solid #0ff;
+       border: 2px solid var(--color-primary);
        padding: 28px 32px;
        min-width: 500px;
        max-width: 800px;
@@ -108,7 +147,7 @@
        border-bottom: 1px solid rgba(0,255,255,0.25);
      }
      .hs-heading {
-       color: #0ff;
+       color: var(--color-primary);
        font-size: clamp(24px, 2.2vw, 40px);
        letter-spacing: 2px;
        margin-bottom: 8px;
@@ -123,18 +162,22 @@
        color: #9cf;
        min-width: 260px;
      }
-     #hsTable th {
-       color: #0ff;
-       text-align: left;
-       padding: 4px 6px;
-       border-bottom: 1px solid rgba(0,255,255,0.3);
-       letter-spacing: 1px;
+     #hsTable th,
+     #hsTable td {
+       padding: 6px;
        white-space: nowrap;
      }
-     #hsTable td {
-       padding: 6px 6px; white-space: nowrap;
+     #hsTable th {
+       color: var(--color-primary);
+       text-align: left;
+       padding-top: 4px;
+       padding-bottom: 4px;
+       border-bottom: 1px solid rgba(0,255,255,0.3);
+       letter-spacing: 1px;
      }
-     #hsTable tbody tr.hs-new td {color: #ff0;}
+     #hsTable tbody tr.hs-new td {
+       color: #ff0;
+     }
      #hsTable tbody tr {
        cursor: pointer;
        transition: background-color 0.2s;
@@ -158,55 +201,19 @@
      .hs-btn {
        padding: 11px 20px;
        font-size: clamp(24px, 2.8vw, 40px);
-       font-family: monospace;
        background: rgba(0, 100, 200, 0.3);
-       color: #0ff;
-       border: 2px solid #0ff;
+       color: var(--color-primary);
+       border: 2px solid var(--color-primary);
        border-radius: 4px;
-       cursor: pointer;
        letter-spacing: 1px;
        transition: background 0.15s, color 0.15s;
      }
-     .hs-btn:hover, .hs-btn:active {
-       background: #0ff;
+     .hs-btn:hover,
+     .hs-btn:active {
+       background: var(--color-primary);
        color: #000;
      }
 
-     #viewScoresBtn {
-       font-family: monospace;
-       font-size: clamp(14px, 2.5vw, 18px);
-       background: transparent;
-       color: #0ff;
-       border: 1px solid #0ff;
-       padding: 3px 8px;
-       border-radius: 3px;
-       cursor: pointer;
-       margin-left: 10px;
-       vertical-align: middle;
-       transition: background 0.12s, color 0.12s;
-     }
-     #viewScoresBtn:hover {
-       background: #0ff;
-       color: #000;
-     }
-     
-     #misc1 {
-       font-family: monospace;
-       font-size: clamp(14px, 2.5vw, 18px);
-       background: transparent;
-       color: #0ff;
-       border: 1px solid #0ff;
-       padding: 3px 8px;
-       border-radius: 3px;
-       cursor: pointer;
-       margin-left: 10px;
-       vertical-align: middle;
-       transition: background 0.12s, color 0.12s;
-     }
-     #misc1:hover {
-       background: #0ff;
-       color: #000;
-     }
     </style>
   </head>
   <body>
@@ -219,9 +226,9 @@
           SCORE
           <span id="statusScore">100</span>
           |
-          <button id="viewScoresBtn">▶ SCORES</button>
+          <button class="panel-btn" id="viewScoresBtn">▶ SCORES</button>
           |
-          <button id="misc1">▶ ??</button>
+          <button class="panel-btn" id="misc1">▶ ??</button>
         </div>
         <div id="statusShip">
           Ship Shield 
@@ -232,12 +239,12 @@
           <div class="status-gauge"><div id="gaugeShipEnergy" class="status-gauge-fill"></div></div>
           <span id="statusShipEnergy">0</span>
         </div>
-        <div id="StatusBase">
+        <div id="statusBase">
           Base Shield
           <div class="status-gauge"><div id="gaugeBaseShield" class="status-gauge-fill"></div></div>
           <span id="statusBaseShield">0</span>
         </div>
-        <div id="StatusEnemy">
+        <div id="statusEnemy">
           ENEMY COUNT
           <span id="statusEnemyCount">1</span>
         </div>
@@ -312,7 +319,7 @@
        WIDTH: AREA_R * 2 + 30,
        HEIGHT: AREA_R * 2 + 30,
      };
-     AREA_CENTER = {
+     const AREA_CENTER = {
        X: PLAY_AREA.WIDTH / 2,
        Y: PLAY_AREA.HEIGHT / 2,
      };
@@ -1286,7 +1293,6 @@
       * なにか衝突したら停止するように座標を計算
       */
      function clampDest(obj, destX, destY, ignoreObjs = []) {
-       // オブジェクトから直接現在座標を取得
        const startX = obj.x;
        const startY = obj.y;
 
@@ -1294,10 +1300,7 @@
          e => e && e.active && e !== obj && !ignoreObjs.includes(e)
        );
 
-       if (obj instanceof FederationShip) {
-         targets.push(g_playerShip);
-       }
-       if (obj instanceof EnemyShip) {
+       if (obj instanceof FederationShip || obj instanceof EnemyShip) {
          targets.push(g_playerShip);
        }
 
@@ -1310,10 +1313,18 @@
 
        for (const tgt of targets) {
          let R = (obj.w + tgt.w) / 2;
-         //console.log(`R=${R}`);
 
          const curDist = Phaser.Math.Distance.Between(startX, startY, tgt.x, tgt.y);
-         if (curDist < R) continue;
+         if (curDist < R) {
+           const toTargetX = tgt.x - startX;
+           const toTargetY = tgt.y - startY;
+           // 【修正】内積が正（＝障害物の中心に向かって進もうとしている場合のみ）進行をストップ
+           // かつ、近距離での接触時に滑らかに沿って動けるよう余裕を持たせる
+           if (dx * toTargetX + dy * toTargetY > 0) {
+             minT = 0; 
+           }
+           continue;
+         }
 
          const fx = startX - tgt.x;
          const fy = startY - tgt.y;
@@ -1324,11 +1335,12 @@
          if (disc < 0) continue; 
          const t = (-b - Math.sqrt(disc)) / (2 * a);
          if (t > 0 && t < minT) minT = t;
-       }  // for ()
+       } 
 
        if (minT < 1.0) {
          const len = Math.sqrt(lenSq);
-         const stopT = Math.max(0, minT - 1.0 / len);
+         // 【修正】3.0は大きすぎて不自然な停止を生むため、1.5pxマージンに調整
+         const stopT = Math.max(0, minT - 1.5 / len); 
          return { x: startX + dx * stopT, y: startY + dy * stopT };
        }
        return { x: destX, y: destY };
@@ -1411,61 +1423,51 @@
        let dy = desiredY - y;
        let reqDistSq = dx * dx + dy * dy;
        
-       // 1. 直進で到達可能か評価
        let directDest = clampDest(obj, desiredX, desiredY, ignoreObjs);
        let directMoveSq = (directDest.x - x)**2 + (directDest.y - y)**2;
        
-       // 障害物なし（または目的地が手前）ならそのまま採用
        if (directMoveSq >= reqDistSq * 0.99) {
          return directDest;
        }
 
-       // 2. 障害物に阻まれた場合、迂回ルートを走査
        let baseAngle = Math.atan2(dy, dx);
        let bestDest = directDest;
        let minTargetDistSq = (directDest.x - desiredX)**2 + (directDest.y - desiredY)**2;
 
-       // 左右両方向を走査
        for (let sign of [1, -1]) {
          // 5度刻みで最大90度まで走査
          for (let i = 5; i <= 90; i += 5) {
            let offset = (i * Math.PI) / 180;
            let testAngle = baseAngle + offset * sign;
            
-           // 【重要】角度が逸れるほど移動予定距離をコサインで減衰させ、大回りを防ぐ
-           let adjustedSpeed = speed * Math.cos(offset);
-           
-           let testX = x + Math.cos(testAngle) * adjustedSpeed;
-           let testY = y + Math.sin(testAngle) * adjustedSpeed;
+           // 【修正】Math.cos(offset) による減速を廃止し、本来のスピードで移動先をテストする
+           let testX = x + Math.cos(testAngle) * speed;
+           let testY = y + Math.sin(testAngle) * speed;
            
            let clamped = clampDest(obj, testX, testY, ignoreObjs);
            
            let moveDistSq = (clamped.x - x)**2 + (clamped.y - y)**2;
            let distToTargetSq = (clamped.x - desiredX)**2 + (clamped.y - desiredY)**2;
            
-           // 全く動けないルートは無視（0.1ピクセル未満）
            if (moveDistSq < 0.1) continue;
 
-           // 現在のベストルートが「スタック状態（ほぼ動けない）」か判定
            let currentBestMoveSq = (bestDest.x - x)**2 + (bestDest.y - y)**2;
            let stuck = currentBestMoveSq < 1.0;
 
-           // 「より本来の目的地に近い」か、「スタックから抜け出せる」ならベストルートを更新
            if (distToTargetSq < minTargetDistSq || stuck) {
              minTargetDistSq = distToTargetSq;
              bestDest = clamped;
            }
 
-           // 障害物を回避して空き地に出た場合（調整後のスピードをほぼ出し切れた）
-           // これ以上角度を広げても無駄に横へ行くだけなので、この方向の走査を打ち切る
-           if (moveDistSq >= (adjustedSpeed * 0.95)**2) {
+           // 【修正】本来のスピードの95%以上移動できた＝障害物をクリアしたと判断して走査終了
+           if (moveDistSq >= (speed * 0.95)**2) {
              break; 
            }
-         } // for ()
-       } // for () 
+         } 
+       } 
        
        return bestDest;
-     } //  resolveMovement(..)
+     } // resolveMovement(..)
 
      /**
       * ドッキングできるか確認
@@ -1481,33 +1483,13 @@
          return false;
        }
 
-       // 星
-       for (const s of g_stars) {
-         if (!s.active) continue;
-
-         if (hasObstacleOnPath(g_playerShip, g_starBase, s)) {
-           return false;
-         }
-       }
-
-       // 敵艦
-       for (const e of g_enemies) {
-         if (!e.active) continue;
-
-         if (hasObstacleOnPath(g_playerShip,g_starBase, e)) {
-           return false;
-         }
-       }
-
-       // 連邦艦
-       if (g_federationShip && g_federationShip.active) {
-         if (hasObstacleOnPath(g_playerShip, g_starBase, g_federationShip)) {
-           return false;
-         }
-       }
-
-       return true;
-     }
+       // 経路上に有効(active)な障害物が1つでもあれば false を返す (パターンB)
+       const hasObstacle = [...g_stars, ...g_enemies, ...g_federationShip].some(
+         obj => obj.active && hasObstacleOnPath(g_playerShip, g_starBase, obj)
+       );
+       //console.log('hasObstacle=', hasObstacle);
+       return !hasObstacle;
+     } // canDock()
 
      /**
       *
@@ -1553,8 +1535,8 @@
        targets.forEach(t => {
          if (!t.active || t === obj) return;
          
-         // オブジェクト自身の半径(r)を基準に回避半径を動的算出
-         const avoidRadius = t.r * radiusMultiplier;
+         // 自分と相手の半径の和を基準に回避半径を算出する
+         const avoidRadius = (obj.r + t.r) * radiusMultiplier;
          let dx = obj.x - t.x;
          let dy = obj.y - t.y;
          let dist = Math.hypot(dx, dy);
@@ -1573,12 +1555,11 @@
       * 障害物や他ユニットからの回避・分離ベクトルを算出する（自機・敵機兼用）
       */
      function getAvoidanceVector(obj, obstacles) {
-       // 1. 障害物(星・基地)からの反発力 + 回り込み力
-       // (回避半径: 3.5倍, 斥力: 1.5, 接線力: 1.0)
-       let avoid = calcAvoidanceForce(obj, obstacles, 3.5, 1.5, 1.0);
+       // 【修正】回避半径倍率を 3.5 -> 2.2、斥力を 1.5 -> 0.8、接線力を 1.0 -> 1.2 に変更
+       // これにより、手前で極端に弾き飛ばされることなく、星に沿ってスムーズに回り込みます
+       let avoid = calcAvoidanceForce(obj, obstacles, 2.2, 0.8, 1.2);
 
-       // 2. 他ユニット(敵)からの反発力（分離）
-       // (回避半径: 2.5倍, 斥力: 2.0, 接線力: 0.0)
+       // 他ユニット(敵)からの分離はそのまま維持
        let sep = calcAvoidanceForce(obj, g_enemies, 2.5, 2.0, 0.0);
 
        return { x: avoid.x + sep.x, y: avoid.y + sep.y };
@@ -1940,12 +1921,18 @@
          x: dest.x, y: dest.y,
          duration: TIMING.TURN_DELAY,
          onComplete: () => {
+           npc.x = Math.floor(npc.x);
+           npc.y = Math.floor(npc.y);
+
            const distFromCenter = Phaser.Math.Distance.Between(
              npc.x, npc.y, AREA_CENTER.X, AREA_CENTER.Y
            );
            if (distFromCenter > AREA_R) {
              // 宇宙域外に撤退
              npc.die();
+             if (npc instanceof FederationShip) {
+               setMsg("通信士: 連邦艦がセクター外へ離脱しました。", "#88f");
+             } // if(FederationShip)
              if (npc instanceof EnemyShip) {
                // 仲間の spirit に影響
                g_enemies.forEach(e => {
@@ -1957,28 +1944,25 @@
                    `副長: 敵艦がセクター外へ離脱。あと、${getActiveEnemyCount()}隻です。`, "#0f0"
                  );
                }
-             } else if (npc instanceof FederationShip) {
-               setMsg("通信士: 連邦艦がセクター外へ離脱しました。", "#88f");
-             }
+             } // if (EnemyShip)
+           } // if
+
+           // シールド回復
+           npc.shield = Math.min(
+             npc.constructor.SHIELD_MAX,
+             npc.shield + (npc.constructor.SHIELD_MAX * npc.constructor.SHIELD_RECOVERY_RATE)
+           );
+           // spirit 回復
+           if ( context.isFleeing ) {
+             npc.spirit = Math.min(
+               npc.constructor.SPIRIT.MAX,
+               (npc.spirit + npc.constructor.SPIRIT.RECOVERY)
+             );
+             console.log(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
            }
-         }
-       });  // scene.tweens.add()
+         } // onComplete
+       });  // scene.tweens.add
 
-       npc.x = Math.floor(npc.x);
-       npc.y = Math.floor(npc.y);
-
-       // ステータス回復処理
-       npc.shield = Math.min(
-         npc.constructor.SHIELD_MAX,
-         npc.shield + (npc.constructor.SHIELD_MAX * npc.constructor.SHIELD_RECOVERY_RATE)
-       );
-       if ( context.isFleeing ) {
-         npc.spirit = Math.min(
-           npc.constructor.SPIRIT.MAX,
-           (npc.spirit + npc.constructor.SPIRIT.RECOVERY)
-         );
-         // console.log(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
-       }
      } // npcMove()
      
      /**
