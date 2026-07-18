@@ -1290,15 +1290,15 @@
      class FederationShip extends NPCShip {
        static W = 60;
        static R = FederationShip.W / 2 * SCALE;
-       static SPEED = 100 * SCALE;
+       static SPEED = 90 * SCALE;
 
        static SHIELD_MAX = 600;
-       static SHIELD_RECOVERY_RATE = 0.04;
+       static SHIELD_RECOVERY_RATE = 0.03;
        static SHIELD_COLOR = 0xffffff;
 
        static WEAPON = {
          POWER: 90,
-         AREA_R: 80,
+         AREA_R: 70,
        };
 
        static SPIRIT = {
@@ -1353,7 +1353,7 @@
      class PlayerShip extends ObjWithEnergy {
        static W = 60;
        static R = PlayerShip.W / 2 * SCALE;
-       static SPEED = 120 * SCALE;
+       static SPEED = 110 * SCALE;
        
        static SHIELD_MAX = 800;
        static SHIELD_RECOVERY_RATE = 0;
