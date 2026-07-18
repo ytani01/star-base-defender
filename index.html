@@ -202,6 +202,7 @@
           <span id="statusScore">100</span>
           |
           <button id="viewScoresBtn">▶ SCORES</button>
+          <button id="misc1">▶ ??</button>
         </div>
         <div id="statusShip">
           Ship Shield 
@@ -229,7 +230,7 @@
         <div id="zoomUI">
           <button id="zoomIn">＋</button>
           <button id="zoomOut">－</button>
-          <button id="misc">*</button>
+          <button id="misc2">??</button>
         </div>
       </div>
     </div>
@@ -546,7 +547,7 @@
       *
       */
      class ObjWithShield extends GameObj {
-       static SHIELD_MAX = 0; // dummy
+       static SHIELD_MAX = 1; // dummy
        static GAUGE_H = 8;
        static GAUGE_Y_OFFSET = 18;
 
@@ -565,6 +566,8 @@
 
          this.shield_gauge = this.scene.add.graphics();
          this.shield_circle = this.scene.add.graphics();
+
+         this.spirit = 0.5;
        }
 
        update() {
@@ -599,6 +602,13 @@
            this.shield_gauge_color
          );
        } // update()
+
+       /**
+        *
+        */
+       isFleeing() {
+         return (this.shield / this.constructor.SHIELD_MAX) < (1.0 - this.spirit);
+       }
 
        /**
         *
@@ -710,7 +720,7 @@
        static SPEED = 40 * SCALE;
 
        static SHIELD_MAX = 300;
-       static SHIELD_RECOVERY_RATE = 0.01;
+       static SHIELD_RECOVERY_RATE = 0.02;
        static SHIELD_COLOR = 0xff8800;
 
        static WEAPON = {
@@ -720,10 +730,10 @@
 
        static SPIRIT = {
          INIT: 0.5,
-         MIN: 0.2,
-         MAX: 0.8,
+         MIN: 0.3,
+         MAX: 0.7,
          STEP: 0.05,  // 敵艦が退却・出現したときの変化量
-         RECOVERY: 0.005,  // 移動時の回復量
+         RECOVERY: 0.01,  // 移動時の回復量
        };
 
        constructor(scene, x, y) {
@@ -745,7 +755,7 @@
        static SPEED = 100 * SCALE;
 
        static SHIELD_MAX = 600;
-       static SHIELD_RECOVERY_RATE = 0.05;
+       static SHIELD_RECOVERY_RATE = 0.04;
        static SHIELD_COLOR = 0xffffff;
 
        static WEAPON = {
@@ -755,8 +765,8 @@
 
        static SPIRIT = {
          INIT: 0.5,
-         MIN: 0.2,
-         MAX: 0.8,
+         MIN: 0.3,
+         MAX: 0.7,
          STEP: -0.00,  // 敵艦が退却・出現したときの変化量
          RECOVERY: 0.00,  // 移動時の回復量
        };
@@ -964,7 +974,7 @@
 
        document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
        document.getElementById('zoomOut').onclick = () => changeZoom(this, -CAMERA.STEP);
-       document.getElementById('misc').onclick = () => newShip(this);
+       document.getElementById('misc2').onclick = () => newShip(this);
 
 
        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
@@ -1309,6 +1319,33 @@
              dirY += (dy / dist) * weight;
            }
          });
+         if ( e instanceof FederationShip ) {
+           g_federationShip.forEach(t => {
+             if ( e === t ) {
+               return;
+             }
+             let dx = t.x - e.x;
+             let dy = t.y - e.y;
+             let dist = Math.hypot(dx, dy);
+             if (dist > 0.001) {
+               let weight = 1.0 / dist;
+               dirX += (dx / dist) * weight;
+               dirY += (dy / dist) * weight;
+             }
+           });
+
+           dx = g_starBase.x - e.x;
+           dy = g_starBase.y - e.y;
+           dist = Math.hypot(dx, dy);
+           dirX += dx / dist / dist;
+           dirY += dy / dist / dist;
+
+           dx = g_playerShip.x - e.x;
+           dy = g_playerShip.y - e.y;
+           dist = Math.hypot(dx, dy);
+           dirX += dx / dist / dist;
+           dirY += dy / dist / dist;
+         }
          let fDist = Math.hypot(dirX, dirY);
          if (fDist > 0.000001) {
            dirX /= fDist;
@@ -1883,11 +1920,11 @@
                });
                if (!g_isGameOver) {
                  setMsg(
-                   `副長: 敵艦、宇宙域外へ離脱。あと、${getActiveEnemyCount()}隻です。`, "#0f0"
+                   `副長: 敵艦がセクター外へ離脱。あと、${getActiveEnemyCount()}隻です。`, "#0f0"
                  );
                }
              } else if (npc instanceof FederationShip) {
-               setMsg("通信士: 連邦艦が宙域から離脱しました。", "#88f");
+               setMsg("通信士: 連邦艦がセクター外へ離脱しました。", "#88f");
              }
            }
          }
@@ -2176,6 +2213,7 @@
      document.getElementById('viewScoresBtn').addEventListener('click', () => {
        showHighScoreOverlay('view');
      });
+     document.getElementById('misc1').onclick = () => newShip(g_curScene);
 
      document.getElementById('hsRestartBtn').addEventListener('click', () => {
        if (g_pendingScene) {
