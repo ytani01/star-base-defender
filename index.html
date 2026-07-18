@@ -189,6 +189,24 @@
        background: #0ff;
        color: #000;
      }
+     
+     #misc1 {
+       font-family: monospace;
+       font-size: clamp(14px, 2.5vw, 18px);
+       background: transparent;
+       color: #0ff;
+       border: 1px solid #0ff;
+       padding: 3px 8px;
+       border-radius: 3px;
+       cursor: pointer;
+       margin-left: 10px;
+       vertical-align: middle;
+       transition: background 0.12s, color 0.12s;
+     }
+     #misc1:hover {
+       background: #0ff;
+       color: #000;
+     }
     </style>
   </head>
   <body>
@@ -202,6 +220,7 @@
           <span id="statusScore">100</span>
           |
           <button id="viewScoresBtn">▶ SCORES</button>
+          |
           <button id="misc1">▶ ??</button>
         </div>
         <div id="statusShip">
@@ -460,8 +479,7 @@
       * 兵器クラス
       */
      class Weapon {
-       // static HALF_DAMAGE_RANGE = 80;  // ダメージが50%になる距離(px)
-       static MAX_DAMAGE_RATIO = 0.2;  // 最大ダメージに対する最低有効ダメージ比率
+       static MAX_DAMAGE_RATIO = 0.2;  // 最大射程距離のダメージ比率
        
        constructor(max_power, area_r, cost=0) {
          console.log(`Weapon> max_power=${max_power}, area_r=${area_r}, const=${cost}`);
@@ -606,8 +624,22 @@
        /**
         *
         */
+       shieldPercent() {
+         return (this.shield / this.constructor.SHIELD_MAX);
+       }
+
+       /**
+        *
+        */
+       fear() {
+         return (1.0 - this.spirit);
+       }
+
+       /**
+        *
+        */
        isFleeing() {
-         return (this.shield / this.constructor.SHIELD_MAX) < (1.0 - this.spirit);
+         return this.shieldPercent() < this.fear();
        }
 
        /**
@@ -1741,6 +1773,9 @@
        //console.log(`=== execNPCAction: ${npc.constructor.name} ===`);
        if (g_isGameOver || !npc.active) return;
        const context = evalNPCTacticalSituation(npc);
+       console.log(
+         npc.constructor.name, npc.shieldPercent().toFixed(3), npc.fear().toFixed(3), context
+       );
 
        if (context.isFleeing) {
          npcMove(scene, npc, context);
@@ -1755,7 +1790,6 @@
       * クラス(所属)に応じた戦況の評価
       */
      function evalNPCTacticalSituation(npc) {
-       //const isFleeing = (npc.shield / npc.constructor.SHIELD_MAX) <  (1.0 - npc.spirit);
        const isFleeing = npc.isFleeing();
        let target = null;
        let distToTarget = Infinity;
@@ -1763,7 +1797,10 @@
 
        let potentialTargets = [];
        if (npc instanceof EnemyShip) {
-         potentialTargets = [g_playerShip, g_starBase, ...g_federationShip];
+         potentialTargets = [g_starBase, ...g_federationShip];
+         if ( ! g_playerShip.is_docked ) {
+           potentialTargets.push(g_playerShip)
+         }
        } else if (npc instanceof FederationShip) {
          potentialTargets = [...g_enemies];
        }
@@ -1774,21 +1811,15 @@
        let closestDist = Infinity;
 
        potentialTargets.forEach(t => {
-         if (!t || !t.active) {
-           return;
-         }
-         if (t === g_playerShip && g_playerShip.is_docked) {
+         if (!t || !t.active) {  // XXX TBD: 不要？
            return;
          }
          if ( npc instanceof FederationShip ) {
-           if ( t.shield < EnemyShip.SHIELD_MAX * 0.3 ) {
-             return;
-           }
-           if ( t.shield / t.constructor.SHIELD_MAX < (1.0 - t.spirit) ) {
+           // if ( t.shield < EnemyShip.SHIELD_MAX * 0.3 || t.isFleeing() ) {
+           if ( t.isFleeing() ) {
              return;
            }
          }
-
          let d = Phaser.Math.Distance.Between(npc.x, npc.y, t.x, t.y);
          
          // 最短距離の対象を記録（攻撃不可の場合の追跡目標）
@@ -1807,7 +1838,7 @@
              }
            }
          }
-       });
+       }); // forEach
 
        if (bestAttackableTarget) {
          // Attack
@@ -1846,8 +1877,9 @@
          return;
        } // if FederationShip
 
-       // npc is EnemyShip
-
+       //
+       // 以降、EnemyShip
+       // 
        // TBD: ここの条件分岐が汚い
        if (target == g_playerShip && t_shield_p < 60) {
          setMsg(`機関部: シールド ${t_shield_p}%`, "#ff0");
@@ -1881,7 +1913,7 @@
       */
      function npcMove(scene, npc, context) {
        let targetDest;
-       let moveAsFleeing = context.isFleeing;
+       // let moveAsFleeing = context.isFleeing;
 
        if (context.isFleeing) {
          let threats = [g_playerShip, g_starBase];
@@ -1889,7 +1921,7 @@
            threats = g_enemies.filter(e => e.active && e !== npc);
          }
          targetDest = threats.map(t => ({ x: t.x, y: t.y }));
-         moveAsFleeing = true; // 逃走フラグを維持して反転計算させる
+         // moveAsFleeing = true; // 逃走フラグを維持して反転計算させる
        } else {
          // 逃走中でない場合：ターゲットがいれば追跡、いなければ基地へ向かう
          if ( context.target ) {
@@ -1897,10 +1929,11 @@
          } else {
            targetDest = { x: g_starBase.x, y: g_starBase.y };
          }
-         moveAsFleeing = false;
+         // moveAsFleeing = false;
        }
 
-       const dest = calcDest(npc, targetDest, moveAsFleeing);
+       // const dest = calcDest(npc, targetDest, moveAsFleeing);
+       const dest = calcDest(npc, targetDest, context.isFleeing);
 
        scene.tweens.add({
          targets: npc,
@@ -1917,7 +1950,7 @@
                // 仲間の spirit に影響
                g_enemies.forEach(e => {
                  e.spirit = Math.max(EnemyShip.SPIRIT.MIN, e.spirit - EnemyShip.SPIRIT.STEP);
-                 console.log(`npcMove> spirit down: ${e.spirit.toFixed(3)}`);
+                 // console.log(`npcMove> spirit down: ${e.spirit.toFixed(3)}`);
                });
                if (!g_isGameOver) {
                  setMsg(
@@ -1944,7 +1977,7 @@
            npc.constructor.SPIRIT.MAX,
            (npc.spirit + npc.constructor.SPIRIT.RECOVERY)
          );
-         console.log(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
+         // console.log(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
        }
      } // npcMove()
      
