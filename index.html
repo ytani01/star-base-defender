@@ -1537,7 +1537,6 @@
          let s = new Star(this, p.x, p.y);
          spaceContext.stars.push(s);
        }
-       spaceContext.stars = spaceContext.stars; // ★登録
 
        // Enemies
        spaceContext.enemies = [];
@@ -1546,7 +1545,6 @@
          let e = new EnemyShip(this, p.x, p.y);
          spaceContext.addEnemy(e);
        }
-       spaceContext.enemies = spaceContext.enemies; // ★登録
 
        // Federation
        spaceContext.federationShips = [];
@@ -1554,7 +1552,6 @@
        // Player
        let pp = getSafeRandPos(0.1, 0.3);
        spaceContext.player = new PlayerShip(this, pp.x, pp.y);
-       spaceContext.player = spaceContext.player; // ★登録
 
        // Camera
        this.cameras.main.setBounds(0, 0, PLAY_AREA.WIDTH, PLAY_AREA.HEIGHT);
@@ -2062,7 +2059,7 @@
          });
          setMsg("戦術士官: 新たな敵が出現しました！", "#ff0")
        }
-       if ( g_turn % NEW_FEDERATION_INTERVAL == 0 ) {
+       if ( g_turn % NEW_FEDERATION_INTERVAL === 0 ) {
          const p = getSafeRandPos(0.8, 0.95);
          const newFed = new FederationShip(scene, p.x, p.y);
          spaceContext.addFederation(newFed);
@@ -2308,8 +2305,6 @@
          const s = g_pendingScene;
          g_pendingScene = null;
          g_isPlayerTurn = true;
-         g_qty_federationShip = 0;
-         console.log(`g_qty_federationShip=${g_qty_federationShip}`);
          s.scene.restart();
        } else {
          location.reload();
