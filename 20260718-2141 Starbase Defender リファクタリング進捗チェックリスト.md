@@ -84,23 +84,23 @@
         
     - [x] `npcAttack` 内のビーム色や攻撃の条件分岐を `attack(target)` 呼び出しへ置換する。
         
-- [ ] **4.2 NPC 戦術評価の委譲**
+- [x] **4.2 NPC 戦術評価の委譲**
     
-    - [ ] `evalNPCTacticalSituation` の中の `instanceof` 分岐を、各クラスのメソッド（例: `evaluateTactics(spaceContext)`）に切り出す。
+    - [x] `evalNPCTacticalSituation` の中の `instanceof` 分岐を、各クラスのメソッド（例: `evaluateTactics(spaceContext)`）に切り出す。
         
-- [ ] **4.3 クリック操作（インターアクト）の委譲**
+- [x] **4.3 クリック操作（インターアクト）の委譲**
     
-    - [ ] `StarBase`, `EnemyShip`, `PlayerShip` にそれぞれ `onInteract(player, spaceContext)` メソッドを実装する。
+    - [x] `StarBase`, `EnemyShip`, `PlayerShip` にそれぞれ `onInteract(player, spaceContext)` メソッドを実装する。
         
-    - [ ] `handlePointerDown` 内の巨大な `if (clickedObj === ...)` 分岐を削除し、`clickedObj.onInteract(...)` のポリモーフィックな呼び出しに置換する。
+    - [x] `handlePointerDown` 内の巨大な `if (clickedObj === ...)` 分岐を削除し、`clickedObj.onInteract(...)` のポリモーフィックな呼び出しに置換する。
         
-- [ ] **Step 4 完了条件（ファクトチェック）**
+- [x] **Step 4 完了条件（ファクトチェック）**
     
-    - [ ] 基地クリックでドッキング / 移動が正しく行われること。
+    - [x] 基地クリックでドッキング / 移動が正しく行われること。
         
-    - [ ] 敵クリックで射程・障害物判定を伴う攻撃が正しく行われること。
+    - [x] 敵クリックで射程・障害物判定を伴う攻撃が正しく行われること。
         
-    - [ ] NPC ターン時に、連邦艦と敵艦がそれぞれの戦術に従って攻撃・追跡・撤退を行うこと。
+    - [x] NPC ターン時に、連邦艦と敵艦がそれぞれの戦術に従って攻撃・追跡・撤退を行うこと。
         
 
 ### Step 5: クリーンアップと最終検証

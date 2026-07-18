@@ -573,44 +573,30 @@
          this.active = true;
        }
 
-       get x() {
-         return this.sprite.x;
-       }
-       set x(val) {
-         this.sprite.x = val;
-       }
+       get x() {return this.sprite.x;}
+       set x(val) {this.sprite.x = val;}
 
-       get y() {
-         return this.sprite.y;
-       }
-       set y(val) {
-         this.sprite.y = val;
-       }
+       get y() {return this.sprite.y;}
+       set y(val) {this.sprite.y = val;}
 
-       get src_w() {
-         return this.sprite.width;
-       }
-       get src_h() {
-         return this.sprite.height;
-       }
-       get src_r() {
-         return (this.src_w + this.src_h) / 4;
-       }
+       get src_w() {return this.sprite.width;}
+       get src_h() {return this.sprite.height;}
+       get src_r() {return (this.src_w + this.src_h) / 4;}
 
-       get w() {
-         return this.src_w * this.scale;
-       }
-       get h() {
-         return this.src_h * this.scale;
-       }
-       get r() {
-         return (this.w + this.h) / 4;
-       }
+       get w() {return this.src_w * this.scale;}
+       get h() {return this.src_h * this.scale;}
+       get r() {return (this.w + this.h) / 4;}
 
        destroy() {
          this.sprite.destroy();
          this.active = false;
        }
+
+       // デフォルトは「アクションを処理しなかった(false)」を返す
+       onInteract(player, scene, endTurn) {
+         return false;
+       }
+
      } // class GameObj
 
      /**
@@ -1011,7 +997,67 @@
         */
        onAfterAttack(target) {
          // デフォルトは何もしない
-       }
+       } // onAfterAttack()
+
+       // --- 評価対象となるターゲット候補リストを取得（子クラスで実装） ---
+       getPotentialTargets() {
+         return [];
+       } // getPotentialTargets()
+
+       // --- 特定のターゲットを評価対象から除外するかどうかの判定（必要に応じて子クラスで実装） ---
+       shouldIgnoreTarget(target) {
+         return false;
+       } // shouldIgnoreTarget()
+
+       // --- 戦術評価の実行 ---
+       evaluateTactics() {
+         const isFleeing = this.isFleeing();
+         let target = null;
+         let distToTarget = Infinity;
+         let canAttack = false;
+
+         const potentialTargets = this.getPotentialTargets();
+         let bestAttackableTarget = null;
+         let bestAttackableDist = Infinity;
+         let closestTarget = null;
+         let closestDist = Infinity;
+
+         potentialTargets.forEach(t => {
+           if (!t || !t.active) return;
+           if (this.shouldIgnoreTarget(t)) return;
+
+           let d = Phaser.Math.Distance.Between(this.x, this.y, t.x, t.y);
+           
+           // 最短距離の対象を記録（攻撃不可の場合の追跡目標）
+           if (d < closestDist) {
+             closestDist = d;
+             closestTarget = t;
+           }
+
+           // 攻撃可能な対象を評価
+           if (!isFleeing && d <= this.weapon.MaxRange() * (1.0 - this.spirit)) {
+             let checkBaseObstacle = (t !== spaceContext.starBase);
+             if (!isLOSBlocked(this, t, checkBaseObstacle)) {
+               if (d < bestAttackableDist) {
+                 bestAttackableDist = d;
+                 bestAttackableTarget = t;
+               }
+             }
+           }
+         }); // forEach
+
+         if (bestAttackableTarget) {
+           target = bestAttackableTarget;
+           distToTarget = bestAttackableDist;
+           canAttack = true;
+         } else {
+           target = closestTarget;
+           distToTarget = closestDist;
+           canAttack = false;
+         }
+
+         return { target, distToTarget, canAttack, isFleeing };
+       } // evaluateTactics()
 
      } // class NPCShip
 
@@ -1091,6 +1137,25 @@
            );
          }
        } // update()
+
+       // 基地に対するクリック操作
+       onInteract(player, scene, endTurn) {
+         if (player.is_docked) {
+           setMsg("基地司令部: ドッキング中。いつでも出撃できます。");
+           endTurn();
+           return true;
+         }
+
+         if (canDock()) {
+           dockShip(scene);
+           endTurn();
+           return true;
+         }
+
+         // 遠距離にいる場合は false を返し、通常の移動ロジックへとフォールバックさせる
+         return false;
+       } // onInteract()
+
      } // class StarBase
 
      /**
@@ -1130,7 +1195,7 @@
          return 0xff00ff;
        }
 
-       // --- 追加: 敵艦が攻撃した後の処理 ---
+       // --- 敵艦が攻撃した後の処理 ---
        onAfterAttack(target) {
          const t_shield_p = Math.floor(target.shield / target.constructor.SHIELD_MAX * 100);
 
@@ -1159,6 +1224,63 @@
            }
          }
        } // onAfterAttack()
+
+       // --- 敵艦のターゲット候補 ---
+       getPotentialTargets() {
+         const targets = [spaceContext.starBase, ...spaceContext.federationShips];
+         if (!spaceContext.player.is_docked) {
+           targets.push(spaceContext.player);
+         }
+         return targets;
+       } // getPotentialTargets()
+
+       // 敵艦に対するクリック操作（攻撃）
+       onInteract(player, scene, endTurn) {
+         if (player.is_docked) {
+           setMsg("戦術士官: ドッキング中のため、兵器は使用できません。", "#a00");
+           return true;
+         }
+         if (player.energy < player.weapon.cost) {
+           setMsg("戦術士官: エネルギー不足で攻撃できません！", "#f00");
+           return true;
+         }
+
+         // 発射
+         player.energy -= player.weapon.cost;
+         const dist = Phaser.Math.Distance.Between(player.x, player.y, this.x, this.y);
+
+         if (dist > player.weapon.MaxRange()) {
+           setMsg("戦術士官: 射程範囲外のため、敵艦にダメージなし。", "#ff0");
+           fireBeam(scene, player, this, 0x444444);
+           endTurn();
+           return true;
+         }
+         if (isLOSBlocked(player, this, false)) {
+           setMsg("戦術士官: 障害物に遮られ、敵艦にダメージなし。", "#ff0");
+           fireBeam(scene, player, this, 0x444444);
+           endTurn();
+           return true;
+         }
+
+         // 命中
+         setMsg("戦術士官: 攻撃命中！ 敵艦シールド減少！", "#f80");
+         const damage = player.weapon.CalcDamage(dist);
+         this.takeDamage(damage);
+         fireBeam(scene, player, this, 0x00ffff);
+
+         if (!this.active) {
+           // 撃墜
+           spaceContext.removeEnemy(this);
+           
+           const rp = getSafeRandPos(0.8, 0.95);
+           const newEnemy = new EnemyShip(scene, rp.x, rp.y);
+           spaceContext.addEnemy(newEnemy);
+           
+           setMsg("戦術士官: 敵艦を撃破！ 別の新たな敵艦を検知しました！", "#ff0");
+         }
+         endTurn();
+         return true;
+       } // onInteract()
 
      } // class EnemyShip
 
@@ -1213,6 +1335,16 @@
          }
        } // onAfterAttack()
 
+       // 連邦感のターゲット候補
+       getPotentialTargets() {
+         return [...spaceContext.enemies];
+       }
+
+       // 連邦艦は逃走中の敵を追撃・攻撃しない 
+       shouldIgnoreTarget(target) {
+         return target.isFleeing();
+       }
+
      } // class FederationShip
 
      /**
@@ -1257,6 +1389,31 @@
          this.sprite.setDepth(10);
          this.shield_gauge.setDepth(10);
        }
+
+       // 自機に対するクリック操作（シールド強化）
+       onInteract(player, scene, endTurn) {
+         const d_shield = PlayerShip.SHIELD_MAX - this.shield;
+         if (d_shield <= 0) {
+           setMsg("機関部: シールドはすでに最大です。", "#fff");
+           return true;
+         }
+
+         const energy_supply = Math.min(this.energy - PlayerShip.ENERGY_MIN, d_shield);
+         if (energy_supply <= 0) {
+           setMsg("機関部: エネルギー不足により、シールドを補強できません！");
+           return true;
+         }
+
+         this.energy -= energy_supply;
+         this.shield += energy_supply;
+
+         const shield_p = Math.floor(this.shield / PlayerShip.SHIELD_MAX * 100);
+         const energy_p = Math.floor(this.energy / PlayerShip.ENERGY_MAX * 100);
+         setMsg(`機関部: シールド回復！エネルギー残り ${energy_p}%`, "#fff");
+         endTurn();
+         return true;
+       } // onInteract()
+
      } // class PlayerShip
 
      // ---------------------------------------------------------
@@ -1558,122 +1715,26 @@
          return;
        }
 
-       // クリックされたオブジェクトを特定
-       // 配列の先頭から評価されるため、重なっている場合は spaceContext.enemies が優先される
        const clickedObj = spaceContext.findObjectAt(pointer.worldX, pointer.worldY);
-       if ( clickedObj ) {
+       if (clickedObj) {
          console.log(`clickedObj=${clickedObj.constructor.name}`);
        }
 
-       // ターン終了の共通処理
        const endTurn = () => {
          g_isPlayerTurn = false;
-
          this.time.delayedCall(TIMING.TURN_DELAY, () => npcTurn(this));
          updateStatus();
        };
 
-       // 2. オブジェクトに応じたアクションの分岐
-       // クラス定義やインスタンスを利用してスッキリと切り分ける
-       if (clickedObj === spaceContext.starBase) {
-         // --- 基地に対するアクション ---
-         if (spaceContext.player.is_docked) {
-           setMsg("基地司令部: ドッキング中。いつでも出撃できます。");
-           endTurn();
-           return;
-         }
+       // 1. オブジェクトがアクションを処理できれば実行(trueが返る)
+       const handled = clickedObj?.onInteract(spaceContext.player, this, endTurn);
+       console.log('handled=', handled);
 
-         const distToBase = Phaser.Math.Distance.Between(
-           spaceContext.player.x, spaceContext.player.y, spaceContext.starBase.x, spaceContext.starBase.y
-         );
-         console.log(`distToBase=${distToBase}`);
-
-         if (canDock()) {
-           dockShip(this);
-           endTurn();
-           return;
-         }
-
-         attemptPlayerMove(this, spaceContext.starBase.x, spaceContext.starBase.y, TIMING.TURN_DELAY);
-
-         if (spaceContext.player.energy < PlayerShip.ENERGY_MIN && !spaceContext.player.is_docked) {
-           updateStatus();
-           gameOver("艦内コンピュータ: パワー障害。生命維持装置ダウン...");
-         }
-       } else if (clickedObj instanceof EnemyShip) {
-         // --- 敵に対するアクション ---
-         if (spaceContext.player.is_docked) {
-           setMsg("戦術士官: ドッキング中のため、兵器は使用できません。", "#a00");
-           return;
-         }
-         if ( spaceContext.player.energy < spaceContext.player.weapon.cost ) {
-           setMsg("戦術士官: エネルギー不足で攻撃できません！", "#f00");
-           return;
-         }
-
-         // 発射
-         spaceContext.player.energy -= spaceContext.player.weapon.cost;
-         const dist = Phaser.Math.Distance.Between(
-           spaceContext.player.x, spaceContext.player.y, clickedObj.x, clickedObj.y
-         );
-
-         if (dist > spaceContext.player.weapon.MaxRange()) {
-           setMsg("戦術士官: 射程範囲外のため、敵艦にダメージなし。", "#ff0");
-           fireBeam(this, spaceContext.player, clickedObj, 0x444444);
-           endTurn();
-           return;
-         }
-         if (isLOSBlocked(spaceContext.player, clickedObj, false)) {
-           setMsg("戦術士官: 障害物に遮られ、敵艦にダメージなし。", "#ff0");
-           fireBeam(this, spaceContext.player, clickedObj, 0x444444);
-           endTurn();
-           return;
-         }
-
-         // 命中
-         setMsg("戦術士官: 攻撃命中！ 敵艦シールド減少！", "#f80");
-         const damage = spaceContext.player.weapon.CalcDamage(dist);
-         clickedObj.takeDamage(damage);
-         fireBeam(this, spaceContext.player, clickedObj, 0x00ffff);
-
-         if (!clickedObj.active) {
-           spaceContext.removeEnemy(clickedObj);
-           
-           const rp = getSafeRandPos(0.8, 0.95);
-           const newEnemy = new EnemyShip(this, rp.x, rp.y);
-           spaceContext.addEnemy(newEnemy);
-           
-           setMsg("戦術士官: 敵艦を撃破！ 別の新たな敵艦を検知しました！", "#ff0");
-         }
-         endTurn();
-       } else if (clickedObj === spaceContext.player) {
-         // --- 自機のシールド強化
-         const d_shield = PlayerShip.SHIELD_MAX - spaceContext.player.shield;
-         console.log(`d_shield=${d_shield}, spaceContext.player.energy=${spaceContext.player.energy}`);
-         if ( d_shield <= 0 ) {
-           setMsg("機関部: シールドはすでに最大です。", "#fff");
-           return;
-         }
-
-         // d_shield > 0
-         const energy_supply = Math.min(spaceContext.player.energy - PlayerShip.ENERGY_MIN, d_shield);
-         console.log(`energy_supply=${energy_supply}`);
-         if ( energy_supply <= 0 ) {
-           setMsg("機関部: エネルギー不足により、シールドを補強できません！");
-           return;
-         }
-
-         spaceContext.player.energy -= energy_supply;
-         spaceContext.player.shield += energy_supply;
-         console.log(`energy=${spaceContext.player.energy}, shield=${spaceContext.player.shield}`)
-
-         const shield_p = Math.floor(spaceContext.player.shield / PlayerShip.SHIELD_MAX * 100);
-         const energy_p = Math.floor(spaceContext.player.energy / PlayerShip.ENERGY_MAX * 100);
-         setMsg(`機関部: シールド回復！エネルギー残り ${energy_p}%`, "#fff");
-         endTurn();
-       } else {
-         // --- 空間に対するアクション（移動） ---
-         attemptPlayerMove(this, pointer.worldX, pointer.worldY, TIMING.TURN_DELAY);
+       // 2. 処理されなかった場合（空間クリック、または遠距離基地クリック）は移動へフォールバック
+       if (!handled) {
+         const targetX = clickedObj ? clickedObj.x : pointer.worldX;
+         const targetY = clickedObj ? clickedObj.y : pointer.worldY;
+         attemptPlayerMove(this, targetX, targetY, TIMING.TURN_DELAY);
 
          if (spaceContext.player.energy < PlayerShip.ENERGY_MIN && !spaceContext.player.is_docked) {
            updateStatus();
@@ -1879,7 +1940,9 @@
        let totalDelay = (
          TIMING.TURN_DELAY + TIMING.TURN_MARGIN + TIMING.ENEMY_DELAY_MAX
        );
-       console.log(`npcTurn> spaceContext.enemies.length=${spaceContext.enemies.length}, totalDelay=${totalDelay}`);
+       console.log(
+         `npcTurn> spaceContext.enemies.length=${spaceContext.enemies.length}, totalDelay=${totalDelay}`
+       );
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
      } // npcTurn()
 
@@ -1889,7 +1952,8 @@
      function execNPCAction(scene, npc) {
        //console.log(`=== execNPCAction: ${npc.constructor.name} ===`);
        if (g_isGameOver || !npc.active) return;
-       const context = evalNPCTacticalSituation(npc);
+       
+       const context = npc.evaluateTactics();
        console.log(
          npc.constructor.name, npc.shieldPercent().toFixed(3), npc.fear().toFixed(3), context
        );
@@ -1902,75 +1966,6 @@
          npcMove(scene, npc, context);
        }
      } // execNPCAction()
-
-     /**
-      * クラス(所属)に応じた戦況の評価
-      */
-     function evalNPCTacticalSituation(npc) {
-       const isFleeing = npc.isFleeing();
-       let target = null;
-       let distToTarget = Infinity;
-       let canAttack = false;
-
-       let potentialTargets = [];
-       if (npc instanceof EnemyShip) {
-         potentialTargets = [spaceContext.starBase, ...spaceContext.federationShips];
-         if ( ! spaceContext.player.is_docked ) {
-           potentialTargets.push(spaceContext.player)
-         }
-       } else if (npc instanceof FederationShip) {
-         potentialTargets = [...spaceContext.enemies];
-       }
-
-       let bestAttackableTarget = null;
-       let bestAttackableDist = Infinity;
-       let closestTarget = null;
-       let closestDist = Infinity;
-
-       potentialTargets.forEach(t => {
-         if (!t || !t.active) {  // XXX TBD: 不要？
-           return;
-         }
-         if ( npc instanceof FederationShip ) {
-           // if ( t.shield < EnemyShip.SHIELD_MAX * 0.3 || t.isFleeing() ) {
-           if ( t.isFleeing() ) {
-             return;
-           }
-         }
-         let d = Phaser.Math.Distance.Between(npc.x, npc.y, t.x, t.y);
-         
-         // 最短距離の対象を記録（攻撃不可の場合の追跡目標）
-         if (d < closestDist) {
-           closestDist = d;
-           closestTarget = t;
-         }
-
-         // 攻撃可能な対象を評価
-         if (!isFleeing && d <= npc.weapon.MaxRange() * (1.0 - npc.spirit)) {
-           let checkBaseObstacle = (t !== spaceContext.starBase);
-           if (!isLOSBlocked(npc, t, checkBaseObstacle)) {
-             if (d < bestAttackableDist) {
-               bestAttackableDist = d;
-               bestAttackableTarget = t;
-             }
-           }
-         }
-       }); // forEach
-
-       if (bestAttackableTarget) {
-         // Attack
-         target = bestAttackableTarget;
-         distToTarget = bestAttackableDist;
-         canAttack = true;
-       } else {
-         // Move
-         target = closestTarget;
-         distToTarget = closestDist;
-         canAttack = false;
-       }
-
-       return { target, distToTarget, canAttack, isFleeing };
-     } // evalNPCTacticalSituation()
 
      /**
       * NPC 移動処理とシールド回復
