@@ -1464,8 +1464,8 @@
            return true;
          }
 
-         const energy_supply = Math.min(this.energy - PlayerShip.ENERGY_MIN, d_shield);
-         if (energy_supply <= 0) {
+         const energy_supply = Math.min(this.energy, d_shield);
+         if (energy_supply < 0) {
            setMsg("機関部: エネルギー不足により、シールドを補強できません！");
            return true;
          }
@@ -1804,7 +1804,7 @@
 
          if (spaceContext.player.energy < PlayerShip.ENERGY_MIN && !spaceContext.player.is_docked) {
            updateStatus();
-           gameOver("艦内コンピュータ: パワー障害。生命維持装置ダウン...");
+           gameOver("コンピュータ: パワー障害。生命維持装置ダウン...");
          }
        }
      } // handlePointerDown()
@@ -1935,7 +1935,7 @@
 
        const speed_p = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
        let cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
-       if ( spaceContext.player.energy - cost <= PlayerShip.ENERGY_MIN ) {
+       if ( spaceContext.player.energy - cost < 0 ) {
          setMsg("機関部: エネルギー不足で移動できません", '#ff0');
          return;
        }
