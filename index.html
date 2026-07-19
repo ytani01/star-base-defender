@@ -10,6 +10,7 @@
        --color-accent: #08f;
        --color-bg-dark: #111;
        --font-mono: monospace;
+       --panel-font-size: clamp(18px, 3vw, 24px);
      }
      body {
        margin:0;
@@ -24,7 +25,9 @@
      }
 
      #gameContainer {
-       display: flex; flex-direction: column; height: 100vh;
+       display: flex;
+       flex-direction: column;
+       height: 100vh;
      }
      
      #statusPanel {
@@ -34,7 +37,7 @@
        flex: 0 0 auto;
        border-bottom:2px solid var(--color-accent);
        overflow-y:auto;
-       font-size: clamp(14px, 2.5vw, 20px);
+       font-size: var(--panel-font-size);
        font-family: var(--font-mono);
        line-height: 1.1;
      }
@@ -44,7 +47,7 @@
      #statusPanel .status-gauge {
        display: inline-block;
        width: 60px;
-       height: clamp(12px, 2.5vw, 18px);
+       height: 0.8em;
        background: #222;
        border: 1px solid var(--color-accent);
        margin-left: 8px;
@@ -57,10 +60,20 @@
        transition: width 0.2s ease, background-color 0.2s ease;
        margin: 0;
      }
-     
+
      #logStatus {
-       height: 70px;
-       line-height: 1.1;
+       height: 90px;
+       line-height: 1.2;
+       overflow-y: auto;
+       background: #000;
+       border: 1px solid rgba(0, 255, 255, 0.2);
+       padding: 4px;
+       margin-top: 5px !important;
+     }
+     #logStatus .log-line {
+       margin: 2px 0;
+       padding: 1px 4px;
+       border-radius: 2px;
      }
 
      #gameWrapper {
@@ -98,7 +111,7 @@
      }
 
      .panel-btn {
-       font-size: clamp(14px, 2.5vw, 18px);
+       font-size: 0.9em;
        background: transparent;
        color: var(--color-primary);
        border: 1px solid var(--color-primary);
@@ -222,33 +235,37 @@
         <div id="turn">
           Turn
           <span id="statusMission">1</span>-<span id="statusTurn">1</span>
-          |
+          /
           SCORE
           <span id="statusScore">100</span>
-          |
+          /
           <button class="panel-btn" id="viewScoresBtn">▶ SCORES</button>
-          |
+          /
           <button class="panel-btn" id="misc1">▶ ??</button>
         </div>
         <div id="statusShip">
-          Ship Shield 
+          Shield 
           <div class="status-gauge"><div id="gaugeShipShield" class="status-gauge-fill"></div></div>
           <span id="statusShipShield">0</span>
-          |
+          /
           Energy
           <div class="status-gauge"><div id="gaugeShipEnergy" class="status-gauge-fill"></div></div>
           <span id="statusShipEnergy">0</span>
         </div>
         <div id="statusBase">
-          Base Shield
+          BaseStation: Shield
           <div class="status-gauge"><div id="gaugeBaseShield" class="status-gauge-fill"></div></div>
           <span id="statusBaseShield">0</span>
         </div>
-        <div id="statusEnemy">
-          ENEMY COUNT
-          <span id="statusEnemyCount">1</span>
+        <div id="shipCount">
+          Ships: 
+          <span id="statusFederationShip">Federation</span>
+          <span id="statusFederationShipCount">1</span>
+          /
+          <span id="statusEnemyShip">Enemy</span>
+          <span id="statusEnemyShipCount">1</span>
         </div>
-        <div id="logStatus">副長: 艦長、命令をどうぞ。</div>
+        <div id="logStatus"></div>
       </div>
       
       <div id="gameWrapper">
@@ -358,6 +375,13 @@
      /**
       *
       */
+     function getActiveFederationShipCount() {
+       return spaceContext.federationShips.filter(f => f.active).length + 1;
+     }
+
+     /**
+      *
+      */
      function getActiveEnemyCount() {
        return spaceContext.enemies.filter(enemy => enemy.active).length;
      } // getActiveEnemyCount()
@@ -394,13 +418,40 @@
      } // drawBoundary()
 
      /**
-      * メッセージの表示
+      * メッセージの表示（複数行スクロール対応）
+      * @param {string} msg 表示するテキスト（空文字の場合はログを全消去）
+      * @param {string} fg 文字色
+      * @param {string} bg 行の背景色
       */
-     function setMsg(msg, fg="#0ff", bg="#444") {
-       const el = document.getElementById('logStatus')
-       el.style.color = fg;
-       el.style.backgroundColor = bg;
-       el.textContent = msg;
+     function setMsg(msg, fg="#0ff", bg="transparent") {
+       const el = document.getElementById('logStatus');
+       
+       // msgが空文字（ゲームオーバー時などの画面クリア命令）の場合は全消去
+       if (!msg) {
+         el.innerHTML = '';
+         return;
+       }
+
+       msg = `T${g_turn}:` + msg;
+
+       // 新しいログ行のDOM要素を作成
+       const line = document.createElement('div');
+       line.className = 'log-line';
+       line.style.color = fg;
+       line.style.backgroundColor = (bg !== "#444") ? bg : "transparent";
+       line.textContent = msg;
+
+       // ログ領域の末尾に追加
+       el.appendChild(line);
+
+       // メモリ及びパフォーマンス対策: ログが50行を超えたら古い行から削除
+       const maxLines = 50;
+       while (el.children.length > maxLines) {
+         el.removeChild(el.firstChild);
+       }
+
+       // 最新のメッセージが見えるように最下部へスクロール位置を調整
+       el.scrollTop = el.scrollHeight;
      } // setMsg()
 
      /**
@@ -1141,7 +1192,7 @@
        // 基地に対するクリック操作
        onInteract(player, scene, endTurn) {
          if (player.is_docked) {
-           setMsg("基地司令部: ドッキング中。いつでも出撃できます。");
+           setMsg("基地司令: ドッキング中。いつでも出撃できます。");
            endTurn();
            return true;
          }
@@ -1200,26 +1251,27 @@
          const t_shield_p = Math.floor(target.shield / target.constructor.SHIELD_MAX * 100);
 
          if (target === spaceContext.player && t_shield_p < 60) {
-           setMsg(`機関部: シールド ${t_shield_p}%`, "#ff0");
-           if (t_shield_p <= 30) {
-             setMsg(`機関部: シールド ${t_shield_p}%、危険です！`, "#f00");
+           if (t_shield_p > 30) {
+             setMsg(`機関部: シールド ${t_shield_p}%`, "#ff0");
+           } else {
+             setMsg(`機関部: 艦長！シールド ${t_shield_p}% 危険です！`, "#f00");
            }
            updateStatus();
          }
          if (target === spaceContext.starBase && t_shield_p < 60) {
-           setMsg(`基地司令部: シールド ${t_shield_p}%、至急救援を求む！`, "#ff0");
+           setMsg(`基地司令: シールド ${t_shield_p}%、至急救援を求む！`, "#ff0");
            if (t_shield_p <= 30) {
-             setMsg(`基地司令部: シールド ${t_shield_p}%、至急救援を求む！`, "#f00");
+             setMsg(`基地司令: シールド ${t_shield_p}%、至急救援を求む！`, "#f00");
            }
            updateStatus();
          }
          if (target.shield <= 0 && !g_isGameOver) {
            if (target === spaceContext.starBase) {
-             gameOver("基地司令部: シールド消失！！ 基地が崩壊...");
+             gameOver("基地司令: シールド消失！！ 基地が崩壊...");
            } else if (target === spaceContext.player) {
              gameOver("機関部: シールド消失！！ 船体が崩壊...");
            } else if (target instanceof FederationShip) { // 【修正】配列比較のバグを解消
-             setMsg("通信士: 味方の艦の反応が 1隻消えました...", "#f00");
+             setMsg("通信士: 味方1隻との通信が途絶えました...", "#f00");
              updateStatus();
            }
          }
@@ -1237,7 +1289,7 @@
        // 敵艦に対するクリック操作（攻撃）
        onInteract(player, scene, endTurn) {
          if (player.is_docked) {
-           setMsg("戦術士官: ドッキング中のため、兵器は使用できません。", "#a00");
+           setMsg("戦術士官: ドッキング中のため、兵器は使用できません。", "#ff0");
            return true;
          }
          if (player.energy < player.weapon.cost) {
@@ -1263,7 +1315,7 @@
          }
 
          // 命中
-         setMsg("戦術士官: 攻撃命中！ 敵艦シールド減少！", "#f80");
+         setMsg("戦術士官: 攻撃命中！ 敵艦シールド低下！", "#f80");
          const damage = player.weapon.CalcDamage(dist);
          this.takeDamage(damage);
          fireBeam(scene, player, this, 0x00ffff);
@@ -1409,7 +1461,7 @@
 
          const shield_p = Math.floor(this.shield / PlayerShip.SHIELD_MAX * 100);
          const energy_p = Math.floor(this.energy / PlayerShip.ENERGY_MAX * 100);
-         setMsg(`機関部: シールド回復！エネルギー残り ${energy_p}%`, "#fff");
+         setMsg(`機関部: シールドアップ。エネルギー残り ${energy_p}%`, "#8ff");
          endTurn();
          return true;
        } // onInteract()
@@ -1437,11 +1489,12 @@
      /**
       *
       */
-     function newShip(scene) {
+     function newFederationShip(scene) {
        let p = getSafeRandPos(0.3, 0.6);
        const newFed = new FederationShip(scene, p.x, p.y);
        spaceContext.addFederation(newFed);
-     } // newShip()
+       updateStatus();
+     } // newFederationShip()
 
      /**
       * 画像の生成
@@ -1526,7 +1579,9 @@
        rangeGraphics = this.add.graphics();
        boundaryGraphics = this.add.graphics();
        drawBoundary();
-       
+
+       setMsg("副長: 艦長、命令をどうぞ。");
+
        // Base
        spaceContext.starBase = new StarBase(this, AREA_CENTER.X, AREA_CENTER.Y);
 
@@ -1563,7 +1618,7 @@
 
        document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
        document.getElementById('zoomOut').onclick = () => changeZoom(this, -CAMERA.STEP);
-       //document.getElementById('misc2').onclick = () => newShip(this);
+       //document.getElementById('misc2').onclick = () => newFederationShip(this);
 
 
        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
@@ -1793,7 +1848,7 @@
          duration: 200,
          ease: 'Sine.easeInOut'
        });
-       setMsg("基地司令部: ドッキング完了", "#0ff");
+       setMsg("基地司令: ドッキング完了", "#0ff");
        updateStatus();
      } // dockShip()
 
@@ -1865,18 +1920,19 @@
          return;
        }
 
-       setMsg(`操舵手: インパルスエンジン、出力 ${speed_p}%`);
-
        // --- 以降は既存のエネルギー消費・ドッキング処理 ---
        let skipAutoDock = false;
        if (spaceContext.player.is_docked) {
          spaceContext.player.is_docked = false;
          skipAutoDock = true;
          spaceContext.player.shield = PlayerShip.SHIELD_MAX;
-         setMsg("基地司令部: ドッキング・クランプ解除");
+         setMsg("基地司令: ドッキング・クランプ解除");
          updateStatus();
        }
 
+       setMsg(`操舵手: コースセット。インパルスエンジン出力 ${speed_p}%`);
+       updateStatus();
+       
        spaceContext.player.energy -= cost;
        g_isPlayerTurn = false;
 
@@ -2004,9 +2060,15 @@
                e.spirit = Math.max(EnemyShip.SPIRIT.MIN, e.spirit - EnemyShip.SPIRIT.STEP);
              });
              if (!g_isGameOver) {
-               setMsg(
-                 `副長: 敵艦がセクター外へ離脱。あと、${getActiveEnemyCount()}隻です。`, "#0f0"
-               );
+               if (getActiveEnemyCount() > 0) {
+                 setMsg(
+                   `副長: 敵艦がセクター外へ離脱。あと、${getActiveEnemyCount()}隻です。`, "#0f0"
+                 );
+               } else {
+                 setMsg(
+                   '副長: 敵艦がすべて撤退しました！', "#0f0"
+                 );
+               }
              }
            }
          } // if (distFromCenter > AREA_R)
@@ -2087,13 +2149,18 @@
        const PlayerEnergy = spaceContext.player.energy > 0 ? spaceContext.player.energy : 0;
        const PlayerShield = spaceContext.player.shield > 0 ? spaceContext.player.shield : 0;
        const baseShield = spaceContext.starBase.shield > 0 ? spaceContext.starBase.shield : 0;
+       const federationCount = getActiveFederationShipCount();
        const enemyCount = getActiveEnemyCount();
 
        document.getElementById('statusTurn').textContent = `${g_turn}`;
        document.getElementById('statusMission').textContent = `${g_curMission}`;
-       document.getElementById('statusEnemyCount').style.color = "#ff0"
-       document.getElementById('statusEnemyCount').textContent = `${enemyCount}`;
        document.getElementById('statusScore').textContent = `${g_score}`;
+
+       document.getElementById('statusFederationShipCount').style.color = "#ff0"
+       document.getElementById('statusFederationShipCount').textContent = `${federationCount}`;
+
+       document.getElementById('statusEnemyShipCount').style.color = "#ff0"
+       document.getElementById('statusEnemyShipCount').textContent = `${enemyCount}`;
 
        // PlayerShip Shield
        let PlayerShieldRatio = PlayerShield / PlayerShip.SHIELD_MAX;
@@ -2296,7 +2363,7 @@
      document.getElementById('viewScoresBtn').addEventListener('click', () => {
        showHighScoreOverlay('view');
      });
-     document.getElementById('misc1').onclick = () => newShip(g_curScene);
+     document.getElementById('misc1').onclick = () => newFederationShip(g_curScene);
 
      document.getElementById('hsRestartBtn').addEventListener('click', () => {
        if (g_pendingScene) {
