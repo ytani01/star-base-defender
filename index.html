@@ -1465,7 +1465,7 @@
          }
 
          const energy_supply = Math.min(this.energy, d_shield);
-         if (energy_supply < 0) {
+         if (energy_supply <= 0) {
            setMsg("機関部: エネルギー不足により、シールドを補強できません！");
            return true;
          }
@@ -1781,6 +1781,14 @@
          return;
        }
 
+       if (spaceContext.player.energy < PlayerShip.ENERGY_MIN && !spaceContext.player.is_docked) {
+         updateStatus();
+         gameOver(
+           "コンピュータ: エネルギー枯渇により航行不能。緊急遭難ビーコンを発信し、機体を放棄します..."
+         );
+         return;
+       }
+
        const clickedObj = spaceContext.findObjectAt(pointer.worldX, pointer.worldY);
        if (clickedObj) {
          console.log(`clickedObj=${clickedObj.constructor.name}`);
@@ -1792,20 +1800,22 @@
          updateStatus();
        };
 
-       // 1. オブジェクトがアクションを処理できれば実行(trueが返る)
+       // オブジェクトがアクションを処理できればtrueが返る
        const handled = clickedObj?.onInteract(spaceContext.player, this, endTurn);
        console.log('handled=', handled);
 
-       // 2. 処理されなかった場合（空間クリック、または遠距離基地クリック）は移動へフォールバック
-       if (!handled) {
-         const targetX = clickedObj ? clickedObj.x : pointer.worldX;
-         const targetY = clickedObj ? clickedObj.y : pointer.worldY;
-         attemptPlayerMove(this, targetX, targetY, TIMING.TURN_DELAY);
+       if (handled) {
+         return;
+       }
+       
+       // 処理されなかった場合（空間クリック、または遠距離基地クリック）は移動へフォールバック
+       const targetX = clickedObj ? clickedObj.x : pointer.worldX;
+       const targetY = clickedObj ? clickedObj.y : pointer.worldY;
+       attemptPlayerMove(this, targetX, targetY, TIMING.TURN_DELAY);
 
-         if (spaceContext.player.energy < PlayerShip.ENERGY_MIN && !spaceContext.player.is_docked) {
-           updateStatus();
-           gameOver("コンピュータ: パワー障害。生命維持装置ダウン...");
-         }
+       if (spaceContext.player.energy < PlayerShip.ENERGY_MIN && !spaceContext.player.is_docked) {
+         updateStatus();
+         gameOver("コンピュータ: エネルギー枯渇により航行不能。緊急遭難ビーコンを発信します...");
        }
      } // handlePointerDown()
 
