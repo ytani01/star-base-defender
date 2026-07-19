@@ -1857,7 +1857,7 @@
      } // dockShip()
 
      /**
-      * 自機の移動処理（新ドッキング仕様に対応）
+      * 自機の移動処理（スタック回避および進路変更報告機能を追加）
       */
      function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
        let rawDist = Phaser.Math.Distance.Between(spaceContext.player.x, spaceContext.player.y, targetX, targetY);
@@ -1879,6 +1879,8 @@
 
        let destX, destY;
        let skipAutoDock = false;
+       let ignoreObjs = [];
+       let isRerouted = false; // 【改修】コース変更を検知するためのフラグ
 
        // 2. ドッキング解除時（離脱時）の特別ロジック
        if (spaceContext.player.is_docked) {
@@ -1887,13 +1889,11 @@
          spaceContext.player.shield = PlayerShip.SHIELD_MAX;
          setMsg("基地司令: ドッキング・クランプ解除");
 
-         // 【変更点】離脱時：基地を障害物とは見なさない
-         const ignoreObjs = [spaceContext.starBase];
+         ignoreObjs = [spaceContext.starBase];
          const finalDest = spaceContext.player.resolveMovement(desiredX, desiredY, moveDist, ignoreObjs);
          destX = finalDest.x;
          destY = finalDest.y;
 
-         // 【変更点】目的地が「基地半径＋自機半径」以内の場合、基地に接する位置まで押し出す
          const distFromBase = Phaser.Math.Distance.Between(spaceContext.starBase.x, spaceContext.starBase.y, destX, destY);
          const minPushDist = StarBase.R + PlayerShip.R;
          if (distFromBase < minPushDist) {
@@ -1904,21 +1904,33 @@
        } 
        // 3. 通常移動およびドッキングを目的とする移動
        else {
-         // 【変更点】目的地がどこであっても、基地を障害物として扱い、回避せずに接する位置で止める
-         // resolveMovement ではなく、めり込み停止機能のみを持つ clampDest を呼び出してストレートに止める
          const finalDest = spaceContext.player.clampDest(desiredX, desiredY, []);
          destX = finalDest.x;
          destY = finalDest.y;
        }
 
-       const actualDist = Phaser.Math.Distance.Between(
+       let actualDist = Phaser.Math.Distance.Between(
          spaceContext.player.x, spaceContext.player.y, destX, destY
        );
        
-       // スタック（完全停止）判定
+       // 【改修】スタック（完全停止）判定時の自動回避処理
        if (actualDist < 0.1) {
-         setMsg("操舵手: 障害物に接近しすぎています。進路がクリアできません！", "#f00");
-         return;
+         // 扇形探索（resolveMovement）を利用して迂回進路を再計算
+         const avoidDest = spaceContext.player.resolveMovement(desiredX, desiredY, moveDist, ignoreObjs);
+         destX = avoidDest.x;
+         destY = avoidDest.y;
+         actualDist = Phaser.Math.Distance.Between(
+           spaceContext.player.x, spaceContext.player.y, destX, destY
+         );
+
+         // 迂回を試みても移動不能な場合（四方を完全に囲まれている場合など）のみキャンセル
+         if (actualDist < 0.1) {
+           setMsg("操舵手: 障害物に接近しすぎています。進路がクリアできません！", "#f00");
+           return;
+         }
+
+         // 回避移動が成立したため、コース変更フラグを立てる
+         isRerouted = true;
        }
 
        const speed_p = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
@@ -1928,9 +1940,11 @@
          return;
        }
 
-       // 当初の目的座標と実際の移動到達点のズレを検知して報告
+       // 【改修】コース変更時のメッセージ分岐を追加
        const shiftDist = Phaser.Math.Distance.Between(desiredX, desiredY, destX, destY);
-       if (shiftDist > 5.0 && !target_is_base) {
+       if (isRerouted) {
+         setMsg(`操舵手: 障害物を回避するため、進路を変更しました。インパルスエンジン出力 ${speed_p}%`, "#ff0");
+       } else if (shiftDist > 5.0 && !target_is_base) {
          setMsg(`操舵手: 進路上に障害物を検知。安全距離にて停止します。出力 ${speed_p}%`, "#ff0");
        } else {
          setMsg(`操舵手: コースセット。インパルスエンジン出力 ${speed_p}%`);
@@ -1942,8 +1956,6 @@
 
        spaceContext.player.moveTo(destX, destY, TIMING.TURN_DELAY, () => {
          if (!skipAutoDock) {
-           // 【変更点】移動終了後、基地と接する位置（半径の合計＋余裕1px以内）にいて、
-           // かつクリックした目的地が基地であればドッキングする
            const dockDist = Phaser.Math.Distance.Between(
              spaceContext.player.x, spaceContext.player.y,
              spaceContext.starBase.x, spaceContext.starBase.y
@@ -1960,9 +1972,9 @@
            if (canDockNow) {
              dockShip(scene);
            }
-         } // if(!skipAutoDock)
+         }
          scene.time.delayedCall(delayBeforeEnemyTurn, () => npcTurn(scene));
-       }); // moveTo()
+       });
 
        updateStatus();
      } // attemptPlayerMove()
