@@ -767,7 +767,11 @@
       * 全ての艦船の基底クラス (SpaceShip)
       */
      class SpaceShip extends ObjWithShield {
-       constructor(scene, x, y, texture, shield, shield_color, scale, weapon_power, weapon_area_r, weapon_cost = 0) {
+       constructor(
+         scene, x, y, texture,
+         shield, shield_color, scale,
+         weapon_power, weapon_area_r, weapon_cost=0
+       ) {
          super(scene, x, y, texture, shield, shield_color, scale);
          this.weapon = new Weapon(weapon_power, weapon_area_r, weapon_cost);
        }
@@ -779,7 +783,12 @@
          const startX = this.x;
          const startY = this.y;
 
-         const targets = [spaceContext.starBase, ...spaceContext.federationShips, ...spaceContext.enemies, ...spaceContext.stars].filter(
+         const targets = [
+           spaceContext.starBase,
+           ...spaceContext.federationShips,
+           ...spaceContext.enemies,
+           ...spaceContext.stars
+         ].filter(
            e => e && e.active && e !== this && !ignoreObjs.includes(e)
          );
 
@@ -836,7 +845,7 @@
          let dy = desiredY - y;
          let reqDistSq = dx * dx + dy * dy;
          
-         // 【変更】グローバル関数ではなく自身の clampDest を呼び出す
+         // 【変更】自身の clampDest を呼び出す
          let directDest = this.clampDest(desiredX, desiredY, ignoreObjs);
          let directMoveSq = (directDest.x - x)**2 + (directDest.y - y)**2;
          
@@ -1825,6 +1834,9 @@
      /**
       *
       */
+/**
+      * ドッキング処理：自機を基地の「中央」に移動させる
+      */
      function dockShip(scene) {
        spaceContext.player.is_docked = true;
 
@@ -1832,24 +1844,11 @@
        spaceContext.player.shield = PlayerShip.SHIELD_MAX;
        spaceContext.player.energy = PlayerShip.ENERGY_MAX;
        
-       const angle = Phaser.Math.Angle.Between(
-         spaceContext.starBase.x,
-         spaceContext.starBase.y,
-         spaceContext.player.x,
-         spaceContext.player.y
-       );
-
-       const dockX =
-         spaceContext.starBase.x +
-         Math.cos(angle) * (StarBase.R - PlayerShip.R);
-       const dockY =
-         spaceContext.starBase.y +
-         Math.sin(angle) * (StarBase.R - PlayerShip.R);
-
+       // 【変更点】自機を基地の中心（X, Y）へ移動させる
        scene.tweens.add({
          targets: spaceContext.player,
-         x: dockX,
-         y: dockY,
+         x: spaceContext.starBase.x,
+         y: spaceContext.starBase.y,
          duration: 200,
          ease: 'Sine.easeInOut'
        });
@@ -1858,84 +1857,84 @@
      } // dockShip()
 
      /**
-      * 自機の移動処理（敵と同じステアリングロジックを適用）
+      * 自機の移動処理（新ドッキング仕様に対応）
       */
      function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
-       // console.log(`targetX=${targetX.toFixed(2)}, targetY=${targetY.toFixed(2)}`);
        let rawDist = Phaser.Math.Distance.Between(spaceContext.player.x, spaceContext.player.y, targetX, targetY);
-       // console.log(`rawDist=${rawDist}`);
-       if (rawDist < 1) {
-         return;
-       }
+       if (rawDist < 1) return;
        let moveDist = Math.min(rawDist, PlayerShip.SPEED);
-       // console.log(`moveDist=${rawDist}`);
 
-       // 基地がドッキング目的地かどうか判定
+       // 目的座標が「基地」そのもの（または基地の内部）をクリックしたか判定
        let target_is_base = false;
        let dist_target_base = Phaser.Math.Distance.Between(targetX, targetY, spaceContext.starBase.x, spaceContext.starBase.y);
-       if (dist_target_base <= StarBase.DOCKING_RANGE) {
+       if (dist_target_base <= StarBase.R) {
          target_is_base = true;
        }
-       console.log(`target_is_base=${target_is_base}`);
 
+       // 1. 直線ベクトルを計算（AIの avoidVec は不使用）
        let target = { x: targetX, y: targetY };
        let targetVec = spaceContext.player.getTargetVector(target, false);
-       // console.log(`targetVec=(${targetVec.x.toFixed(3)}, ${targetVec.y.toFixed(3)})`);
+       let desiredX = spaceContext.player.x + targetVec.x * moveDist;
+       let desiredY = spaceContext.player.y + targetVec.y * moveDist;
 
-       let obstacles = [...spaceContext.stars];
-       if (!canDock()) {
-         obstacles.push(spaceContext.starBase);
+       let destX, destY;
+       let skipAutoDock = false;
+
+       // 2. ドッキング解除時（離脱時）の特別ロジック
+       if (spaceContext.player.is_docked) {
+         spaceContext.player.is_docked = false;
+         skipAutoDock = true;
+         spaceContext.player.shield = PlayerShip.SHIELD_MAX;
+         setMsg("基地司令: ドッキング・クランプ解除");
+
+         // 【変更点】離脱時：基地を障害物とは見なさない
+         const ignoreObjs = [spaceContext.starBase];
+         const finalDest = spaceContext.player.resolveMovement(desiredX, desiredY, moveDist, ignoreObjs);
+         destX = finalDest.x;
+         destY = finalDest.y;
+
+         // 【変更点】目的地が「基地半径＋自機半径」以内の場合、基地に接する位置まで押し出す
+         const distFromBase = Phaser.Math.Distance.Between(spaceContext.starBase.x, spaceContext.starBase.y, destX, destY);
+         const minPushDist = StarBase.R + PlayerShip.R;
+         if (distFromBase < minPushDist) {
+           let pushAngle = Math.atan2(destY - spaceContext.starBase.y, destX - spaceContext.starBase.x);
+           destX = spaceContext.starBase.x + Math.cos(pushAngle) * minPushDist;
+           destY = spaceContext.starBase.y + Math.sin(pushAngle) * minPushDist;
+         }
+       } 
+       // 3. 通常移動およびドッキングを目的とする移動
+       else {
+         // 【変更点】目的地がどこであっても、基地を障害物として扱い、回避せずに接する位置で止める
+         // resolveMovement ではなく、めり込み停止機能のみを持つ clampDest を呼び出してストレートに止める
+         const finalDest = spaceContext.player.clampDest(desiredX, desiredY, []);
+         destX = finalDest.x;
+         destY = finalDest.y;
        }
-       let avoidVec = spaceContext.player.getAvoidanceVector(obstacles);
-       // console.log(`avoidVec=(${avoidVec.x.toFixed(3)}, ${avoidVec.y.toFixed(3)})`);
-
-       // ベクトル合成（敵と全く同じバランス）
-       let finalX = targetVec.x * 1.0 + avoidVec.x;
-       let finalY = targetVec.y * 1.0 + avoidVec.y;
-       let finalDist = Math.hypot(finalX, finalY);
-
-       if (finalDist < 0.001) {
-         let randomAngle = Math.random() * Math.PI * 2;
-         finalX = Math.cos(randomAngle);
-         finalY = Math.sin(randomAngle);
-         finalDist = 1.0;
-       }
-
-       // 正規化した方向に予定距離(moveDist)を掛ける
-       let desiredX = spaceContext.player.x + (finalX / finalDist) * moveDist;
-       let desiredY = spaceContext.player.y + (finalY / finalDist) * moveDist;
-
-       // resolveMovementでめり込みと最終的な迂回軌道を解決
-       const ignoreObjs = [spaceContext.starBase];
-       const finalDest = spaceContext.player.resolveMovement(desiredX, desiredY, moveDist, ignoreObjs);
-       let destX = finalDest.x;
-       let destY = finalDest.y;
 
        const actualDist = Phaser.Math.Distance.Between(
          spaceContext.player.x, spaceContext.player.y, destX, destY
        );
-       if (actualDist < 1) return;
+       
+       // スタック（完全停止）判定
+       if (actualDist < 0.1) {
+         setMsg("操舵手: 障害物に接近しすぎています。進路がクリアできません！", "#f00");
+         return;
+       }
 
        const speed_p = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
-       console.log(`actualDist=${actualDist.toFixed(1)}, ${speed_p}`);
-       
        let cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
        if ( spaceContext.player.energy - cost <= PlayerShip.ENERGY_MIN ) {
          setMsg("機関部: エネルギー不足で移動できません", '#ff0');
          return;
        }
 
-       // --- 以降は既存のエネルギー消費・ドッキング処理 ---
-       let skipAutoDock = false;
-       if (spaceContext.player.is_docked) {
-         spaceContext.player.is_docked = false;
-         skipAutoDock = true;
-         spaceContext.player.shield = PlayerShip.SHIELD_MAX;
-         setMsg("基地司令: ドッキング・クランプ解除");
-         updateStatus();
+       // 当初の目的座標と実際の移動到達点のズレを検知して報告
+       const shiftDist = Phaser.Math.Distance.Between(desiredX, desiredY, destX, destY);
+       if (shiftDist > 5.0 && !target_is_base) {
+         setMsg(`操舵手: 進路上に障害物を検知。安全距離にて停止します。出力 ${speed_p}%`, "#ff0");
+       } else {
+         setMsg(`操舵手: コースセット。インパルスエンジン出力 ${speed_p}%`);
        }
-
-       setMsg(`操舵手: コースセット。インパルスエンジン出力 ${speed_p}%`);
        updateStatus();
        
        spaceContext.player.energy -= cost;
@@ -1943,18 +1942,22 @@
 
        spaceContext.player.moveTo(destX, destY, TIMING.TURN_DELAY, () => {
          if (!skipAutoDock) {
+           // 【変更点】移動終了後、基地と接する位置（半径の合計＋余裕1px以内）にいて、
+           // かつクリックした目的地が基地であればドッキングする
            const dockDist = Phaser.Math.Distance.Between(
              spaceContext.player.x, spaceContext.player.y,
              spaceContext.starBase.x, spaceContext.starBase.y
            );
-           const canDock = (
+           const contactDist = StarBase.R + PlayerShip.R + 1.5;
+           
+           const canDockNow = (
              !spaceContext.player.is_docked 
-             && dockDist <= StarBase.DOCKING_RANGE 
+             && dockDist <= contactDist 
              && spaceContext.starBase.active 
              && spaceContext.starBase.shield > 0 
              && target_is_base
            );
-           if (canDock) {
+           if (canDockNow) {
              dockShip(scene);
            }
          } // if(!skipAutoDock)
