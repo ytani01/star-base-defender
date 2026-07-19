@@ -432,7 +432,12 @@
          return;
        }
 
-       msg = `T${g_turn}:` + msg;
+       s = String(g_curMission).padStart(3,"0");
+       s += ".";
+       s += String(g_turn).padStart(4,"0");
+       s += " "
+       s += msg;
+       msg = s;
 
        // 新しいログ行のDOM要素を作成
        const line = document.createElement('div');
@@ -1848,7 +1853,7 @@
          duration: 200,
          ease: 'Sine.easeInOut'
        });
-       setMsg("基地司令: ドッキング完了", "#0ff");
+       setMsg("基地司令: ドッキング完了。エネルギーを補給します。", "#0ff");
        updateStatus();
      } // dockShip()
 
@@ -2008,7 +2013,7 @@
        
        const context = npc.evaluateTactics();
        console.log(
-         npc.constructor.name, npc.shieldPercent().toFixed(3), npc.fear().toFixed(3), context
+         npc.constructor.name, "shield", npc.shieldPercent().toFixed(3), ", fear", npc.fear().toFixed(3), context
        );
 
        if (context.isFleeing) {
@@ -2209,7 +2214,7 @@
 
        g_pendingScene = scene;
 
-       setMsg(`司令部: ミッション #${clearedMission} 成功`);
+       setMsg(`司令部: ミッション #${clearedMission} クリア`, '#fff');
        scene.time.delayedCall(
          TIMING.MISSION_OVER, () => showHighScoreOverlay(
            'missionclear', { clearedMission, bonus, list, newIdx }
