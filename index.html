@@ -235,13 +235,9 @@
         <div id="turn">
           Turn
           <span id="statusMission">1</span>-<span id="statusTurn">1</span>
-          /
-          SCORE
-          <span id="statusScore">100</span>
-          /
-          <button class="panel-btn" id="viewScoresBtn">▶ SCORES</button>
-          /
-          <button class="panel-btn" id="misc1">▶ HELP</button>
+          <button class="panel-btn" id="viewScoresBtn">SCORE
+            <span id="statusScore">100</span>
+          </button>
         </div>
         <div id="statusShip">
           Shield 
@@ -253,14 +249,16 @@
           <span id="statusShipEnergy">0</span>
         </div>
         <div id="statusBase">
-          BaseStation: Shield
+          BaseStation Shield
           <div class="status-gauge"><div id="gaugeBaseShield" class="status-gauge-fill"></div></div>
           <span id="statusBaseShield">0</span>
         </div>
         <div id="shipCount">
-          Ships: 
-          <span id="statusFederationShip">Federation</span>
-          <span id="statusFederationShipCount">1</span>
+          Ships
+          <button class="panel-btn" id="misc1">
+            <span id="statusFederationShip">Federation</span>
+            <span id="statusFederationShipCount">1</span>
+          </button>
           /
           <span id="statusEnemyShip">Enemy</span>
           <span id="statusEnemyShipCount">1</span>
@@ -325,8 +323,8 @@
        ENEMY: 3,
      };
 
-     const NEW_ENEMY_INTERVAL = 30;
-     const NEW_FEDERATION_INTERVAL = 250;  // TBD
+     const NEW_ENEMY_INTERVAL = 25;
+     const NEW_FEDERATION_INTERVAL = 40;  // TBD
 
      const SCALE = 0.5;
 
@@ -365,6 +363,7 @@
      let g_flagClear = false;
      let g_pendingScene = null;
      let g_curScene = null;
+     let g_qty_federationShip = 0;
 
      let rangeGraphics, boundaryGraphics;
 
@@ -1351,7 +1350,7 @@
      } // class EnemyShip
 
      /**
-      * FederationShip (SpaceShip 継承)
+      * FederationShip
       */
      class FederationShip extends NPCShip {
        static W = 60;
@@ -1482,6 +1481,27 @@
 
      } // class PlayerShip
 
+     /**
+      * ズーム倍率変更
+      */
+     function changeZoom(scene, amount) {
+       let nextZoom = 1.0;
+       if ( amount > 0 ) {
+         nextZoom = CurZoom * amount;
+       }
+       if ( amount < 0 ) {
+         nextZoom = CurZoom / -amount;
+       }
+       CurZoom = Phaser.Math.Clamp(nextZoom, CAMERA.ZOOM_MIN, CAMERA.ZOOM_MAX);
+       
+       scene.tweens.add({
+         targets: scene.cameras.main,
+         zoom: CurZoom,
+         duration: 250,
+         ease: 'Sine.easeInOut'
+       });
+     } // changeZoom()
+
      // ---------------------------------------------------------
      // ゲーム(Phaser)初期化・ループ
      // ---------------------------------------------------------
@@ -1497,7 +1517,6 @@
        },
        scene: { preload, create, update }
      };
-
      new Phaser.Game(config);
 
      /**
@@ -1609,7 +1628,7 @@
 
        // Enemies
        spaceContext.enemies = [];
-       for (let i=0; i<QTY.ENEMY; i++) {
+       for (let i=0; i < QTY.ENEMY; i++) {
          let p = getSafeRandPos(0.6, 0.9);
          let e = new EnemyShip(this, p.x, p.y);
          spaceContext.addEnemy(e);
@@ -1617,6 +1636,9 @@
 
        // Federation
        spaceContext.federationShips = [];
+       for (let i=0; i < g_qty_federationShip; i++) {
+         newFederationShip(this);
+       }
        
        // Player
        let pp = getSafeRandPos(0.1, 0.3);
@@ -1644,39 +1666,22 @@
      } // create()
 
      /**
-      * ズーム倍率変更
-      */
-     function changeZoom(scene, amount) {
-       let nextZoom = 1.0;
-       if ( amount > 0 ) {
-         nextZoom = CurZoom * amount;
-       }
-       if ( amount < 0 ) {
-         nextZoom = CurZoom / -amount;
-       }
-       CurZoom = Phaser.Math.Clamp(nextZoom, CAMERA.ZOOM_MIN, CAMERA.ZOOM_MAX);
-       
-       scene.tweens.add({
-         targets: scene.cameras.main,
-         zoom: CurZoom,
-         duration: 250,
-         ease: 'Sine.easeInOut'
-       });
-     } // changeZoom()
-
-     /**
       * フレーム更新
       */
      function update() {
        rangeGraphics.clear();
 
        // 障害物リストをコンテキストから取得するように変更
-       const allObjects = [spaceContext.player, ...spaceContext.federationShips, ...spaceContext.enemies];
+       const allObjects = [
+         spaceContext.player, ...spaceContext.federationShips, ...spaceContext.enemies
+       ];
        
        allObjects.forEach((obj) => {
          if(!obj || !obj.active) return;
          
-         let color = (obj === spaceContext.player || obj instanceof FederationShip) ? 0x00ffff : 0xffff00;
+         let color = (
+           obj === spaceContext.player || obj instanceof FederationShip
+         ) ? 0x00ffff : 0xffff00;
 
          rangeGraphics.lineStyle(1, color, 0.5);
          rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.EffectiveRange());
@@ -1697,7 +1702,7 @@
      /**
       *
       */
-     function getSafeRandPos(minDist, maxDist){
+     function getSafeRandPos(dist_min, dist_max){
        let x, y, distToCenter;
        let safe = false;
        let attempts = 0;
@@ -1710,13 +1715,15 @@
          y = Phaser.Math.Between(AREA_CENTER.Y - AREA_R, AREA_CENTER.Y + AREA_R);
          distToCenter = Phaser.Math.Distance.Between(x, y, AREA_CENTER.X, AREA_CENTER.Y);
          
-         if ( distToCenter < AREA_R * minDist || distToCenter > AREA_R * maxDist ) {
+         if ( distToCenter < AREA_R * dist_min || distToCenter > AREA_R * dist_max ) {
            continue;
          }
          
          safe = true;
 
-         for(let s of [...spaceContext.stars, ...spaceContext.federationShips, ...spaceContext.enemies]) {
+         for(let s of [
+           ...spaceContext.stars, ...spaceContext.federationShips, ...spaceContext.enemies]
+         ) {
            if (s.active && Phaser.Math.Distance.Between(x, y, s.x, s.y) < MIN_SPAWN_DIST) {
              safe = false;
              break;
@@ -1834,7 +1841,9 @@
        }
 
        // 経路上に有効(active)な障害物が1つでもあれば false を返す (パターンB)
-       const hasObstacle = [...spaceContext.stars, ...spaceContext.enemies, ...spaceContext.federationShips].some(
+       const hasObstacle = [
+         ...spaceContext.stars, ...spaceContext.enemies, ...spaceContext.federationShips
+       ].some(
          obj => obj.active && hasObstacleOnPath(spaceContext.player, spaceContext.starBase, obj)
        );
        //console.log('hasObstacle=', hasObstacle);
@@ -1844,7 +1853,7 @@
      /**
       *
       */
-/**
+     /**
       * ドッキング処理：自機を基地の「中央」に移動させる
       */
      function dockShip(scene) {
@@ -1923,19 +1932,22 @@
          spaceContext.player.x, spaceContext.player.y, destX, destY
        );
        
-       // 【改修】スタック（完全停止）判定時の自動回避処理
+       // スタック（完全停止）判定時の自動回避処理
        if (actualDist < 0.1) {
          // 扇形探索（resolveMovement）を利用して迂回進路を再計算
-         const avoidDest = spaceContext.player.resolveMovement(desiredX, desiredY, moveDist, ignoreObjs);
+         const avoidDest = spaceContext.player.resolveMovement(
+           desiredX, desiredY, moveDist, ignoreObjs
+         );
          destX = avoidDest.x;
          destY = avoidDest.y;
          actualDist = Phaser.Math.Distance.Between(
            spaceContext.player.x, spaceContext.player.y, destX, destY
          );
 
-         // 迂回を試みても移動不能な場合（四方を完全に囲まれている場合など）のみキャンセル
+         // 迂回を試みても移動不能な場合（四方を完全に囲まれている場合など）キャンセル
          if (actualDist < 0.1) {
            setMsg("操舵手: 障害物に接近しすぎています。進路がクリアできません！", "#f00");
+           updateStatus();
            return;
          }
 
@@ -1947,13 +1959,14 @@
        let cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
        if ( spaceContext.player.energy - cost < 0 ) {
          setMsg("機関部: エネルギー不足で移動できません", '#ff0');
+         updateStatus();
          return;
        }
 
-       // 【改修】コース変更時のメッセージ分岐を追加
+       // コース変更時のメッセージ
        const shiftDist = Phaser.Math.Distance.Between(desiredX, desiredY, destX, destY);
        if (isRerouted) {
-         setMsg(`操舵手: 障害物を回避するため、進路を変更しました。インパルスエンジン出力 ${speed_p}%`, "#ff0");
+         setMsg(`操舵手: 障害物回避のため進路変更。インパルスエンジン出力 ${speed_p}%`, "#ff0");
        } else if (shiftDist > 5.0 && !target_is_base) {
          setMsg(`操舵手: 進路上に障害物を検知。安全距離にて停止します。出力 ${speed_p}%`, "#ff0");
        } else {
@@ -2038,7 +2051,12 @@
        
        const context = npc.evaluateTactics();
        console.log(
-         npc.constructor.name, "shield", npc.shieldPercent().toFixed(3), ", fear", npc.fear().toFixed(3), context
+         npc.constructor.name,
+         "shield",
+         npc.shieldPercent().toFixed(3),
+         ", fear",
+         npc.fear().toFixed(3),
+         context
        );
 
        if (context.isFleeing) {
@@ -2155,7 +2173,7 @@
          const p = getSafeRandPos(0.8, 0.95);
          const newFed = new FederationShip(scene, p.x, p.y);
          spaceContext.addFederation(newFed);
-         setMsg("戦術士官: 援軍が到着しました！", "#0f0");
+         setMsg("通信士: 援軍が到着しました！", "#0f0");
        }
 
        // 基地の回復
@@ -2165,7 +2183,9 @@
            StarBase.SHIELD_MAX,
            spaceContext.starBase.shield + (StarBase.SHIELD_MAX * StarBase.SHIELD_RECOVERY_RATE)
          ));
-         console.log(`spaceContext.starBase: ${prev_starbase_shield} --> ${spaceContext.starBase.shield}`);
+         console.log(
+           `spaceContext.starBase: ${prev_starbase_shield} --> ${spaceContext.starBase.shield}`
+         );
        }
 
        updateStatus(); 
@@ -2223,11 +2243,14 @@
      function nextMission(scene) {
        const clearedMission = g_curMission;
        let bonus = g_curMission * 100;
-       if ( g_score > 0 ) {
-         bonus += g_score;
-       }
-       console.log(`nextMission> bonus=${bonus}`);
        g_score += bonus;
+       console.log(`nextMission> bonus=${bonus}, g_score=${g_score}`);
+
+       g_qty_federationShip = spaceContext.federationShips.filter(o => o.active).length;
+       if ( g_turn < NEW_ENEMY_INTERVAL ) {
+         g_qty_federationShip++;
+       }
+       console.log(`nextMission> g_qty_federationShip=${g_qty_federationShip}`);
 
        const { list, newIdx } = saveHighScore(
          g_score, g_turn, clearedMission, `MISSION #${clearedMission} CLEARED`, true
@@ -2361,7 +2384,7 @@
        if (mode === 'missionclear') {
          const { clearedMission, bonus, list, newIdx } = data;
          resultEl.style.color      = '#0f0';
-         resultEl.textContent      = `✓ MISSION ${clearedMission} CLEARED!`;
+         resultEl.textContent      = `✓ MISSION #${clearedMission} CLEARED!`;
          finalEl.textContent       = `TURNS:${g_turn}, MISSION BONUS:+${bonus}, SCORE: ${g_score}`;
          renderHSTable(list);
          closeBtn.style.display    = 'none';
@@ -2372,7 +2395,7 @@
          resultEl.style.color      = '#ff0';
          resultEl.textContent      = msg;
          finalEl.textContent       = `MISSION FAILED: SCORE: ${g_score}  ` +
-                                     `MISSION: ${g_curMission}  TURNS: ${g_turn}`;
+                                     `MISSION #${g_curMission}  TURNS: ${g_turn}`;
          renderHSTable(loadHighScores());
          closeBtn.style.display    = 'none';
          restartBtn.textContent    = '▶ RESTART';
@@ -2380,12 +2403,13 @@
        } else {
          resultEl.style.color      = '#0ff';
          resultEl.textContent      = '▶ HIGH SCORES ◀';
-         finalEl.textContent       = `NOW — SCORE: ${g_score}   ` +
-                                     `MISSION: ${g_curMission}   TURN: ${g_turn}`;
-         renderHSTable(loadHighScores());
+         finalEl.textContent       = `NOW — ` +
+                                     `MISSION #${g_curMission} TURN: ${g_turn} - ` +
+                                     `SCORE:${g_score}`;
          closeBtn.style.display    = 'inline-block';
          restartBtn.textContent    = '▶ RESTART';
          restartBtn.style.display  = 'inline-block';
+         renderHSTable(loadHighScores());
        }
        overlay.style.display = 'flex';
      } // showHighScoreOverlay()
@@ -2411,7 +2435,6 @@
      document.getElementById('hsCloseBtn').addEventListener('click', () => {
        document.getElementById('highScoreOverlay').style.display = 'none';
      });
-
     </script>
   </body>
 </html>
