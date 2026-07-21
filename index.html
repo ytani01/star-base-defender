@@ -325,7 +325,7 @@
 
      const NEW_ENEMY_INTERVAL = 25;
      const NEW_FEDERATION_INTERVAL = 40;  // TBD
-
+     
      const SCALE = 0.5;
 
      const AREA_R = 300;
@@ -1216,7 +1216,7 @@
        // 基地に対するクリック操作
        onInteract(player, scene, endTurn) {
          if (player.is_docked) {
-           setMsg("基地司令: ドッキング中。いつでも出撃できます。");
+           setMsg("基地: ドッキング中。いつでも出撃できます。");
            endTurn();
            return true;
          }
@@ -1283,15 +1283,15 @@
            updateStatus();
          }
          if (target === spaceContext.starBase && t_shield_p < 60) {
-           setMsg(`基地司令: シールド ${t_shield_p}%、至急救援を求む！`, "#ff0");
+           setMsg(`基地: シールド ${t_shield_p}%、至急救援を求む！`, "#ff0");
            if (t_shield_p <= 30) {
-             setMsg(`基地司令: シールド ${t_shield_p}%、至急救援を求む！`, "#f00");
+             setMsg(`基地: シールド ${t_shield_p}%、至急救援を求む！`, "#f00");
            }
            updateStatus();
          }
          if (target.shield <= 0 && !gameState.isGameOver) {
            if (target === spaceContext.starBase) {
-             gameOver("基地司令: シールド消失！！ 基地が崩壊...");
+             gameOver("基地: シールド消失！！ 基地が崩壊...");
            } else if (target === spaceContext.player) {
              gameOver("機関部: シールド消失！！ 船体が崩壊...");
            } else if (target instanceof FederationShip) { // 【修正】配列比較のバグを解消
@@ -1533,8 +1533,8 @@
      /**
       *
       */
-     function newFederationShip(scene) {
-       let p = getSafeRandPos(0.3, 0.6);
+     function newFederationShip(scene, dist_min, dist_max) {
+       let p = getSafeRandPos(dist_min, dist_max);
        const newFed = new FederationShip(scene, p.x, p.y);
        spaceContext.addFederation(newFed);
        updateStatus();
@@ -1648,7 +1648,7 @@
        // Federation
        spaceContext.federationShips = [];
        for (let i=0; i < gameState.qtyFederationShip; i++) {
-         newFederationShip(this);
+         newFederationShip(this, 0.3, 0.6);
        }
        
        // Player
@@ -1882,7 +1882,7 @@
          duration: 200,
          ease: 'Sine.easeInOut'
        });
-       setMsg("基地司令: ドッキング完了。エネルギーを補給します。", "#0ff");
+       setMsg("基地: ドッキング完了。エネルギーを補給します。", "#0ff");
        updateStatus();
      } // dockShip()
 
@@ -1917,7 +1917,7 @@
          spaceContext.player.is_docked = false;
          skipAutoDock = true;
          spaceContext.player.shield = PlayerShip.SHIELD_MAX;
-         setMsg("基地司令: ドッキング・クランプ解除");
+         setMsg("基地: ドッキング・クランプ解除");
 
          ignoreObjs = [spaceContext.starBase];
          const finalDest = spaceContext.player.resolveMovement(desiredX, desiredY, moveDist, ignoreObjs);
@@ -2184,10 +2184,8 @@
          setMsg("戦術士官: 新たな敵が出現しました！", "#ff0")
        }
        if ( gameState.turn % NEW_FEDERATION_INTERVAL === 0 ) {
-         const p = getSafeRandPos(0.8, 0.95);
-         const newFed = new FederationShip(scene, p.x, p.y);
-         spaceContext.addFederation(newFed);
-         setMsg("通信士: 援軍が到着しました！", "#0f0");
+         setMsg("通信士: 味方の援軍が到着しました！", "#0f0");
+         newFederationShip(scene, 0.8, 0.95);
        }
 
        // 基地の回復
