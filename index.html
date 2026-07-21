@@ -355,15 +355,26 @@
        STORAGE_KEY: 'starbaseDefenderScores'
      };
 
-     let g_turn = 1;
-     let g_curMission = 1;
-     let g_score = SCORE.INIT;
-     let g_isPlayerTurn = true;
-     let g_isGameOver = false;
-     let g_flagClear = false;
-     let g_pendingScene = null;
-     let g_curScene = null;
-     let g_qty_federationShip = 0;
+     /**
+      * ゲーム進行状態（ターン・スコア・ミッション進行・シーン参照など）を
+      * カプセル化するクラス。spaceContext と同様、単一インスタンスとして扱う。
+      */
+     class GameState {
+       constructor() {
+         this.turn = 1;
+         this.curMission = 1;
+         this.score = SCORE.INIT;
+         this.isPlayerTurn = true;
+         this.isGameOver = false;
+         this.flagClear = false;
+         this.pendingScene = null;
+         this.curScene = null;
+         this.qtyFederationShip = 0;
+       }
+     } // class GameState
+
+     // グローバルなゲーム進行状態インスタンス
+     const gameState = new GameState();
 
      let rangeGraphics, boundaryGraphics;
 
@@ -431,9 +442,9 @@
          return;
        }
 
-       s = String(g_curMission).padStart(3,"0");
+       s = String(gameState.curMission).padStart(3,"0");
        s += ".";
-       s += String(g_turn).padStart(4,"0");
+       s += String(gameState.turn).padStart(4,"0");
        s += " "
        s += msg;
        msg = s;
@@ -741,7 +752,7 @@
        takeDamage(amount) {
          this.shield -= amount;
          if (this.shield <= 0) {
-           g_score -= SCORE.DESTROY_PENALTY;
+           gameState.score -= SCORE.DESTROY_PENALTY;
            this.die();
          }
        } // takeDamage()
@@ -1278,7 +1289,7 @@
            }
            updateStatus();
          }
-         if (target.shield <= 0 && !g_isGameOver) {
+         if (target.shield <= 0 && !gameState.isGameOver) {
            if (target === spaceContext.starBase) {
              gameOver("基地司令: シールド消失！！ 基地が崩壊...");
            } else if (target === spaceContext.player) {
@@ -1608,7 +1619,7 @@
       * 初期画面表示
       */
      function create() {
-       g_curScene = this;
+       gameState.curScene = this;
        rangeGraphics = this.add.graphics();
        boundaryGraphics = this.add.graphics();
        drawBoundary();
@@ -1636,7 +1647,7 @@
 
        // Federation
        spaceContext.federationShips = [];
-       for (let i=0; i < g_qty_federationShip; i++) {
+       for (let i=0; i < gameState.qtyFederationShip; i++) {
          newFederationShip(this);
        }
        
@@ -1777,7 +1788,7 @@
       *
       */
      function handlePointerDown(pointer) {
-       if (g_isGameOver || !g_isPlayerTurn) return;
+       if (gameState.isGameOver || !gameState.isPlayerTurn) return;
 
        // 宇宙域外は無視
        if (
@@ -1802,7 +1813,7 @@
        }
 
        const endTurn = () => {
-         g_isPlayerTurn = false;
+         gameState.isPlayerTurn = false;
          this.time.delayedCall(TIMING.TURN_DELAY, () => npcTurn(this));
          updateStatus();
        };
@@ -1975,7 +1986,7 @@
        updateStatus();
        
        spaceContext.player.energy -= cost;
-       g_isPlayerTurn = false;
+       gameState.isPlayerTurn = false;
 
        spaceContext.player.moveTo(destX, destY, TIMING.TURN_DELAY, () => {
          if (!skipAutoDock) {
@@ -2021,7 +2032,7 @@
       * NPCターン全体の制御（エントリーポイント）
       */
      function npcTurn(scene) {
-       if (g_isGameOver) {
+       if (gameState.isGameOver) {
          return;
        }
 
@@ -2047,7 +2058,7 @@
       */
      function execNPCAction(scene, npc) {
        //console.log(`=== execNPCAction: ${npc.constructor.name} ===`);
-       if (g_isGameOver || !npc.active) return;
+       if (gameState.isGameOver || !npc.active) return;
        
        const context = npc.evaluateTactics();
        console.log(
@@ -2107,7 +2118,7 @@
              spaceContext.enemies.forEach(e => {
                e.spirit = Math.max(EnemyShip.SPIRIT.MIN, e.spirit - EnemyShip.SPIRIT.STEP);
              });
-             if (!g_isGameOver) {
+             if (!gameState.isGameOver) {
                if (getActiveEnemyCount() > 0) {
                  setMsg(
                    `副長: 敵艦がセクター外へ離脱。あと、${getActiveEnemyCount()}隻です。`, "#0f0"
@@ -2144,20 +2155,20 @@
      function finalizeEnemyTurn(scene) {
        spaceContext.enemies = spaceContext.enemies.filter(e => e.active);
        
-       if (spaceContext.enemies.length === 0 && !g_isGameOver) {
+       if (spaceContext.enemies.length === 0 && !gameState.isGameOver) {
          nextMission(scene);
          return;
        }
 
-       if ( g_isGameOver ) {
+       if ( gameState.isGameOver ) {
          return;
        }
 
-       g_turn++;
-       g_score--;
+       gameState.turn++;
+       gameState.score--;
 
        // 増援の出現
-       if (g_turn % NEW_ENEMY_INTERVAL === 0) {
+       if (gameState.turn % NEW_ENEMY_INTERVAL === 0) {
          const p = getSafeRandPos(0.8, 0.95);
          const newEnemy = new EnemyShip(scene, p.x, p.y);
          spaceContext.addEnemy(newEnemy);
@@ -2169,7 +2180,7 @@
          });
          setMsg("戦術士官: 新たな敵が出現しました！", "#ff0")
        }
-       if ( g_turn % NEW_FEDERATION_INTERVAL === 0 ) {
+       if ( gameState.turn % NEW_FEDERATION_INTERVAL === 0 ) {
          const p = getSafeRandPos(0.8, 0.95);
          const newFed = new FederationShip(scene, p.x, p.y);
          spaceContext.addFederation(newFed);
@@ -2189,7 +2200,7 @@
        }
 
        updateStatus(); 
-       g_isPlayerTurn = true;
+       gameState.isPlayerTurn = true;
      } // finalizeEnemyTurn()
 
      /**
@@ -2202,9 +2213,9 @@
        const federationCount = getActiveFederationShipCount();
        const enemyCount = getActiveEnemyCount();
 
-       document.getElementById('statusTurn').textContent = `${g_turn}`;
-       document.getElementById('statusMission').textContent = `${g_curMission}`;
-       document.getElementById('statusScore').textContent = `${g_score}`;
+       document.getElementById('statusTurn').textContent = `${gameState.turn}`;
+       document.getElementById('statusMission').textContent = `${gameState.curMission}`;
+       document.getElementById('statusScore').textContent = `${gameState.score}`;
 
        document.getElementById('statusFederationShipCount').style.color = "#ff0"
        document.getElementById('statusFederationShipCount').textContent = `${federationCount}`;
@@ -2241,26 +2252,26 @@
       * 次のステージに移行
       */
      function nextMission(scene) {
-       const clearedMission = g_curMission;
-       let bonus = g_curMission * 100;
-       g_score += bonus;
-       console.log(`nextMission> bonus=${bonus}, g_score=${g_score}`);
+       const clearedMission = gameState.curMission;
+       let bonus = gameState.curMission * 100;
+       gameState.score += bonus;
+       console.log(`nextMission> bonus=${bonus}, gameState.score=${gameState.score}`);
 
-       g_qty_federationShip = spaceContext.federationShips.filter(o => o.active).length;
-       if ( g_turn < NEW_ENEMY_INTERVAL ) {
-         g_qty_federationShip++;
+       gameState.qtyFederationShip = spaceContext.federationShips.filter(o => o.active).length;
+       if ( gameState.turn < NEW_ENEMY_INTERVAL ) {
+         gameState.qtyFederationShip++;
        }
-       console.log(`nextMission> g_qty_federationShip=${g_qty_federationShip}`);
+       console.log(`nextMission> gameState.qtyFederationShip=${gameState.qtyFederationShip}`);
 
        const { list, newIdx } = saveHighScore(
-         g_score, g_turn, clearedMission, `MISSION #${clearedMission} CLEARED`, true
+         gameState.score, gameState.turn, clearedMission, `MISSION #${clearedMission} CLEARED`, true
        );
 
-       g_curMission++;
+       gameState.curMission++;
        QTY.ENEMY++;
-       g_isPlayerTurn = false;
+       gameState.isPlayerTurn = false;
 
-       g_pendingScene = scene;
+       gameState.pendingScene = scene;
 
        setMsg(`司令部: ミッション #${clearedMission} クリア`, '#fff');
        scene.time.delayedCall(
@@ -2274,9 +2285,9 @@
       * ゲームオーバー
       */
      function gameOver(msg, clear=false) {
-       g_isGameOver = true;
-       g_flagClear = clear;
-       g_isPlayerTurn = false;
+       gameState.isGameOver = true;
+       gameState.flagClear = clear;
+       gameState.isPlayerTurn = false;
        setMsg('', "#000");
        updateStatus();
        setTimeout(() => showHighScoreOverlay('gameover', { msg }), TIMING.MISSION_OVER);
@@ -2299,7 +2310,7 @@
          String(now.getMonth() + 1).padStart(2, '0'),
          String(now.getDate()).padStart(2, '0')
        ].join('/');
-       if ( g_flagClear || forceSave ) {
+       if ( gameState.flagClear || forceSave ) {
          list.push({
            score, turns, mission, result,
            gameid: GAME_ID, date: dateStr, _new: true
@@ -2347,26 +2358,26 @@
          // ★追加: 行をクリックした際の処理
          tr.addEventListener('click', () => {
            // スコアを引き継ぐ
-           g_score = s.score;
+           gameState.score = s.score;
            // 記録されたステージの次からスタートする
-           g_curMission = (s.mission !== undefined ? s.mission : 1) + 1;
-           g_turn = 1;
+           gameState.curMission = (s.mission !== undefined ? s.mission : 1) + 1;
+           gameState.turn = 1;
            
            // 敵の初期生成数を、進行するステージに合わせて再計算
            // (初期値3 + ステージ進行分)
-           QTY.ENEMY = 3 + (g_curMission - 1);
+           QTY.ENEMY = 3 + (gameState.curMission - 1);
            
-           g_isGameOver = false;
-           g_flagClear = false;
-           g_isPlayerTurn = true;
-           g_pendingScene = null;
+           gameState.isGameOver = false;
+           gameState.flagClear = false;
+           gameState.isPlayerTurn = true;
+           gameState.pendingScene = null;
            
            // オーバーレイを非表示にする
            document.getElementById('highScoreOverlay').style.display = 'none';
            
            // シーンを再起動
-           if (g_curScene) {
-             g_curScene.scene.restart();
+           if (gameState.curScene) {
+             gameState.curScene.scene.restart();
            }
          });
 
@@ -2385,7 +2396,7 @@
          const { clearedMission, bonus, list, newIdx } = data;
          resultEl.style.color      = '#0f0';
          resultEl.textContent      = `✓ MISSION #${clearedMission} CLEARED!`;
-         finalEl.textContent       = `TURNS:${g_turn}, MISSION BONUS:+${bonus}, SCORE: ${g_score}`;
+         finalEl.textContent       = `TURNS:${gameState.turn}, MISSION BONUS:+${bonus}, SCORE: ${gameState.score}`;
          renderHSTable(list);
          closeBtn.style.display    = 'none';
          restartBtn.textContent    = '▶ NEXT MISSION';
@@ -2394,8 +2405,8 @@
          const { msg } = data;
          resultEl.style.color      = '#ff0';
          resultEl.textContent      = msg;
-         finalEl.textContent       = `MISSION FAILED: SCORE: ${g_score}  ` +
-                                     `MISSION #${g_curMission}  TURNS: ${g_turn}`;
+         finalEl.textContent       = `MISSION FAILED: SCORE: ${gameState.score}  ` +
+                                     `MISSION #${gameState.curMission}  TURNS: ${gameState.turn}`;
          renderHSTable(loadHighScores());
          closeBtn.style.display    = 'none';
          restartBtn.textContent    = '▶ RESTART';
@@ -2404,8 +2415,8 @@
          resultEl.style.color      = '#0ff';
          resultEl.textContent      = '▶ HIGH SCORES ◀';
          finalEl.textContent       = `NOW — ` +
-                                     `MISSION #${g_curMission} TURN: ${g_turn} - ` +
-                                     `SCORE:${g_score}`;
+                                     `MISSION #${gameState.curMission} TURN: ${gameState.turn} - ` +
+                                     `SCORE:${gameState.score}`;
          closeBtn.style.display    = 'inline-block';
          restartBtn.textContent    = '▶ RESTART';
          restartBtn.style.display  = 'inline-block';
@@ -2417,15 +2428,15 @@
      document.getElementById('viewScoresBtn').addEventListener('click', () => {
        showHighScoreOverlay('view');
      });
-     document.getElementById('misc1').onclick = () => newFederationShip(g_curScene);
+     document.getElementById('misc1').onclick = () => newFederationShip(gameState.curScene);
 
      document.getElementById('hsRestartBtn').addEventListener('click', () => {
-       if (g_pendingScene) {
+       if (gameState.pendingScene) {
          document.getElementById('highScoreOverlay').style.display = 'none';
-         g_turn = 1;
-         const s = g_pendingScene;
-         g_pendingScene = null;
-         g_isPlayerTurn = true;
+         gameState.turn = 1;
+         const s = gameState.pendingScene;
+         gameState.pendingScene = null;
+         gameState.isPlayerTurn = true;
          s.scene.restart();
        } else {
          location.reload();
