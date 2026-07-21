@@ -1957,7 +1957,7 @@
 
          // 迂回を試みても移動不能な場合（四方を完全に囲まれている場合など）キャンセル
          if (actualDist < 0.1) {
-           setMsg("操舵手: 障害物に接近しすぎています。進路がクリアできません！", "#f00");
+           setMsg("操舵手: 障害物に接近しすぎています。コース設定できません。", "#0f0");
            updateStatus();
            return;
          }
@@ -2113,6 +2113,7 @@
            npc.die();
            if (npc instanceof FederationShip) {
              setMsg("通信士: 連邦艦がセクター外へ離脱しました。", "#88f");
+             gameState.score -= SCORE.DESTROY_PENALTY;
            }
            if (npc instanceof EnemyShip) {
              spaceContext.enemies.forEach(e => {
@@ -2165,7 +2166,9 @@
        }
 
        gameState.turn++;
-       gameState.score--;
+       // 減点
+       gameState.score -= spaceContext.enemies.filter(e => e.active).length;
+       gameState.score -= spaceContext.federationShips.filter(e => e.active).length;
 
        // 増援の出現
        if (gameState.turn % NEW_ENEMY_INTERVAL === 0) {
@@ -2258,9 +2261,9 @@
        console.log(`nextMission> bonus=${bonus}, gameState.score=${gameState.score}`);
 
        gameState.qtyFederationShip = spaceContext.federationShips.filter(o => o.active).length;
-       if ( gameState.turn < NEW_ENEMY_INTERVAL ) {
-         gameState.qtyFederationShip++;
-       }
+       /* if ( gameState.turn < NEW_ENEMY_INTERVAL ) {
+        *   gameState.qtyFederationShip++;
+        * } */
        console.log(`nextMission> gameState.qtyFederationShip=${gameState.qtyFederationShip}`);
 
        const { list, newIdx } = saveHighScore(
