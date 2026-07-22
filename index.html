@@ -950,35 +950,32 @@
              }
            });
            if ( this instanceof FederationShip ) {
-             spaceContext.federationShips.forEach(t => {
-               if ( this === t ) return;
+             let obj = [...spaceContext.federationShips].filter(f => f !==this);
+             obj.push(spaceContext.starBase);
+             obj.push(spaceContext.player);
+             console.log(obj);
+             obj.forEach(t => {
                let dx = t.x - this.x;
                let dy = t.y - this.y;
                let dist = Math.hypot(dx, dy);
                if (dist > 0.001) {
                  let weight = 1.0 / dist;
+                 if ( t === spaceContext.player ) {
+                   weight *= 2;
+                 }
+                 if ( t === spaceContext.starBase ) {
+                   weight *= 3;
+                 }
                  dirX += (dx / dist) * weight;
                  dirY += (dy / dist) * weight;
                }
              });
-
-             let dx = spaceContext.starBase.x - this.x;
-             let dy = spaceContext.starBase.y - this.y;
-             let dist = Math.hypot(dx, dy);
-             dirX += dx / dist / dist;
-             dirY += dy / dist / dist;
-
-             dx = spaceContext.player.x - this.x;
-             dy = spaceContext.player.y - this.y;
-             dist = Math.hypot(dx, dy);
-             dirX += dx / dist / dist;
-             dirY += dy / dist / dist;
            }
            let fDist = Math.hypot(dirX, dirY);
            if (fDist > 0.000001) {
              dirX /= fDist;
              dirY /= fDist;
-           }
+           } // if (FederationShip)
          } else {
            let dx = target.x - this.x;
            let dy = target.y - this.y;
@@ -1276,7 +1273,7 @@
 
          if (target === spaceContext.player && t_shield_p < 60) {
            if (t_shield_p > 30) {
-             setMsg(`機関部: シールド ${t_shield_p}%`, "#ff0");
+             setMsg(`機関部: シールド ${t_shield_p}% に低下`, "#ff0");
            } else {
              setMsg(`機関部: 艦長！シールド ${t_shield_p}% 危険です！`, "#f00");
            }
@@ -1339,7 +1336,7 @@
          }
 
          // 命中
-         setMsg("戦術士官: 攻撃命中！ 敵艦シールド低下！", "#f80");
+         //setMsg("戦術士官: 攻撃命中！ 敵艦シールド低下！", "#f80");
          const damage = player.weapon.CalcDamage(dist);
          this.takeDamage(damage);
          fireBeam(scene, player, this, 0x00ffff);
@@ -1347,11 +1344,9 @@
          if (!this.active) {
            // 撃墜
            spaceContext.removeEnemy(this);
-           
            const rp = getSafeRandPos(0.8, 0.95);
            const newEnemy = new EnemyShip(scene, rp.x, rp.y);
            spaceContext.addEnemy(newEnemy);
-           
            setMsg("戦術士官: 敵艦を撃破！ 別の新たな敵艦を検知しました！", "#ff0");
          }
          endTurn();
@@ -1378,7 +1373,7 @@
        };
 
        static SPIRIT = {
-         INIT: 0.5,
+         INIT: 0.4,
          MIN: 0.3,
          MAX: 0.7,
          STEP: -0.00,
@@ -1533,7 +1528,7 @@
      /**
       *
       */
-     function newFederationShip(scene, dist_min, dist_max) {
+     function newFederationShip(scene, dist_min=0.3, dist_max=0.6) {
        let p = getSafeRandPos(dist_min, dist_max);
        const newFed = new FederationShip(scene, p.x, p.y);
        spaceContext.addFederation(newFed);
@@ -1981,7 +1976,7 @@
        } else if (shiftDist > 5.0 && !target_is_base) {
          setMsg(`操舵手: 進路上に障害物を検知。安全距離にて停止します。出力 ${speed_p}%`, "#ff0");
        } else {
-         setMsg(`操舵手: コースセット。インパルスエンジン出力 ${speed_p}%`);
+         //setMsg(`操舵手: コースセット。インパルスエンジン出力 ${speed_p}%`);
        }
        updateStatus();
        
