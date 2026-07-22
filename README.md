@@ -7,7 +7,7 @@
 
 [**<< Play ! >>**](https://ytani01.github.io/star-base-defender/)
 
-![screenshot1](docs/screenshot1.png)
+[![screenshot1](docs/screenshot1.png)](https://ytani01.github.io/star-base-defender/)
 
 ## 重要事項
 
