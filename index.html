@@ -106,10 +106,17 @@
        position: relative;
        flex: 1;
        min-height: 0;
+       display: flex;             /* 追加: フレックスボックス化 */
+       justify-content: flex-start; /* 追加: 左詰め */
+       align-items: flex-start;     /* 追加: 上詰め */
+       background: #000;          /* 余白部分を黒に */
      }
      #gameCanvas {
        width: 100%;
        height: 100%;
+       max-width: 100%;
+       max-height: 100%;
+       aspect-ratio: 1 / 1;       /* 追加: 常に正方形を保つことで見切れと間延びを防止 */
      }
 
      #zoomUI {
@@ -264,6 +271,21 @@
        color: #000;
      }
 
+     @media (orientation: landscape) {
+       #gameContainer {
+         flex-direction: row;
+       }
+       #statusPanel {
+         width: 320px; /* 適切な固定幅を指定 */
+         height: 100vh;
+         border-bottom: none;
+         border-right: 2px solid var(--color-accent);
+       }
+       /* 横長画面でのパネル内のフォントサイズ微調整 */
+       :root {
+         --panel-font-size: clamp(16px, 2vw, 22px);
+       }
+     }
     </style>
   </head>
   <body>
@@ -280,30 +302,30 @@
             <span id="statusScore">100</span>
           </button>
         </div>
-        <div id="statusShip">
+        <div id="statusShip1">
           Shield 
           <div class="status-gauge"><div id="gaugeShipShield" class="status-gauge-fill"></div></div>
           <span id="statusShipShield">0</span>
-          /
+        </div>
+        <div id="statusShip2">
           Energy
           <div class="status-gauge"><div id="gaugeShipEnergy" class="status-gauge-fill"></div></div>
           <span id="statusShipEnergy">0</span>
         </div>
         <div id="statusBase">
-          BaseStation Shield
+          Base Shield
           <div class="status-gauge"><div id="gaugeBaseShield" class="status-gauge-fill"></div></div>
           <span id="statusBaseShield">0</span>
         </div>
-        <div id="shipCount">
-          Ships
-          <button class="panel-btn" id="misc1">
-            <span id="statusFederationShip">Federation</span>
-            <span id="statusFederationShipCount">1</span>
-          </button>
-          /
+        <div id="shipCount1">
+          <span id="statusFederationShip">Federation</span>
+          <span id="statusFederationShipCount">1</span>
+        </div>
+        <div id="shipCount2">
           <span id="statusEnemyShip">Enemy</span>
           <span id="statusEnemyShipCount">1</span>
         </div>
+        <button class="panel-btn" id="misc1">----</button>
         <div id="logStatus"></div>
       </div>
       
@@ -1534,14 +1556,18 @@
       * ズーム倍率変更
       */
      function changeZoom(scene, amount) {
-       let nextZoom = 1.0;
-       if ( amount > 0 ) {
+       let nextZoom = CurZoom;
+       if (amount > 0) {
          nextZoom = CurZoom * amount;
-       }
-       if ( amount < 0 ) {
+       } else if (amount < 0) {
          nextZoom = CurZoom / -amount;
        }
-       CurZoom = Phaser.Math.Clamp(nextZoom, CAMERA.ZOOM_MIN, CAMERA.ZOOM_MAX);
+       
+       // 最小倍率を 1.0 に強制固定（1倍以下はない）
+       CurZoom = Phaser.Math.Clamp(nextZoom, 1.0, CAMERA.ZOOM_MAX);
+       
+       // ターゲットの切り替えを実行
+       updateCameraTarget(scene);
        
        scene.tweens.add({
          targets: scene.cameras.main,
@@ -1654,6 +1680,22 @@
      } // preload()
 
      /**
+      * ズーム倍率に応じてカメラのターゲットを切り替える
+      */
+     function updateCameraTarget(scene) {
+       // 1倍以下のズーム倍率は存在しないように制限
+       if (CurZoom <= 1.0) {
+         CurZoom = 1.0;
+         // 1倍のときはスターベース（AREA_CENTER）を中心とし、追従を解除
+         scene.cameras.main.stopFollow();
+         scene.cameras.main.centerOn(AREA_CENTER.X, AREA_CENTER.Y);
+       } else {
+         // 1倍より大きい（2倍、4倍など）ときは自機を中心に追従（見切れ許容）
+         scene.cameras.main.startFollow(spaceContext.player.sprite, true, 0.1, 0.1);
+       }
+     }
+
+     /**
       * 初期画面表示
       */
      function create() {
@@ -1694,8 +1736,11 @@
        spaceContext.player = new PlayerShip(this, pp.x, pp.y);
 
        // Camera
-       this.cameras.main.setBounds(0, 0, PLAY_AREA.WIDTH, PLAY_AREA.HEIGHT);
-       this.cameras.main.startFollow(spaceContext.player.sprite, true, 0.08, 0.08);
+       this.cameras.main.removeBounds();
+       // 初期倍率を1.0倍とし、ターゲット切り替え関数を適用する
+       CurZoom = 1.0;
+       this.cameras.main.setZoom(CurZoom);
+       updateCameraTarget(this);
 
        updateStatus();
 
