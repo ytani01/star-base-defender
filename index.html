@@ -949,6 +949,7 @@
                dirY += (dy / dist) * weight;
              }
            });
+           // FederationShipの場合、StarBaseやPlayerShipに近づくようにする。
            if ( this instanceof FederationShip ) {
              let obj = [...spaceContext.federationShips].filter(f => f !==this);
              obj.push(spaceContext.starBase);
@@ -964,13 +965,14 @@
                    weight *= 2;
                  }
                  if ( t === spaceContext.starBase ) {
-                   weight *= 3;
+                   weight *= 4;
                  }
                  dirX += (dx / dist) * weight;
                  dirY += (dy / dist) * weight;
                }
              });
-           }
+           } // if (FederationShip)
+
            let fDist = Math.hypot(dirX, dirY);
            if (fDist > 0.000001) {
              dirX /= fDist;
@@ -1171,7 +1173,7 @@
        static W = 40;
        static R = Star.W / 2 * SCALE;
        static RANGE = {
-         MIN: 0.20,
+         MIN: 0.25,
          MAX: 0.85,
        };
        constructor(scene, x, y) {
@@ -1364,7 +1366,7 @@
        static SPEED = 90 * SCALE;
 
        static SHIELD_MAX = 600;
-       static SHIELD_RECOVERY_RATE = 0.03;
+       static SHIELD_RECOVERY_RATE = 0.005;
        static SHIELD_COLOR = 0xffffff;
 
        static WEAPON = {
@@ -1373,7 +1375,7 @@
        };
 
        static SPIRIT = {
-         INIT: 0.4,
+         INIT: 0.40,
          MIN: 0.3,
          MAX: 0.7,
          STEP: -0.00,
@@ -2077,26 +2079,41 @@
      /**
       * NPC 移動処理とシールド回復
       */
+     /**
+      * NPC 移動処理とシールド回復
+      */
      function npcMove(scene, npc, context) {
-       let targetDest;
+       let dest;
+       let isDocking = false;
+
+       const base = spaceContext.starBase;
+       const isBaseActive = base && base.active && base.shield > 0;
 
        if (context.isFleeing) {
-         let threats = [spaceContext.player, spaceContext.starBase];
-         if ( npc instanceof FederationShip ) {
-           threats = spaceContext.enemies.filter(e => e.active && e !== npc);
+         // 連邦艦かつ移動可能距離内に有効な基地がある場合、ドッキング移動を最優先する
+         if (npc instanceof FederationShip && isBaseActive) {
+           const distToBase = Phaser.Math.Distance.Between(npc.x, npc.y, base.x, base.y);
+           if (distToBase <= npc.constructor.SPEED) {
+             dest = { x: base.x, y: base.y };
+             isDocking = true;
+           }
          }
-         targetDest = threats.map(t => ({ x: t.x, y: t.y }));
+
+         // ドッキング対象でない場合は、通常の逃走（敵・障害物回避）経路を計算
+         if (!isDocking) {
+           let threats = [spaceContext.player, base];
+           if (npc instanceof FederationShip) {
+             threats = spaceContext.enemies.filter(e => e.active && e !== npc);
+           }
+           const targetDest = threats.map(t => ({ x: t.x, y: t.y }));
+           dest = npc.calculateDestination(targetDest, context.isFleeing);
+         }
        } else {
          // 逃走中でない場合：ターゲットがいれば追跡、いなければ基地へ向かう
-         if ( context.target ) {
-           targetDest = { x: context.target.x, y: context.target.y };
-         } else {
-           targetDest = { x: spaceContext.starBase.x, y: spaceContext.starBase.y };
-         }
+         const targetDest = context.target ? { x: context.target.x, y: context.target.y } : { x: base.x, y: base.y };
+         dest = npc.calculateDestination(targetDest, context.isFleeing);
        }
 
-       const dest = npc.calculateDestination(targetDest, context.isFleeing);
-       
        npc.moveTo(dest.x, dest.y, TIMING.TURN_DELAY, () => {
          npc.x = Math.floor(npc.x);
          npc.y = Math.floor(npc.y);
@@ -2128,13 +2145,19 @@
            }
          } // if (distFromCenter > AREA_R)
 
-         // シールド回復
-         npc.shield = Math.min(
-           npc.constructor.SHIELD_MAX,
-           npc.shield + (npc.constructor.SHIELD_MAX * npc.constructor.SHIELD_RECOVERY_RATE)
-         );
+         // シールド回復処理
+         if (isDocking) {
+           npc.shield = npc.constructor.SHIELD_MAX;
+           setMsg("通信士: 味方連邦艦が基地にドッキングし、シールドを全回復しました。", "#0ff");
+         } else {
+           npc.shield = Math.min(
+             npc.constructor.SHIELD_MAX,
+             npc.shield + (npc.constructor.SHIELD_MAX * npc.constructor.SHIELD_RECOVERY_RATE)
+           );
+         }
+
          // spirit 回復
-         if ( context.isFleeing ) {
+         if (context.isFleeing) {
            npc.spirit = Math.min(
              npc.constructor.SPIRIT.MAX,
              (npc.spirit + npc.constructor.SPIRIT.RECOVERY)
@@ -2179,8 +2202,15 @@
          setMsg("戦術士官: 新たな敵が出現しました！", "#ff0")
        }
        if ( gameState.turn % NEW_FEDERATION_INTERVAL === 0 ) {
-         setMsg("通信士: 味方の援軍が到着しました！", "#0f0");
-         newFederationShip(scene, 0.8, 0.95);
+         // XXX TBD 連邦の援軍が出現する条件
+         qty_enemies = spaceContext.enemies.filter(e => e.active).length;
+         console.log(
+           `qtyFederationShip=${gameState.qtyFederationShip}, qty_enemies=${qty_enemies}`
+         );
+         if ( gameState.qtyFederationShip < qty_enemies / 2 ) {
+           setMsg("通信士: 味方の援軍が到着しました！", "#0f0");
+           newFederationShip(scene, 0.8, 0.95);
+         }
        }
 
        // 基地の回復
@@ -2424,7 +2454,7 @@
      document.getElementById('viewScoresBtn').addEventListener('click', () => {
        showHighScoreOverlay('view');
      });
-     document.getElementById('misc1').onclick = () => newFederationShip(gameState.curScene);
+     // document.getElementById('misc1').onclick = () => newFederationShip(gameState.curScene);
 
      document.getElementById('hsRestartBtn').addEventListener('click', () => {
        if (gameState.pendingScene) {
