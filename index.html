@@ -10,7 +10,7 @@
        --color-accent: #08f;
        --color-bg-dark: #111;
        --font-mono: monospace;
-       --panel-font-size: clamp(24px, 3vw, 28px);
+       --panel-font-size: clamp(28px, 3.6vw, 38px);
      }
      body {
        margin:0;
@@ -44,10 +44,36 @@
      #statusPanel div {
        margin: 1px 5px;
      }
+
+     #statusPanel .status-header {
+       display: flex;
+       background: #0a0a2a;
+       justify-content: space-between;
+       align-items: flex-end;
+       border-bottom: 1px dashed var(--color-primary);
+       padding-bottom: 6px;
+       margin-bottom: 10px !important;
+       flex-wrap: wrap;
+     }
+     #statusPanel .status-header span {
+       margin: 0; /* 親の margin 指定をリセット */
+     }
+     #statusPanel .game-title {
+       font-size: 1.1em;
+       font-weight: bold;
+       color: #fff;
+       letter-spacing: 1px;
+     }
+     #statusPanel .game-version,
+     #statusPanel .game-credits {
+       font-size: 0.8em;
+       color: var(--color-accent)
+     }
+     
      #statusPanel .status-gauge {
        display: inline-block;
        width: 60px;
-       height: 0.8em;
+       height: 1.0em;
        background: #222;
        border: 1px solid var(--color-accent);
        margin-left: 8px;
@@ -62,7 +88,7 @@
      }
 
      #logStatus {
-       height: 90px;
+       height: 150px;
        line-height: 1.2;
        overflow-y: auto;
        background: #000;
@@ -108,6 +134,17 @@
      #zoomUI button:active {
        background: rgba(0, 255, 255, 0.8);
        color: #000;
+     }
+
+     #creditUI {
+       position: absolute;
+       bottom: 10px;
+       right: 15px;
+       color: rgba(0, 255, 255, 0.6);
+       font-family: var(--font-mono);
+       font-size: 28px;
+       pointer-events: none; /* クリックイベントをキャンバスへ透過させる */
+       z-index: 1000;
      }
 
      .panel-btn {
@@ -232,6 +269,10 @@
   <body>
     <div id="gameContainer">
       <div id="statusPanel">
+        <div class="status-header">
+          <span class="game-title">StarBase Defender v0.3.5</span>
+          <div class="game-credits">&copy; 2026 Yoichi Tanibayashi</div>
+        </div>
         <div id="turn">
           Turn
           <span id="statusMission">1</span>-<span id="statusTurn">1</span>
@@ -1331,7 +1372,7 @@
            return true;
          }
          if (isLOSBlocked(player, this, false)) {
-           setMsg("戦術士官: 障害物に遮られ、敵艦にダメージなし。", "#ff0");
+           setMsg("戦術士官: 障害物に遮られました。", "#ff0");
            fireBeam(scene, player, this, 0x444444);
            endTurn();
            return true;
@@ -1879,7 +1920,7 @@
          duration: 200,
          ease: 'Sine.easeInOut'
        });
-       setMsg("基地: ドッキング完了。エネルギーを補給します。", "#0ff");
+       setMsg("基地: ドッキング完了。エネルギー補給開始。", "#0ff");
        updateStatus();
      } // dockShip()
 
@@ -2124,7 +2165,7 @@
          if (distFromCenter > AREA_R) {
            npc.die();
            if (npc instanceof FederationShip) {
-             setMsg("通信士: 連邦艦がセクター外へ離脱しました。", "#88f");
+             setMsg("通信士: 味方の艦がセクター外へ離脱。", "#88f");
              gameState.score -= SCORE.DESTROY_PENALTY;
            }
            if (npc instanceof EnemyShip) {
@@ -2134,7 +2175,7 @@
              if (!gameState.isGameOver) {
                if (getActiveEnemyCount() > 0) {
                  setMsg(
-                   `副長: 敵艦がセクター外へ離脱。あと、${getActiveEnemyCount()}隻です。`, "#0f0"
+                   `副長: 敵艦がセクター外へ離脱。`, "#0f0"
                  );
                } else {
                  setMsg(
