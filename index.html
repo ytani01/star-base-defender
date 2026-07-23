@@ -1028,7 +1028,7 @@
                    weight *= 2;
                  }
                  if ( t === spaceContext.starBase ) {
-                   weight *= 4;
+                   weight *= 5;
                  }
                  dirX += (dx / dist) * weight;
                  dirY += (dy / dist) * weight;
@@ -1891,10 +1891,10 @@
        }
 
        const clickedObj = spaceContext.findObjectAt(pointer.worldX, pointer.worldY);
-       if (clickedObj) {
-         console.log(`clickedObj=${clickedObj.constructor.name}`);
-       }
-
+       /* if (clickedObj) {
+        *   console.log(`clickedObj=${clickedObj.constructor.name}`);
+        * }
+        */
        const endTurn = () => {
          gameState.isPlayerTurn = false;
          this.time.delayedCall(TIMING.TURN_DELAY, () => npcTurn(this));
@@ -1903,7 +1903,7 @@
 
        // オブジェクトがアクションを処理できればtrueが返る
        const handled = clickedObj?.onInteract(spaceContext.player, this, endTurn);
-       console.log('handled=', handled);
+       //console.log('handled=', handled);
 
        if (handled) {
          return;
@@ -2130,9 +2130,9 @@
        let totalDelay = (
          TIMING.TURN_DELAY + TIMING.TURN_MARGIN + TIMING.ENEMY_DELAY_MAX
        );
-       console.log(
-         `npcTurn> spaceContext.enemies.length=${spaceContext.enemies.length}, totalDelay=${totalDelay}`
-       );
+       /* console.log(
+        *   `npcTurn> spaceContext.enemies.length=${spaceContext.enemies.length}, totalDelay=${totalDelay}`
+        * ); */
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
      } // npcTurn()
 
@@ -2150,7 +2150,7 @@
          npc.shieldPercent().toFixed(3),
          ", fear",
          npc.fear().toFixed(3),
-         context
+         //context
        );
 
        if (context.isFleeing) {
@@ -2210,7 +2210,7 @@
          if (distFromCenter > AREA_R) {
            npc.die();
            if (npc instanceof FederationShip) {
-             setMsg("通信士: 味方の艦がセクター外へ離脱。", "#88f");
+             setMsg("通信士: 味方が離脱。", "#88f");
              gameState.score -= SCORE.DESTROY_PENALTY;
            }
            if (npc instanceof EnemyShip) {
@@ -2220,11 +2220,11 @@
              if (!gameState.isGameOver) {
                if (getActiveEnemyCount() > 0) {
                  setMsg(
-                   `副長: 敵艦がセクター外へ離脱。`, "#0f0"
+                   `副長: 敵艦が離脱。`, "#0f8"
                  );
                } else {
                  setMsg(
-                   '副長: 敵艦がすべて撤退しました！', "#0f0"
+                   '副長: 敵艦がすべて撤退しました！', "#ff0"
                  );
                }
              }
@@ -2234,7 +2234,7 @@
          // シールド回復処理
          if (isDocking) {
            npc.shield = npc.constructor.SHIELD_MAX;
-           setMsg("通信士: 味方連邦艦が基地にドッキングし、シールドを全回復しました。", "#0ff");
+           //setMsg("通信士: 味方連邦艦が基地にドッキングし、シールドを全回復しました。", "#0ff");
          } else {
            npc.shield = Math.min(
              npc.constructor.SHIELD_MAX,
@@ -2248,7 +2248,7 @@
              npc.constructor.SPIRIT.MAX,
              (npc.spirit + npc.constructor.SPIRIT.RECOVERY)
            );
-           console.log(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
+           //console.log(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
          }
        }); // npc.moveTo()
 
@@ -2306,9 +2306,9 @@
            StarBase.SHIELD_MAX,
            spaceContext.starBase.shield + (StarBase.SHIELD_MAX * StarBase.SHIELD_RECOVERY_RATE)
          ));
-         console.log(
-           `spaceContext.starBase: ${prev_starbase_shield} --> ${spaceContext.starBase.shield}`
-         );
+         /* console.log(
+          *   `spaceContext.starBase: ${prev_starbase_shield} --> ${spaceContext.starBase.shield}`
+          * ); */
        }
 
        updateStatus(); 
