@@ -9,6 +9,8 @@
 
 [![screenshot1](docs/screenshot1.png)](https://ytani01.github.io/star-base-defender/)
 
+![](https://youtu.be/4og3v2Hp660)
+
 ## 重要事項
 
 * このゲームの目的は、敵機を弱らせて**撤退**させることです。破壊することではありません。
