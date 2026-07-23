@@ -2285,7 +2285,7 @@
            obj.spirit = Math.min(EnemyShip.SPIRIT.MAX, obj.spirit + EnemyShip.SPIRIT.STEP);
            console.log(`finalizeEnemyTurn> obj.spirit up: ${obj.spirit.toFixed(3)}`);
          });
-         setMsg("戦術士官: 新たな敵が出現しました！", "#ff0")
+         setMsg("戦術士官: 新たな敵を検知！", "#ff0")
        }
        if ( gameState.turn % NEW_FEDERATION_INTERVAL === 0 ) {
          // XXX TBD 連邦の援軍が出現する条件
