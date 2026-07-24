@@ -368,6 +368,7 @@
     </div>
     
     <script>
+     "use strict";
      // ---------------------------------------------------------
      // 設定・定数の定義
      // ---------------------------------------------------------
@@ -507,7 +508,7 @@
 
        let msgstr = from + '>' + msg;
        
-       s = String(gameState.curMission).padStart(3,"0");
+       let s = String(gameState.curMission).padStart(3,"0");
        s += ".";
        s += String(gameState.turn).padStart(4,"0");
        s += " "
@@ -1214,9 +1215,9 @@
          weapon_power = 0, weapon_area_r = 0, weapon_cost = 0
        ) {
          // 親クラス (SpaceShip) へパラメータを渡す
-         super(
-           scene, x, y, texture, shield, gauge_color, scale, weapon_power, weapon_area_r, weapon_cost
-         );
+        super(
+          scene, x, y, texture, shield, gauge_color, scale, weapon_power, weapon_area_r, weapon_cost
+        );
          this.energy = energy;
          this.energy_gauge_color = energy_color;
 
@@ -1666,11 +1667,12 @@
        const CX_STARBASE = StarBase.W / 2;
        const CY_STARBASE = StarBase.W / 2;
        const base_color = 0x88ffff;
-       g.fillStyle(0x0000,.3);
        g.fillStyle(base_color);
-       g.fillEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * 0.4, StarBase.W * 0.8);
-       g.lineStyle(5, base_color ,1);
-       g.strokeEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * 0.8, StarBase.W * 0.4);
+       g.lineStyle(8, base_color, 1);
+       g.fillEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * .2, StarBase.W * 0.9);
+       g.fillEllipse(CX_STARBASE, CY_STARBASE - 20, StarBase.W * 0.7, StarBase.W * 0.3);
+       g.fillEllipse(CX_STARBASE, CY_STARBASE +10, StarBase.W * 0.35, StarBase.W * 0.3);
+       g.strokeEllipse(CX_STARBASE, CY_STARBASE + 10, StarBase.W * 0.75, StarBase.W * 0.3);
        g.generateTexture('baseImg', StarBase.W, StarBase.W);
 
        g.clear();
@@ -2180,9 +2182,6 @@
      /**
       * NPC 移動処理とシールド回復
       */
-     /**
-      * NPC 移動処理とシールド回復
-      */
      function npcMove(scene, npc, context) {
        let dest;
        let isDocking = false;
@@ -2300,7 +2299,7 @@
        }
        if ( gameState.turn % NEW_FEDERATION_INTERVAL === 0 ) {
          // XXX TBD 連邦の援軍が出現する条件
-         qty_enemies = spaceContext.enemies.filter(e => e.active).length;
+         const qty_enemies = spaceContext.enemies.filter(e => e.active).length;
          console.log(
            `qtyFederationShip=${gameState.qtyFederationShip}, qty_enemies=${qty_enemies}`
          );
