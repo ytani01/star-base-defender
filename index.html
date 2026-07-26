@@ -947,7 +947,7 @@
              let moveDistSq = (clamped.x - x)**2 + (clamped.y - y)**2;
              let distToTargetSq = (clamped.x - desiredX)**2 + (clamped.y - desiredY)**2;
              
-             if (moveDistSq < 0.1) continue;
+             if (moveDistSq < 0.3) continue;  // XXX TBD
 
              let currentBestMoveSq = (bestDest.x - x)**2 + (bestDest.y - y)**2;
              let stuck = currentBestMoveSq < 1.0;
@@ -1215,9 +1215,9 @@
          weapon_power = 0, weapon_area_r = 0, weapon_cost = 0
        ) {
          // 親クラス (SpaceShip) へパラメータを渡す
-        super(
-          scene, x, y, texture, shield, gauge_color, scale, weapon_power, weapon_area_r, weapon_cost
-        );
+         super(
+           scene, x, y, texture, shield, gauge_color, scale, weapon_power, weapon_area_r, weapon_cost
+         );
          this.energy = energy;
          this.energy_gauge_color = energy_color;
 
@@ -1319,8 +1319,8 @@
        static SHIELD_COLOR = 0xff8800;
 
        static WEAPON = {
-         POWER: 80,
-         AREA_R: 65,
+         POWER: 90,
+         AREA_R: 70,
        };
 
        static SPIRIT = {
@@ -1437,15 +1437,15 @@
      class FederationShip extends NPCShip {
        static W = 60;
        static R = FederationShip.W / 2 * SCALE;
-       static SPEED = 90 * SCALE;
+       static SPEED = 80 * SCALE;
 
        static SHIELD_MAX = 400;
        static SHIELD_RECOVERY_RATE = 0.005;
        static SHIELD_COLOR = 0xffffff;
 
        static WEAPON = {
-         POWER: 90,
-         AREA_R: 75,
+         POWER: 100,
+         AREA_R: 80,
        };
 
        static SPIRIT = {
@@ -1500,9 +1500,9 @@
      class PlayerShip extends ObjWithEnergy {
        static W = 60;
        static R = PlayerShip.W / 2 * SCALE;
-       static SPEED = 110 * SCALE;
+       static SPEED = 80 * SCALE;
        
-       static SHIELD_MAX = 500;
+       static SHIELD_MAX = 400;
        static SHIELD_RECOVERY_RATE = 0;
        static SHIELD_COLOR = 0xffffff;
 
@@ -1511,8 +1511,8 @@
        static ENERGY_COLOR = 0xffff00;
 
        static WEAPON = {
-         POWER: 90,
-         AREA_R: 75,
+         POWER: 100,
+         AREA_R: 80,
          COST: 100,
        };
 
@@ -1670,9 +1670,11 @@
        g.fillStyle(base_color);
        g.lineStyle(8, base_color, 1);
        g.fillEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * .2, StarBase.W * 0.9);
-       g.fillEllipse(CX_STARBASE, CY_STARBASE - 20, StarBase.W * 0.7, StarBase.W * 0.3);
-       g.fillEllipse(CX_STARBASE, CY_STARBASE +10, StarBase.W * 0.35, StarBase.W * 0.3);
-       g.strokeEllipse(CX_STARBASE, CY_STARBASE + 10, StarBase.W * 0.75, StarBase.W * 0.3);
+       g.fillEllipse(CX_STARBASE, CY_STARBASE - 30, StarBase.W * 0.25, StarBase.W * 0.25);
+       g.fillEllipse(CX_STARBASE, CY_STARBASE + 30, StarBase.W * 0.25, StarBase.W * 0.25);
+       g.fillEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * 0.4, StarBase.W * 0.3);
+       g.strokeEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * 0.8, StarBase.W * 0.3);
+       //g.strokeEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * 0.5, StarBase.W * 0.8);
        g.generateTexture('baseImg', StarBase.W, StarBase.W);
 
        g.clear();
@@ -1943,7 +1945,7 @@
          spaceContext.starBase.x, spaceContext.starBase.y
        );
 
-       if (dist > PlayerShip.SPEED) {
+       if (dist - StarBase.W / 2 > PlayerShip.SPEED) {
          return false;
        }
 
@@ -2163,10 +2165,8 @@
        const context = npc.evaluateTactics();
        console.log(
          npc.constructor.name,
-         "shield",
-         npc.shieldPercent().toFixed(3),
-         ", fear",
-         npc.fear().toFixed(3),
+         "shield", npc.shieldPercent().toFixed(3),
+         ", fear", npc.fear().toFixed(3),
          //context
        );
 
@@ -2188,12 +2188,13 @@
 
        const base = spaceContext.starBase;
        const isBaseActive = base && base.active && base.shield > 0;
+       const distToBase = Phaser.Math.Distance.Between(npc.x, npc.y, base.x, base.y);
 
        if (context.isFleeing) {
          // 連邦艦かつ移動可能距離内に有効な基地がある場合、ドッキング移動を最優先する
          if (npc instanceof FederationShip && isBaseActive) {
-           const distToBase = Phaser.Math.Distance.Between(npc.x, npc.y, base.x, base.y);
-           if (distToBase <= npc.constructor.SPEED) {
+           if (distToBase - StarBase.W / 2 <= npc.constructor.SPEED) {
+             // ドッキング
              dest = { x: base.x, y: base.y };
              isDocking = true;
            }
@@ -2208,11 +2209,25 @@
            const targetDest = threats.map(t => ({ x: t.x, y: t.y }));
            dest = npc.calculateDestination(targetDest, context.isFleeing);
          }
-       } else {
-         // 逃走中でない場合：ターゲットがいれば追跡、いなければ基地へ向かう
-         const targetDest = context.target ? { x: context.target.x, y: context.target.y } : { x: base.x, y: base.y };
-         dest = npc.calculateDestination(targetDest, context.isFleeing);
-       }
+       } else { // 逃走中でない場合
+         if ( context.target ) {
+           // ターゲットがいれば追跡
+           const targetDest = { x: context.target.x, y: context.target.y};
+           dest = npc.calculateDestination(targetDest, context.isFleeing);
+         } else {
+           // ターゲットがいなければ基地へ向かう
+           const targetDest = { x: base.x, y: base.y };
+           dest = npc.calculateDestination(targetDest, context.isFleeing);
+
+           if ( npc instanceof FederationShip ) {
+             if (distToBase - StarBase.W / 2 <= npc.constructor.SPEED) {
+               // ドッキング
+               dest = { x: base.x, y: base.y };
+               isDocking = true;
+             }
+           }
+         }
+       } // if (context.isFleeing)
 
        npc.moveTo(dest.x, dest.y, TIMING.TURN_DELAY, () => {
          npc.x = Math.floor(npc.x);
