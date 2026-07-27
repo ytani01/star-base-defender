@@ -334,7 +334,6 @@
         <div id="zoomUI">
           <button id="zoomIn">＋</button>
           <button id="zoomOut">－</button>
-          <!-- <button id="misc2">??</button> -->
         </div>
       </div>
     </div>
@@ -689,7 +688,6 @@
        }
        
        MaxRange() {
-         //console.log(`area_r=${this.area_r}, MAX_DAMAGE_RATIO=${this.constructor.MAX_DAMAGE_RATIO}`);
          return Math.floor(this.area_r * Math.sqrt(1 / this.constructor.MAX_DAMAGE_RATIO - 1));
        }
 
@@ -1718,7 +1716,6 @@
        g.fillEllipse(CX_STARBASE, CY_STARBASE + 30, StarBase.W * 0.25, StarBase.W * 0.25);
        g.fillEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * 0.4, StarBase.W * 0.3);
        g.strokeEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * 0.8, StarBase.W * 0.3);
-       //g.strokeEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * 0.5, StarBase.W * 0.8);
        g.generateTexture('baseImg', StarBase.W, StarBase.W);
 
        g.clear();
@@ -1802,8 +1799,6 @@
 
        document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
        document.getElementById('zoomOut').onclick = () => changeZoom(this, -CAMERA.STEP);
-       //document.getElementById('misc2').onclick = () => newFederationShip(this);
-
 
        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
          let zoomAmount = deltaY > 0 ? -CAMERA.STEP : CAMERA.STEP;
@@ -1962,10 +1957,6 @@
        }
 
        const clickedObj = gameObjs.findObjectAt(pointer.worldX, pointer.worldY);
-       /* if (clickedObj) {
-        *   console.log(`clickedObj=${clickedObj.constructor.name}`);
-        * }
-        */
        const endTurn = () => {
          gameState.isPlayerTurn = false;
          this.time.delayedCall(TIMING.TURN_DELAY, () => npcTurn(this));
@@ -1974,7 +1965,6 @@
 
        // オブジェクトがアクションを処理できればtrueが返る
        const handled = clickedObj?.onInteract(gameObjs.player, this, endTurn);
-       //console.log('handled=', handled);
 
        if (handled) {
          return;
@@ -2013,7 +2003,6 @@
        ].some(
          obj => obj.active && hasObstacleOnPath(gameObjs.player, gameObjs.starBase, obj)
        );
-       //console.log('hasObstacle=', hasObstacle);
        return !hasObstacle;
      } // canDock()
 
@@ -2079,7 +2068,6 @@
          gameObjs.player.is_docked = false;
          skipAutoDock = true;
          gameObjs.player.shield = PlayerShip.SHIELD_MAX;
-         //setMsg("基地", "ドッキング・クランプ解除");
 
          ignoreObjs = [gameObjs.starBase];
          const finalDest = gameObjs.player.resolveMovement(
@@ -2099,7 +2087,6 @@
            destY = gameObjs.starBase.y + Math.sin(pushAngle) * minPushDist;
          }
        } else {  // 通常移動およびドッキングを目的とする移動
-         //const finalDest = gameObjs.player.clampDest(desiredX, desiredY, []);
          const finalDest = gameObjs.player.clampDest(desiredX, desiredY, []);
          destX = finalDest.x;
          destY = finalDest.y;
@@ -2150,8 +2137,6 @@
          setMsg("操舵手", `障害物回避のためコース調整。推力 ${speed_p}%`, "#ff0");
        } else if (shiftDist > 5.0 && !target_is_base) {
          setMsg("操舵手", `進路上に障害物。安全距離にて停止。推力 ${speed_p}%`, "#ff0");
-       } else {
-         //setMsg(`操舵手: コースセット。インパルス出力 ${speed_p}%`);
        }
        updateStatus();
        
@@ -2217,9 +2202,6 @@
        let totalDelay = (
          TIMING.TURN_DELAY + TIMING.TURN_MARGIN + TIMING.ENEMY_DELAY_MAX
        );
-       /* console.log(
-        *   `npcTurn> gameObjs.enemies.length=${gameObjs.enemies.length}, totalDelay=${totalDelay}`
-        * ); */
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
      } // npcTurn()
 
@@ -2227,15 +2209,13 @@
       * NPC1体の具体的な行動（思考と実行）
       */
      function execNPCAction(scene, npc) {
-       //console.log(`=== execNPCAction: ${npc.constructor.name} ===`);
        if (gameState.isGameOver || !npc.active) return;
-       
+
        const context = npc.evaluateTactics();
        debugLog(
          npc.constructor.name,
          "shield", npc.shieldPercent().toFixed(3),
          ", fear", npc.fear().toFixed(3),
-         //context
        );
 
        if (context.isFleeing) {
@@ -2327,7 +2307,6 @@
          // シールド回復処理
          if (isDocking) {
            npc.shield = npc.constructor.SHIELD_MAX;
-           //setMsg("通信士: 味方連邦艦が基地にドッキングし、シールドを全回復しました。", "#0ff");
          } else {
            npc.shield = Math.min(
              npc.constructor.SHIELD_MAX,
@@ -2392,14 +2371,10 @@
 
        // 基地の回復
        if ( gameObjs.starBase.shield < StarBase.SHIELD_MAX ) {
-         const prev_starbase_shield = gameObjs.starBase.shield;
          gameObjs.starBase.shield = Math.floor(Math.min(
            StarBase.SHIELD_MAX,
            gameObjs.starBase.shield + (StarBase.SHIELD_MAX * StarBase.SHIELD_RECOVERY_RATE)
          ));
-         /* console.log(
-          *   `gameObjs.starBase: ${prev_starbase_shield} --> ${gameObjs.starBase.shield}`
-          * ); */
        }
 
        const enp = gameObjs.player.energy_p(); 
@@ -2458,9 +2433,6 @@
        debugLog(`nextMission> bonus=${bonus}, gameState.score=${gameState.score}`);
 
        gameState.qtyFederationShip = gameObjs.federationShips.filter(o => o.active).length;
-       /* if ( gameState.turn < NEW_ENEMY_INTERVAL ) {
-        *   gameState.qtyFederationShip++;
-        * } */
        debugLog(`nextMission> gameState.qtyFederationShip=${gameState.qtyFederationShip}`);
 
        const { list, newIdx } = saveHighScore(
@@ -2631,7 +2603,6 @@
      document.getElementById('viewScoresBtn').addEventListener('click', () => {
        showHighScoreOverlay('view');
      });
-     // document.getElementById('misc1').onclick = () => newFederationShip(gameState.curScene);
 
      document.getElementById('hsRestartBtn').addEventListener('click', () => {
        if (gameState.pendingScene) {
