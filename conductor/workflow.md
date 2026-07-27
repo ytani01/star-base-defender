@@ -1,333 +1,207 @@
-# Project Workflow
+# 開発ワークフロー (Project Workflow)
 
-## Guiding Principles
+## 基本原則
 
-1. **The Plan is the Source of Truth:** All work must be tracked in `plan.md`
-2. **The Tech Stack is Deliberate:** Changes to the tech stack must be documented in `tech-stack.md` *before* implementation
-3. **Test-Driven Development:** Write unit tests before implementing functionality
-4. **High Code Coverage:** Aim for >80% code coverage for all modules
-5. **User Experience First:** Every decision should prioritize user experience
-6. **Non-Interactive & CI-Aware:** Prefer non-interactive commands. Use `CI=true` for watch-mode tools (tests, linters) to ensure single execution.
+1. **計画が正である。** まとまった作業は Track の `plan.md` で管理し、進捗はそこに反映する。
+2. **技術選択の変更は実装より先に文書化する。** [Tech Stack](./tech-stack.md) を更新してから着手する。
+3. **自動テストがない代わりに、手動確認を手順化して必ず実行する。** 「動くはず」で終わらせない（→ [確認シナリオ](#確認シナリオ)）。
+4. **リファクタリングは挙動を変えない。** ゲームバランスに関わる数値の変更は、リファクタリングとは別のコミットにする。
+5. **モバイルでの確認を省略しない。** PC だけで確認して完了としない。
+6. **小さく刻んでコミットする。** 1コミット = 1つの意味のある変更。
 
-## Task Workflow
+## 作業の進め方
 
-All tasks follow a strict lifecycle:
+### Track を立てるかどうか
 
-### Standard Task Workflow
+| 規模 | 進め方 |
+|---|---|
+| 数行〜1箇所の修正、バグ修正、バージョン更新 | Track 不要。直接コミットする |
+| 複数フェーズにまたがる作業、新機能、大規模リファクタリング | Track を立てる |
 
-1. **Select Task:** Choose the next available task from `plan.md` in sequential order
+Track を立てるほどではないが計画を残したい場合は、`archives/YYYYMMDD<連番>-<名前>.md` として計画文書を置く
+（例: `archives/20260728a-refactoring-plan.md`）。
 
-2. **Mark In Progress:** Before beginning work, edit `plan.md` and change the task from `[ ]` to `[~]`
+### Track の作成
 
-3. **Write Failing Tests (Red Phase):**
-   - Create a new test file for the feature or bug fix.
-   - Write one or more unit tests that clearly define the expected behavior and acceptance criteria for the task.
-   - **CRITICAL:** Run the tests and confirm that they fail as expected. This is the "Red" phase of TDD. Do not proceed until you have failing tests.
+`conductor/<track_id>/` に3ファイルを作成する。`track_id` は `<type>_<内容>_<YYYYMMDD>` 形式。
 
-4. **Implement to Pass Tests (Green Phase):**
-   - Write the minimum amount of application code necessary to make the failing tests pass.
-   - Run the test suite again and confirm that all tests now pass. This is the "Green" phase.
+- **`spec.md`** — 概要 / 機能要件 / **範囲外**。「やらないこと」を明示することが重要。
+- **`plan.md`** — フェーズに分けたタスクのチェックリスト。
+- **`metadata.json`** — `track_id` / `type` / `status` / `created_at` / `updated_at` / `description`。
 
-5. **Refactor (Optional but Recommended):**
-   - With the safety of passing tests, refactor the implementation code and the test code to improve clarity, remove duplication, and enhance performance without changing the external behavior.
-   - Rerun tests to ensure they still pass after refactoring.
+### タスクのライフサイクル
 
-6. **Verify Coverage:** Run coverage reports using the project's chosen tools. For example, in a Python project, this might look like:
+1. **選択** — `plan.md` の上から順に、次の未着手タスクを選ぶ。
+2. **着手** — `plan.md` の該当タスクを `[ ]` → `[~]` に変更する。
+3. **実装** — [Code Style Guides](./code_styleguides/) に従って実装する。
+4. **確認** — 変更内容に対応する[確認シナリオ](#確認シナリオ)を実行する。
+5. **コミット** — [コミット規約](#コミット規約)に従ってコミットする。
+6. **記録** — `git notes` でコミットに作業サマリーを添付する。
    ```bash
-   pytest --cov=app --cov-report=html
+   git notes add -m "<サマリー>" $(git log -1 --format=%H)
    ```
-   Target: >80% coverage for new code. The specific tools and commands will vary by language and framework.
+   サマリーには「タスク名」「変更点」「変更したファイル」「なぜそうしたか」を含める。
+7. **完了** — `plan.md` を `[~]` → `[x]` に更新し、末尾にコミットハッシュ先頭7桁を付ける。
+   この `plan.md` の更新は別コミットにする（`conductor(plan): ...`）。
 
-7. **Document Deviations:** If implementation differs from tech stack:
-   - **STOP** implementation
-   - Update `tech-stack.md` with new design
-   - Add dated note explaining the change
-   - Resume implementation
+### フェーズ完了時の確認
 
-8. **Commit Code Changes:**
-   - Stage all code changes related to the task.
-   - Propose a clear, concise commit message e.g, `feat(ui): Create basic HTML structure for calculator`.
-   - Perform the commit.
+フェーズ最後のタスクを終えたら、以下を行う。
 
-9. **Attach Task Summary with Git Notes:**
-   - **Step 9.1: Get Commit Hash:** Obtain the hash of the *just-completed commit* (`git log -1 --format="%H"`).
-   - **Step 9.2: Draft Note Content:** Create a detailed summary for the completed task. This should include the task name, a summary of changes, a list of all created/modified files, and the core "why" for the change.
-   - **Step 9.3: Attach Note:** Use the `git notes` command to attach the summary to the commit.
-     ```bash
-     # The note content from the previous step is passed via the -m flag.
-     git notes add -m "<note content>" <commit_hash>
-     ```
+1. **フェーズ全体の差分を確認する。**
+   ```bash
+   git diff --name-only <前回チェックポイントのSHA> HEAD
+   ```
+2. **[確認シナリオ](#確認シナリオ)を全項目通しで実行する。** タスク単位では部分確認でよいが、フェーズ完了時は全項目を行う。
+3. **ユーザーに手動確認を依頼する。** 以下の形式で、具体的な手順と期待結果を提示する。
 
-10. **Get and Record Task Commit SHA:**
-    - **Step 10.1: Update Plan:** Read `plan.md`, find the line for the completed task, update its status from `[~]` to `[x]`, and append the first 7 characters of the *just-completed commit's* commit hash.
-    - **Step 10.2: Write Plan:** Write the updated content back to `plan.md`.
+   ```
+   **手動確認の手順:**
+   1. ブラウザで index.html を開く（またはローカルサーバで配信する）
+   2. スマートフォンの縦画面・横画面の両方で表示する
+   3. 確認事項: 〈具体的に何がどうなっていれば正しいか〉
+   ```
 
-11. **Commit Plan Update:**
-    - **Action:** Stage the modified `plan.md` file.
-    - **Action:** Commit this change with a descriptive message (e.g., `conductor(plan): Mark task 'Create user model' as complete`).
+4. **ユーザーの明示的な承認を待つ。** 承認なしに次のフェーズへ進まない。
+5. **チェックポイントコミットを作成し**（`conductor(checkpoint): ...`）、`git notes` で確認レポートを添付する。
+6. **`plan.md` のフェーズ見出しに `[checkpoint: <sha先頭7桁>]` を追記する。**
 
-### Phase Completion Verification and Checkpointing Protocol
+## ブランチとリリース
 
-**Trigger:** This protocol is executed immediately after a task is completed that also concludes a phase in `plan.md`.
+```
+develop  ── 通常の開発はここで行う
+   │
+   └─▶ master  ── マージすると GitHub Pages で公開される
+```
 
-1.  **Announce Protocol Start:** Inform the user that the phase is complete and the verification and checkpointing protocol has begun.
+- **`develop` で作業し、`master` へマージして公開する。**
+- `master` は常に「公開して問題ない状態」を保つ。動作未確認のものをマージしない。
+- **公開されるのは `index.html` そのもの**である。ビルドを挟まないため、コミットした内容が即座にプレイヤーに届く。
 
-2.  **Ensure Test Coverage for Phase Changes:**
-    -   **Step 2.1: Determine Phase Scope:** To identify the files changed in this phase, you must first find the starting point. Read `plan.md` to find the Git commit SHA of the *previous* phase's checkpoint. If no previous checkpoint exists, the scope is all changes since the first commit.
-    -   **Step 2.2: List Changed Files:** Execute `git diff --name-only <previous_checkpoint_sha> HEAD` to get a precise list of all files modified during this phase.
-    -   **Step 2.3: Verify and Create Tests:** For each file in the list:
-        -   **CRITICAL:** First, check its extension. Exclude non-code files (e.g., `.json`, `.md`, `.yaml`).
-        -   For each remaining code file, verify a corresponding test file exists.
-        -   If a test file is missing, you **must** create one. Before writing the test, **first, analyze other test files in the repository to determine the correct naming convention and testing style.** The new tests **must** validate the functionality described in this phase's tasks (`plan.md`).
+### バージョン更新
 
-3.  **Execute Automated Tests with Proactive Debugging:**
-    -   Before execution, you **must** announce the exact shell command you will use to run the tests.
-    -   **Example Announcement:** "I will now run the automated test suite to verify the phase. **Command:** `CI=true npm test`"
-    -   Execute the announced command.
-    -   If tests fail, you **must** inform the user and begin debugging. You may attempt to propose a fix a **maximum of two times**. If the tests still fail after your second proposed fix, you **must stop**, report the persistent failure, and ask the user for guidance.
+- リリースする変更をまとめたら、`index.html` 内のバージョン番号を更新し、
+  **バージョン更新だけの `chore:` コミットを1つ作る。**
+- 番号の付け方: `v0.<機能追加>.<修正>`。挙動が変わらないリファクタリングのみの場合は上げなくてよい。
 
-4.  **Propose a Detailed, Actionable Manual Verification Plan:**
-    -   **CRITICAL:** To generate the plan, first analyze `product.md`, `product-guidelines.md`, and `plan.md` to determine the user-facing goals of the completed phase.
-    -   You **must** generate a step-by-step plan that walks the user through the verification process, including any necessary commands and specific, expected outcomes.
-    -   The plan you present to the user **must** follow this format:
+## コミット規約
 
-        **For a Frontend Change:**
-        ```
-        The automated tests have passed. For manual verification, please follow these steps:
+### 形式
 
-        **Manual Verification Steps:**
-        1.  **Start the development server with the command:** `npm run dev`
-        2.  **Open your browser to:** `http://localhost:3000`
-        3.  **Confirm that you see:** The new user profile page, with the user's name and email displayed correctly.
-        ```
+```
+<type>(<scope>): <日本語の要約>
 
-        **For a Backend Change:**
-        ```
-        The automated tests have passed. For manual verification, please follow these steps:
+[必要なら本文（なぜそう変更したか）]
+```
 
-        **Manual Verification Steps:**
-        1.  **Ensure the server is running.**
-        2.  **Execute the following command in your terminal:** `curl -X POST http://localhost:8080/api/v1/users -d '{"name": "test"}'`
-        3.  **Confirm that you receive:** A JSON response with a status of `201 Created`.
-        ```
+- **`type` は英語の Conventional Commits を使い、要約と本文は日本語で書く。**
+- 要約は「何をしたか」が一読でわかるように書く。`UPD: 修正` のような情報量のない要約にしない。
+- `scope` は任意。
 
-5.  **Await Explicit User Feedback:**
-    -   After presenting the detailed plan, ask the user for confirmation: "**Does this meet your expectations? Please confirm with yes or provide feedback on what needs to be changed.**"
-    -   **PAUSE** and await the user's response. Do not proceed without an explicit yes or confirmation.
+### type
 
-6.  **Create Checkpoint Commit:**
-    -   Stage all changes. If no changes occurred in this step, proceed with an empty commit.
-    -   Perform the commit with a clear and concise message (e.g., `conductor(checkpoint): Checkpoint end of Phase X`).
+| type | 用途 |
+|---|---|
+| `feat` | ゲームメカニクス・UI の追加 |
+| `fix` | バグ修正 |
+| `refactor` | 挙動を変えないコード整理 |
+| `style` | 整形・命名の統一（挙動もロジックも変えない） |
+| `balance` | ゲームバランスの数値調整 |
+| `docs` | README・`conductor/` などの文書のみの変更 |
+| `chore` | バージョン更新、ファイル整理などの雑務 |
+| `conductor` | Track の `plan.md` / `metadata.json` の更新 |
 
-7.  **Attach Auditable Verification Report using Git Notes:**
-    -   **Step 7.1: Draft Note Content:** Create a detailed verification report including the automated test command, the manual verification steps, and the user's confirmation.
-    -   **Step 7.2: Attach Note:** Use the `git notes` command and the full commit hash from the previous step to attach the full report to the checkpoint commit.
+### 例
 
-8.  **Get and Record Phase Checkpoint SHA:**
-    -   **Step 8.1: Get Commit Hash:** Obtain the hash of the *just-created checkpoint commit* (`git log -1 --format="%H"`).
-    -   **Step 8.2: Update Plan:** Read `plan.md`, find the heading for the completed phase, and append the first 7 characters of the commit hash in the format `[checkpoint: <sha>]`.
-    -   **Step 8.3: Write Plan:** Write the updated content back to `plan.md`.
-
-9. **Commit Plan Update:**
-    - **Action:** Stage the modified `plan.md` file.
-    - **Action:** Commit this change with a descriptive message following the format `conductor(plan): Mark phase '<PHASE NAME>' as complete`.
-
-10.  **Announce Completion:** Inform the user that the phase is complete and the checkpoint has been created, with the detailed verification report attached as a git note.
-
-### Quality Gates
-
-Before marking any task complete, verify:
-
-- [ ] All tests pass
-- [ ] Code coverage meets requirements (>80%)
-- [ ] Code follows project's code style guidelines (as defined in `code_styleguides/`)
-- [ ] All public functions/methods are documented (e.g., docstrings, JSDoc, GoDoc)
-- [ ] Type safety is enforced (e.g., type hints, TypeScript types, Go types)
-- [ ] No linting or static analysis errors (using the project's configured tools)
-- [ ] Works correctly on mobile (if applicable)
-- [ ] Documentation updated if needed
-- [ ] No security vulnerabilities introduced
-
-## Development Commands
-
-**AI AGENT INSTRUCTION: This section should be adapted to the project's specific language, framework, and build tools.**
-
-### Setup
 ```bash
-# Example: Commands to set up the development environment (e.g., install dependencies, configure database)
-# e.g., for a Node.js project: npm install
-# e.g., for a Go project: go mod tidy
+git commit -m "fix: 連邦艦の増援判定をライブ集計に修正し、重複していた集計処理を統一"
+git commit -m "refactor: 参照されていない static プロパティと未使用メソッドを削除"
+git commit -m "balance: 敵艦の士気回復率を下げ、逃走後の再突入を起きにくくする"
+git commit -m "chore: バージョンを v0.3.18 に更新"
 ```
 
-### Daily Development
-```bash
-# Example: Commands for common daily tasks (e.g., start dev server, run tests, lint, format)
-# e.g., for a Node.js project: npm run dev, npm test, npm run lint
-# e.g., for a Go project: go run main.go, go test ./..., go fmt ./...
-```
+### 混ぜてはいけない組み合わせ
 
-### Before Committing
-```bash
-# Example: Commands to run all pre-commit checks (e.g., format, lint, type check, run tests)
-# e.g., for a Node.js project: npm run check
-# e.g., for a Go project: make check (if a Makefile exists)
-```
+- **リファクタリングとバランス調整を同じコミットに入れない。** 挙動が変わったとき原因の切り分けができなくなる。
+- **命名の一括変更（`style`）を他の変更と混ぜない。** 差分が大きく、レビューで実質的な変更を見落とす。
 
-## Testing Requirements
+## 確認シナリオ
 
-### Unit Testing
-- Every module must have corresponding tests.
-- Use appropriate test setup/teardown mechanisms (e.g., fixtures, beforeEach/afterEach).
-- Mock external dependencies.
-- Test both success and failure cases.
+自動テストが存在しないため、**このリストが唯一の回帰チェックである。**
+変更した箇所に関係する項目は必ず、フェーズ完了時は全項目を確認する。
 
-### Integration Testing
-- Test complete user flows
-- Verify database transactions
-- Test authentication and authorization
-- Check form submissions
+### 基本操作
 
-### Mobile Testing
-- Test on actual iPhone when possible
-- Use Safari developer tools
-- Test touch interactions
-- Verify responsive layouts
-- Check performance on 3G/4G
+- [ ] 空間をクリックして移動できる。障害物の手前で停止する。
+- [ ] 障害物に囲まれた状況で、迂回コースが選ばれる（操舵手からコース調整の報告が出る）。
+- [ ] 敵をクリックして攻撃できる。命中・射程外・障害物ありの3パターンで、それぞれ適切な報告が出る。
+- [ ] 自機をクリックしてシールドを回復できる。エネルギーが減る。
+- [ ] 基地へ移動し、隣接した状態で基地をクリックするとドッキングする。エネルギーとシールドが最大まで回復する。
+- [ ] ドッキング中は攻撃できない。ドッキングを解除すると基地から押し出される。
 
-## Code Review Process
+### ターン進行と戦況
 
-### Self-Review Checklist
-Before requesting review:
+- [ ] プレイヤーの行動後、敵と味方が行動し、プレイヤーのターンに戻る。
+- [ ] 敵を撃破すると、スコアが減点され、新たな敵が出現する。
+- [ ] 敵が宇宙域の外へ出ると撤退扱いになり、残りの敵の士気が下がる。
+- [ ] 一定ターンごとに敵の増援が出現する。
+- [ ] 味方が劣勢のとき、一定ターンごとに連邦艦の増援が出現する。
+- [ ] 連邦艦が基地に隣接するとシールドが全回復する。
+- [ ] シールドを削られた敵が逃走し、移動しながらシールドを回復して戻ってくる。
 
-1. **Functionality**
-   - Feature works as specified
-   - Edge cases handled
-   - Error messages are user-friendly
+### 決着
 
-2. **Code Quality**
-   - Follows style guide
-   - DRY principle applied
-   - Clear variable/function names
-   - Appropriate comments
+- [ ] すべての敵を撤退させるとミッションクリアとなり、ボーナスが加算されハイスコアに記録される。
+- [ ] NEXT MISSION で次のミッションが始まり、敵の初期数が1隻増えている。
+- [ ] 基地のシールド消失で敗北する。
+- [ ] 自機のシールド消失で敗北する。
+- [ ] エネルギー枯渇で敗北する。
+- [ ] **敗北時はハイスコアに記録されない。**
+- [ ] ハイスコアの行をクリックすると、その次のミッションから再開でき、敵の初期数が正しい。
 
-3. **Testing**
-   - Unit tests comprehensive
-   - Integration tests pass
-   - Coverage adequate (>80%)
+### 表示・操作環境
 
-4. **Security**
-   - No hardcoded secrets
-   - Input validation present
-   - SQL injection prevented
-   - XSS protection in place
+- [ ] ズームボタンで拡大・縮小できる。等倍では基地が中心、拡大時は自機に追従する。
+- [ ] スマートフォンの**縦画面**で、ステータス欄が宇宙域を圧迫していない。
+- [ ] スマートフォンの**横画面**で、宇宙域が見切れていない。
+- [ ] タップ対象（ズームボタン等）が十分な大きさを保っている。
+- [ ] ログが蓄積され、スクロールしてさかのぼれる。
 
-5. **Performance**
-   - Database queries optimized
-   - Images optimized
-   - Caching implemented where needed
+### デバッグ確認（命名変更・ロジック変更時）
 
-6. **Mobile Experience**
-   - Touch targets adequate (44x44px)
-   - Text readable without zooming
-   - Performance acceptable on mobile
-   - Interactions feel native
+- [ ] `DEBUG = true` に切り替えて、`debugLog()` の出力がエラーなく出る（改名漏れ・参照漏れの検出）。
+- [ ] ブラウザのコンソールにエラーや警告が出ていない。
 
-## Commit Guidelines
+## 完了の定義 (Definition of Done)
 
-### Message Format
-```
-<type>(<scope>): <description>
+タスクが完了と言えるのは、以下がすべて満たされたときである。
 
-[optional body]
+- [ ] 仕様どおりに実装されている
+- [ ] 関係する[確認シナリオ](#確認シナリオ)を実行し、問題がない
+- [ ] **モバイル（縦・横）で確認した**
+- [ ] コンソールにエラーが出ていない
+- [ ] [Code Style Guides](./code_styleguides/) に従っている
+- [ ] 追加・変更した関数・クラスに JSDoc がある（中身のない `/** */` を残さない）
+- [ ] `console.log()` を直接書いていない（`debugLog()` を使っている）
+- [ ] 規約に従ったコミットメッセージでコミットした
+- [ ] `git notes` に作業サマリーを添付した
+- [ ] Track の場合、`plan.md` を更新した
 
-[optional footer]
-```
+## トラブル対応
 
-### Types
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation only
-- `style`: Formatting, missing semicolons, etc.
-- `refactor`: Code change that neither fixes a bug nor adds a feature
-- `test`: Adding missing tests
-- `chore`: Maintenance tasks
+### 公開後に不具合が見つかった
 
-### Examples
-```bash
-git commit -m "feat(auth): Add remember me functionality"
-git commit -m "fix(posts): Correct excerpt generation for short posts"
-git commit -m "test(comments): Add tests for emoji reaction limits"
-git commit -m "style(mobile): Improve button touch targets"
-```
+1. **まず戻す。** `master` で当該コミットを `git revert` し、公開状態を正常に戻す。
+2. `develop` で原因を調査し、修正する。
+3. 修正時は、その不具合を検出できる確認項目を[確認シナリオ](#確認シナリオ)に追加する。
 
-## Definition of Done
+### ハイスコアが読めない・壊れている
 
-A task is complete when:
+`localStorage` の破損が原因なので、読み込みが例外で落ちずに空リストとして扱われることを確認する。
+ユーザーには開発者ツールから `starbaseDefenderScores` を削除してもらう。
 
-1. All code implemented to specification
-2. Unit tests written and passing
-3. Code coverage meets project requirements
-4. Documentation complete (if applicable)
-5. Code passes all configured linting and static analysis checks
-6. Works beautifully on mobile (if applicable)
-7. Implementation notes added to `plan.md`
-8. Changes committed with proper message
-9. Git note with task summary attached to the commit
+### Phaser の CDN が落ちている
 
-## Emergency Procedures
-
-### Critical Bug in Production
-1. Create hotfix branch from main
-2. Write failing test for bug
-3. Implement minimal fix
-4. Test thoroughly including mobile
-5. Deploy immediately
-6. Document in plan.md
-
-### Data Loss
-1. Stop all write operations
-2. Restore from latest backup
-3. Verify data integrity
-4. Document incident
-5. Update backup procedures
-
-### Security Breach
-1. Rotate all secrets immediately
-2. Review access logs
-3. Patch vulnerability
-4. Notify affected users (if any)
-5. Document and update security procedures
-
-## Deployment Workflow
-
-### Pre-Deployment Checklist
-- [ ] All tests passing
-- [ ] Coverage >80%
-- [ ] No linting errors
-- [ ] Mobile testing complete
-- [ ] Environment variables configured
-- [ ] Database migrations ready
-- [ ] Backup created
-
-### Deployment Steps
-1. Merge feature branch to main
-2. Tag release with version
-3. Push to deployment service
-4. Run database migrations
-5. Verify deployment
-6. Test critical paths
-7. Monitor for errors
-
-### Post-Deployment
-1. Monitor analytics
-2. Check error logs
-3. Gather user feedback
-4. Plan next iteration
-
-## Continuous Improvement
-
-- Review workflow weekly
-- Update based on pain points
-- Document lessons learned
-- Optimize for user happiness
-- Keep things simple and maintainable
+バージョンを URL で固定しているため、勝手に壊れることはない。
+CDN 自体の障害時は復旧を待つ。恒久対策として Phaser の同梱を検討する場合は、
+[Tech Stack](./tech-stack.md) を先に更新すること。
