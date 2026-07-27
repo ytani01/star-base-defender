@@ -905,13 +905,9 @@
 
            const fx = startX - tgt.x;
            const fy = startY - tgt.y;
-           const a = lenSq;
-           const b = 2 * (fx * dx + fy * dy);
-           const c = fx * fx + fy * fy - R * R;
-           const disc = b * b - 4 * a * c;
-           if (disc < 0) continue; 
-           const t = (-b - Math.sqrt(disc)) / (2 * a);
-           if (t > 0 && t < minT) minT = t;
+           const hit = intersectSegmentCircle(dx, dy, lenSq, fx, fy, R);
+           if (!hit) continue;
+           if (hit.t1 > 0 && hit.t1 < minT) minT = hit.t1;
          } // for(tgt)
 
          if (minT < 1.0) {
@@ -1444,9 +1440,7 @@
          if (!this.active) {
            // 撃墜
            gameObjs.removeEnemy(this);
-           const rp = getSafeRandPos(0.8, 0.95);
-           const newEnemy = new EnemyShip(scene, rp.x, rp.y);
-           gameObjs.addEnemy(newEnemy);
+           spawnEnemy(scene, 0.8, 0.95);
            setMsg("戦術士官", "敵艦を撃破！ 別の新たな敵艦を検知しました！", "#ff0");
          }
          endTurn();
@@ -1500,7 +1494,7 @@
         */
        onAfterAttack(target) {
          if (!target.active) {
-           gameObjs.enemies = gameObjs.enemies.filter(e => e !== target);
+           gameObjs.removeEnemy(target);
            setMsg("通信士", "連邦艦が敵艦を撃破しました！", "#f40");
            updateStatus();
          }
@@ -1654,6 +1648,16 @@
      } // newFederationShip()
 
      /**
+      * 敵艦を1隻、安全な位置に生成して gameObjs に登録する
+      */
+     function spawnEnemy(scene, dist_min, dist_max) {
+       const p = getSafeRandPos(dist_min, dist_max);
+       const enemy = new EnemyShip(scene, p.x, p.y);
+       gameObjs.addEnemy(enemy);
+       return enemy;
+     } // spawnEnemy()
+
+     /**
       * 画像の生成
       */
      function preload(){
@@ -1772,9 +1776,7 @@
        // Enemies
        gameObjs.enemies = [];
        for (let i=0; i < QTY.ENEMY; i++) {
-         let p = getSafeRandPos(0.6, 0.9);
-         let e = new EnemyShip(this, p.x, p.y);
-         gameObjs.addEnemy(e);
+         spawnEnemy(this, 0.6, 0.9);
        }
 
        // Federation
@@ -1881,6 +1883,27 @@
      } // getSafeRandPos()
 
      /**
+      * 線分（始点からdx,dy方向へ、長さの2乗がa）と円（中心が始点からfx,fy、半径radius）
+      * の交差判定。線分をt=0(始点)〜t=1(終点)としてパラメータ化した交点位置を返す。
+      * 交差しない場合は null。
+      * clampDest()（衝突による移動停止）と hasObstacleOnPath()（LOS/経路上の障害物判定）
+      * で共通して使う、線分と円の交差の二次方程式を解く部分だけを切り出したもの。
+      */
+     function intersectSegmentCircle(dx, dy, a, fx, fy, radius) {
+       const b = 2 * (fx * dx + fy * dy);
+       const c = fx * fx + fy * fy - radius * radius;
+       const disc = b * b - 4 * a * c;
+       if (disc < 0) {
+         return null;
+       }
+       const sqrtDisc = Math.sqrt(disc);
+       return {
+         t1: (-b - sqrtDisc) / (2 * a),
+         t2: (-b + sqrtDisc) / (2 * a),
+       };
+     } // intersectSegmentCircle()
+
+     /**
       *
       */
      function hasObstacleOnPath(src, dst, obj) {
@@ -1890,16 +1913,11 @@
          return false;
        }
        const fx = src.x - obj.x, fy = src.y - obj.y;
-       const b = 2*(fx * dx + fy * dy);
-       const c = fx*fx + fy*fy - obj.r * obj.r;
-       const disc = b*b-4*a*c;
-       if ( disc < 0 ) {
+       const hit = intersectSegmentCircle(dx, dy, a, fx, fy, obj.r);
+       if (!hit) {
          return false;
        }
-       const t1 = (-b-Math.sqrt(disc)) / (2*a);
-       const t2 = (-b+Math.sqrt(disc)) / (2*a);
-
-       return (t1 > 0.05 && t1 < 0.95) || (t2 > 0.05 && t2 < 0.95);
+       return (hit.t1 > 0.05 && hit.t1 < 0.95) || (hit.t2 > 0.05 && hit.t2 < 0.95);
      } // hasObstacleOnPath()
 
      /**
@@ -2351,9 +2369,7 @@
 
        // 増援の出現
        if (gameState.turn % NEW_ENEMY_INTERVAL === 0) {
-         const p = getSafeRandPos(0.8, 0.95);
-         const newEnemy = new EnemyShip(scene, p.x, p.y);
-         gameObjs.addEnemy(newEnemy);
+         spawnEnemy(scene, 0.8, 0.95);
 
          // spirit
          gameObjs.enemies.forEach(obj => {
@@ -2396,6 +2412,18 @@
      } // finalizeEnemyTurn()
 
      /**
+      * シールド/エネルギー系ゲージの共通更新処理（数値表示・色・幅を一括更新）
+      */
+     function updateGaugeDisplay(valueElId, gaugeElId, value, max) {
+       const ratio = value / max;
+       const color = ratio < 0.3 ? "#f00" : "#0f0";
+       document.getElementById(valueElId).style.color = color;
+       document.getElementById(valueElId).textContent = value;
+       document.getElementById(gaugeElId).style.width = (ratio * 100) + '%';
+       document.getElementById(gaugeElId).style.background = color;
+     } // updateGaugeDisplay()
+
+     /**
       * ステータスエリア更新
       */
      function updateStatus() {
@@ -2415,29 +2443,9 @@
        document.getElementById('statusEnemyShipCount').style.color = "#ff0"
        document.getElementById('statusEnemyShipCount').textContent = `${enemyCount}`;
 
-       // PlayerShip Shield
-       let PlayerShieldRatio = PlayerShield / PlayerShip.SHIELD_MAX;
-       let PlayerShieldColor = PlayerShieldRatio < 0.3 ? "#f00" : "#0f0";
-       document.getElementById('statusShipShield').style.color = PlayerShieldColor;
-       document.getElementById('statusShipShield').textContent = PlayerShield;
-       document.getElementById('gaugeShipShield').style.width = (PlayerShieldRatio * 100) + '%';
-       document.getElementById('gaugeShipShield').style.background = PlayerShieldColor;
-
-       // PlayerShip Energy
-       let energyRatio = PlayerEnergy / PlayerShip.ENERGY_MAX;
-       let energyColor = energyRatio < 0.3 ? "#f00" : "#0f0";
-       document.getElementById('statusShipEnergy').style.color = energyColor;
-       document.getElementById('statusShipEnergy').textContent = PlayerEnergy;
-       document.getElementById('gaugeShipEnergy').style.width = (energyRatio * 100) + '%';
-       document.getElementById('gaugeShipEnergy').style.background = energyColor;
-
-       // Base Shield
-       let baseShieldRatio = baseShield / StarBase.SHIELD_MAX;
-       let baseShieldColor = baseShieldRatio < 0.3 ? "#f00" : "#0f0";
-       document.getElementById('statusBaseShield').style.color = baseShieldColor;
-       document.getElementById('statusBaseShield').textContent = baseShield;
-       document.getElementById('gaugeBaseShield').style.width = (baseShieldRatio * 100) + '%';
-       document.getElementById('gaugeBaseShield').style.background = baseShieldColor;
+       updateGaugeDisplay('statusShipShield', 'gaugeShipShield', PlayerShield, PlayerShip.SHIELD_MAX);
+       updateGaugeDisplay('statusShipEnergy', 'gaugeShipEnergy', PlayerEnergy, PlayerShip.ENERGY_MAX);
+       updateGaugeDisplay('statusBaseShield', 'gaugeBaseShield', baseShield, StarBase.SHIELD_MAX);
      } // updateStatus()
 
      /**
