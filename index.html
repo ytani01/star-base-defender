@@ -2032,49 +2032,39 @@
      } // dockShip()
 
      /**
-      * 自機の移動処理（スタック回避および進路変更報告機能を追加）
+      * 自機の速度を考慮した目的座標を計算する。
+      * 移動距離が実質ゼロ（1未満）の場合は null を返す。
       */
-     function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
-       const dx = targetX - gameObjs.player.x;
-       const dy = targetY - gameObjs.player.y;
+     function computeDesiredMove(player, targetX, targetY) {
+       const dx = targetX - player.x;
+       const dy = targetY - player.y;
        const rawDist = Math.hypot(dx, dy);
        if (rawDist < 1) {
-         return;
+         return null;
        }
-
-       // スピードを考慮した移動距離
        const moveDist = Math.min(rawDist, PlayerShip.SPEED);
+       return {
+         desiredX: player.x + dx / rawDist * moveDist,
+         desiredY: player.y + dy / rawDist * moveDist,
+         moveDist,
+       };
+     } // computeDesiredMove()
 
-       // 実際の目的座標
-       const desiredX = gameObjs.player.x + dx / rawDist * moveDist;
-       const desiredY = gameObjs.player.y + dy / rawDist * moveDist;
-
-       // 目的座標が「基地」かどうかの判定
-       const dist_target_to_base = Phaser.Math.Distance.Between(
-         targetX, targetY, gameObjs.starBase.x, gameObjs.starBase.y
-       );
-       const target_is_base = dist_target_to_base <= StarBase.R ? true : false;
-
-       let destX, destY;
-       let skipAutoDock = false;
-       let ignoreObjs = [];
-       let isRerouted = false;
-       // 通常移動時のclampDest結果。スタック判定でresolveMovement()を呼ぶ際に
-       // 使い回し、同じ直線移動の再計算を避ける（ドッキング解除時はnullのまま）。
-       let precomputedDirectDest = null;
-
-       // 2. ドッキング解除時（離脱時）の特別ロジック
+     /**
+      * ドッキング状態に応じて自機の移動先を解決する。
+      * ドッキング解除時は基地から一定距離だけ強制的に離す「押し出し」処理を行う。
+      * @return {{destX:number, destY:number, skipAutoDock:boolean, ignoreObjs:Array,
+      *           precomputedDirectDest:?{x:number,y:number}}}
+      */
+     function resolvePlayerDestination(desiredX, desiredY, moveDist) {
        if (gameObjs.player.is_docked) {
          gameObjs.player.is_docked = false;
-         skipAutoDock = true;
          gameObjs.player.shield = PlayerShip.SHIELD_MAX;
 
-         ignoreObjs = [gameObjs.starBase];
-         const finalDest = gameObjs.player.resolveMovement(
+         const ignoreObjs = [gameObjs.starBase];
+         let { x: destX, y: destY } = gameObjs.player.resolveMovement(
            desiredX, desiredY, moveDist, ignoreObjs
          );
-         destX = finalDest.x;
-         destY = finalDest.y;
 
          const distFromBase = Phaser.Math.Distance.Between(
            gameObjs.starBase.x, gameObjs.starBase.y, destX, destY
@@ -2082,49 +2072,86 @@
          const minPushDist = StarBase.R + PlayerShip.R;
          if (distFromBase < minPushDist) {
            debugLog('distFromBase', distFromBase, 'minPushDist', minPushDist);
-           let pushAngle = Math.atan2(destY - gameObjs.starBase.y, destX - gameObjs.starBase.x);
+           const pushAngle = Math.atan2(destY - gameObjs.starBase.y, destX - gameObjs.starBase.x);
            destX = gameObjs.starBase.x + Math.cos(pushAngle) * minPushDist;
            destY = gameObjs.starBase.y + Math.sin(pushAngle) * minPushDist;
          }
-       } else {  // 通常移動およびドッキングを目的とする移動
-         const finalDest = gameObjs.player.clampDest(desiredX, desiredY, []);
-         destX = finalDest.x;
-         destY = finalDest.y;
-         precomputedDirectDest = finalDest;
+         return { destX, destY, skipAutoDock: true, ignoreObjs, precomputedDirectDest: null };
        }
 
-       let actualDist = Phaser.Math.Distance.Between(
-         gameObjs.player.x, gameObjs.player.y, destX, destY
-       );
+       // 通常移動およびドッキングを目的とする移動
+       const finalDest = gameObjs.player.clampDest(desiredX, desiredY, []);
+       return {
+         destX: finalDest.x,
+         destY: finalDest.y,
+         skipAutoDock: false,
+         ignoreObjs: [],
+         precomputedDirectDest: finalDest,
+       };
+     } // resolvePlayerDestination()
+
+     /**
+      * スタック（ほぼ動けていない）状態を検知し、必要なら扇形探索で迂回先を再計算する。
+      * 迂回を試みても動けない場合は cancelled:true を返す。
+      */
+     function resolveStuckAvoidance(desiredX, desiredY, moveDist, resolved) {
+       const { ignoreObjs, precomputedDirectDest } = resolved;
+       let destX = resolved.destX;
+       let destY = resolved.destY;
+
+       let actualDist = Phaser.Math.Distance.Between(gameObjs.player.x, gameObjs.player.y, destX, destY);
        debugLog('actualDist', actualDist);
-       
-       // スタック（完全停止）判定時の自動回避処理
-       if ( actualDist < 10 ) { // XXX TBD
-         // 扇形探索（resolveMovement）を利用して迂回進路を再計算。
-         // 通常移動時は直前に計算済みのclampDest結果を渡し、同じ計算を繰り返さない。
-         const avoidDest = gameObjs.player.resolveMovement(
-           desiredX, desiredY, moveDist, ignoreObjs, precomputedDirectDest
-         );
-         destX = avoidDest.x;
-         destY = avoidDest.y;
-         actualDist = Phaser.Math.Distance.Between(
-           gameObjs.player.x, gameObjs.player.y, destX, destY
-         );
-         debugLog('actualDist(2)', actualDist);
 
-         // 迂回を試みても移動不能な場合（四方を完全に囲まれている場合など）キャンセル
-         if (actualDist < 0.1) {
-           setMsg("操舵手", "障害物に接近しすぎてコース設定できません", "#0f0");
-           updateStatus();
-           return;
-         }
-
-         // 回避移動が成立したため、コース変更フラグを立てる
-         isRerouted = true;
+       if (actualDist >= 10) { // XXX TBD
+         return { destX, destY, actualDist, isRerouted: false, cancelled: false };
        }
+
+       // 扇形探索（resolveMovement）を利用して迂回進路を再計算。
+       // 通常移動時は直前に計算済みのclampDest結果を渡し、同じ計算を繰り返さない。
+       const avoidDest = gameObjs.player.resolveMovement(
+         desiredX, desiredY, moveDist, ignoreObjs, precomputedDirectDest
+       );
+       destX = avoidDest.x;
+       destY = avoidDest.y;
+       actualDist = Phaser.Math.Distance.Between(gameObjs.player.x, gameObjs.player.y, destX, destY);
+       debugLog('actualDist(2)', actualDist);
+
+       // 迂回を試みても移動不能な場合（四方を完全に囲まれている場合など）キャンセル
+       if (actualDist < 0.1) {
+         return { destX, destY, actualDist, isRerouted: false, cancelled: true };
+       }
+
+       return { destX, destY, actualDist, isRerouted: true, cancelled: false };
+     } // resolveStuckAvoidance()
+
+     /**
+      * 自機の移動処理（スタック回避および進路変更報告機能を追加）
+      */
+     function attemptPlayerMove(scene, targetX, targetY, delayBeforeEnemyTurn) {
+       const desired = computeDesiredMove(gameObjs.player, targetX, targetY);
+       if (!desired) {
+         return;
+       }
+       const { desiredX, desiredY, moveDist } = desired;
+
+       // 目的座標が「基地」かどうかの判定
+       const dist_target_to_base = Phaser.Math.Distance.Between(
+         targetX, targetY, gameObjs.starBase.x, gameObjs.starBase.y
+       );
+       const target_is_base = dist_target_to_base <= StarBase.R;
+
+       const resolved = resolvePlayerDestination(desiredX, desiredY, moveDist);
+       const stuck = resolveStuckAvoidance(desiredX, desiredY, moveDist, resolved);
+       if (stuck.cancelled) {
+         setMsg("操舵手", "障害物に接近しすぎてコース設定できません", "#0f0");
+         updateStatus();
+         return;
+       }
+       const { destX, destY, actualDist, isRerouted } = stuck;
+       const { skipAutoDock } = resolved;
 
        const speed_p = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
-       let cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
+       const cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
        if ( gameObjs.player.energy - cost < 0 ) {
          setMsg("機関部", "エネルギー不足です", '#ff0');
          updateStatus();
@@ -2139,7 +2166,7 @@
          setMsg("操舵手", `進路上に障害物。安全距離にて停止。推力 ${speed_p}%`, "#ff0");
        }
        updateStatus();
-       
+
        gameObjs.player.energy -= cost;
        gameState.isPlayerTurn = false;
 
@@ -2150,12 +2177,12 @@
              gameObjs.starBase.x, gameObjs.starBase.y
            );
            const contactDist = StarBase.R + PlayerShip.R + 1.5;
-           
+
            const canDockNow = (
-             !gameObjs.player.is_docked 
-             && dockDist <= contactDist 
-             && gameObjs.starBase.active 
-             && gameObjs.starBase.shield > 0 
+             !gameObjs.player.is_docked
+             && dockDist <= contactDist
+             && gameObjs.starBase.active
+             && gameObjs.starBase.shield > 0
              && target_is_base
            );
            if (canDockNow) {
