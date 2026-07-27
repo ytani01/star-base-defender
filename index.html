@@ -151,17 +151,6 @@
        color: #000;
      }
 
-     #creditUI {
-       position: absolute;
-       bottom: 10px;
-       right: 15px;
-       color: rgba(0, 255, 255, 0.6);
-       font-family: var(--font-mono);
-       font-size: 28px;
-       pointer-events: none; /* クリックイベントをキャンバスへ透過させる */
-       z-index: 1000;
-     }
-
      .panel-btn {
        font-size: 0.9em;
        background: transparent;
@@ -305,37 +294,36 @@
           <span class="game-title">StarBase Defender v0.3.17</span>
           <div class="game-credits">&copy; 2026 Yoichi Tanibayashi</div>
         </div>
-        <div id="turn">
+        <div>
           Turn
           <span id="statusMission">1</span>-<span id="statusTurn">1</span>
           <button class="panel-btn" id="viewScoresBtn">SCORE
             <span id="statusScore">100</span>
           </button>
         </div>
-        <div id="statusShip1">
-          Shield 
+        <div>
+          Shield
           <div class="status-gauge"><div id="gaugeShipShield" class="status-gauge-fill"></div></div>
           <span id="statusShipShield">0</span>
         </div>
-        <div id="statusShip2">
+        <div>
           Energy
           <div class="status-gauge"><div id="gaugeShipEnergy" class="status-gauge-fill"></div></div>
           <span id="statusShipEnergy">0</span>
         </div>
-        <div id="statusBase">
+        <div>
           Base Shield
           <div class="status-gauge"><div id="gaugeBaseShield" class="status-gauge-fill"></div></div>
           <span id="statusBaseShield">0</span>
         </div>
-        <div id="shipCount1">
-          <span id="statusFederationShip">Federation</span>
+        <div>
+          Federation
           <span id="statusFederationShipCount">1</span>
         </div>
-        <div id="shipCount2">
-          <span id="statusEnemyShip">Enemy</span>
+        <div>
+          Enemy
           <span id="statusEnemyShipCount">1</span>
         </div>
-        <button class="panel-btn" id="misc1">----</button>
         <div id="logStatus"></div>
       </div>
       
