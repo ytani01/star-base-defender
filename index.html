@@ -11,7 +11,7 @@
        --color-accent: #08f;
        --color-bg-dark: #111;
        --font-mono: monospace;
-       --panel-font-size: clamp(24px, 3.4vw, 30px);
+       --panel-font-size: clamp(14px, 3.4vw, 30px);
      }
      body {
        margin:0;
@@ -37,6 +37,10 @@
        color: var(--color-primary);
        padding:15px;
        flex: 0 0 auto;
+       /* 縦画面ではステータス欄が肥大化して宇宙域を圧迫しないよう上限を設ける
+          （横画面では下の @media で解除し、これまで通りサイドパネル全高を使う） */
+       max-height: 40vh;
+       max-height: 40dvh;
        border-bottom:2px solid var(--color-accent);
        overflow-y:auto;
        font-size: var(--panel-font-size);
@@ -90,7 +94,7 @@
      }
 
      #logStatus {
-       height: 150px;
+       height: 90px;
        line-height: 1.2;
        overflow-y: auto;
        background: #000;
@@ -131,9 +135,11 @@
        z-index: 1000;
      }
      #zoomUI button {
-       width: 90px;
-       height: 90px;
-       font-size: 48px;
+       /* タップしやすい最小サイズ(48px)は確保しつつ、画面が小さい端末では
+          宇宙域を圧迫しないよう viewport 幅に応じて縮小する */
+       width: clamp(48px, 11vw, 68px);
+       height: clamp(48px, 11vw, 68px);
+       font-size: clamp(24px, 6vw, 34px);
        background: rgba(0, 136, 255, 0.5);
        color: #fff;
        border: 2px solid var(--color-primary);
@@ -279,6 +285,7 @@
        }
        #statusPanel {
          width: 320px; /* 適切な固定幅を指定 */
+         max-height: none; /* 縦画面用の上限を解除し、サイドパネルとして全高を使う */
          height: 100vh; /* dvh未対応ブラウザ向けのフォールバック */
          height: 100dvh; /* ツールバーの表示/非表示に追従する実際の可視高さ */
          border-bottom: none;
