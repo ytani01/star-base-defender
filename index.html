@@ -419,6 +419,18 @@
        STORAGE_KEY: 'starbaseDefenderScores'
      };
 
+     // デバッグログの有効/無効切り替え。開発時に true にすると各種ログが出力される。
+     const DEBUG = false;
+
+     /**
+      * デバッグ用ログ出力（DEBUG=true のときのみ console.log する）
+      */
+     function debugLog(...args) {
+       if (DEBUG) {
+         console.log(...args);
+       }
+     } // debugLog()
+
      /**
       * ゲーム進行状態（ターン・スコア・ミッション進行・シーン参照など）を
       * カプセル化するクラス。gameObjs と同様、単一インスタンスとして扱う。
@@ -666,7 +678,7 @@
        static MAX_DAMAGE_RATIO = 0.2;  // 最大射程距離のダメージ比率
        
        constructor(max_power, area_r, cost=0) {
-         console.log(`Weapon> max_power=${max_power}, area_r=${area_r}, const=${cost}`);
+         debugLog(`Weapon> max_power=${max_power}, area_r=${area_r}, const=${cost}`);
          this.max_power = max_power;
          this.area_r = area_r;
          this.cost = cost;
@@ -953,12 +965,12 @@
              }
 
              let currentBestMoveSq = (bestDest.x - x)**2 + (bestDest.y - y)**2;
-             console.log('currentBestMoveSq', currentBestMoveSq);
+             debugLog('currentBestMoveSq', currentBestMoveSq);
              let stuck = currentBestMoveSq < 1.0;
 
              if (distToTargetSq < minTargetDistSq || stuck) {
                minTargetDistSq = distToTargetSq;
-               console.log('minTargetDistSq', minTargetDistSq);
+               debugLog('minTargetDistSq', minTargetDistSq);
                bestDest = clamped;
              }
 
@@ -1025,7 +1037,7 @@
              let obj = [...gameObjs.federationShips].filter(f => f !==this);
              obj.push(gameObjs.starBase);
              obj.push(gameObjs.player);
-             console.log(obj);
+             debugLog(obj);
              obj.forEach(t => {
                let dx = t.x - this.x;
                let dy = t.y - this.y;
@@ -1113,7 +1125,7 @@
 
          // 子クラス(EnemyShip / FederationShip) が持つスタティックプロパティを参照して士気を初期化
          this.spirit = this.constructor.SPIRIT.INIT;
-         console.log(`${this.constructor.name}> spirit=${Number(this.spirit).toFixed(3)}`);
+         debugLog(`${this.constructor.name}> spirit=${Number(this.spirit).toFixed(3)}`);
        }
 
        /**
@@ -2037,7 +2049,7 @@
          );
          const minPushDist = StarBase.R + PlayerShip.R;
          if (distFromBase < minPushDist) {
-           console.log('distFromBase', distFromBase, 'minPushDist', minPushDist);
+           debugLog('distFromBase', distFromBase, 'minPushDist', minPushDist);
            let pushAngle = Math.atan2(destY - gameObjs.starBase.y, destX - gameObjs.starBase.x);
            destX = gameObjs.starBase.x + Math.cos(pushAngle) * minPushDist;
            destY = gameObjs.starBase.y + Math.sin(pushAngle) * minPushDist;
@@ -2052,7 +2064,7 @@
        let actualDist = Phaser.Math.Distance.Between(
          gameObjs.player.x, gameObjs.player.y, destX, destY
        );
-       console.log('actualDist', actualDist);
+       debugLog('actualDist', actualDist);
        
        // スタック（完全停止）判定時の自動回避処理
        if ( actualDist < 10 ) { // XXX TBD
@@ -2065,7 +2077,7 @@
          actualDist = Phaser.Math.Distance.Between(
            gameObjs.player.x, gameObjs.player.y, destX, destY
          );
-         console.log('actualDist(2)', actualDist);
+         debugLog('actualDist(2)', actualDist);
 
          // 迂回を試みても移動不能な場合（四方を完全に囲まれている場合など）キャンセル
          if (actualDist < 0.1) {
@@ -2173,7 +2185,7 @@
        if (gameState.isGameOver || !npc.active) return;
        
        const context = npc.evaluateTactics();
-       console.log(
+       debugLog(
          npc.constructor.name,
          "shield", npc.shieldPercent().toFixed(3),
          ", fear", npc.fear().toFixed(3),
@@ -2283,7 +2295,7 @@
              npc.constructor.SPIRIT.MAX,
              (npc.spirit + npc.constructor.SPIRIT.RECOVERY)
            );
-           console.log(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
+           debugLog(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
          }
        }); // npc.moveTo()
 
@@ -2318,14 +2330,14 @@
          // spirit
          gameObjs.enemies.forEach(obj => {
            obj.spirit = Math.min(EnemyShip.SPIRIT.MAX, obj.spirit + EnemyShip.SPIRIT.STEP);
-           console.log(`finalizeEnemyTurn> obj.spirit up: ${obj.spirit.toFixed(3)}`);
+           debugLog(`finalizeEnemyTurn> obj.spirit up: ${obj.spirit.toFixed(3)}`);
          });
          setMsg("戦術士官", "新たな敵を検知！", "#ff0")
        }
        if ( gameState.turn % NEW_FEDERATION_INTERVAL === 0 ) {
          // XXX TBD 連邦の援軍が出現する条件
          const qty_enemies = gameObjs.enemies.filter(e => e.active).length;
-         console.log(
+         debugLog(
            `qtyFederationShip=${gameState.qtyFederationShip}, qty_enemies=${qty_enemies}`
          );
          if ( gameState.qtyFederationShip < qty_enemies / 2 ) {
@@ -2407,13 +2419,13 @@
        const clearedMission = gameState.curMission;
        let bonus = gameState.curMission * 100;
        gameState.score += bonus;
-       console.log(`nextMission> bonus=${bonus}, gameState.score=${gameState.score}`);
+       debugLog(`nextMission> bonus=${bonus}, gameState.score=${gameState.score}`);
 
        gameState.qtyFederationShip = gameObjs.federationShips.filter(o => o.active).length;
        /* if ( gameState.turn < NEW_ENEMY_INTERVAL ) {
         *   gameState.qtyFederationShip++;
         * } */
-       console.log(`nextMission> gameState.qtyFederationShip=${gameState.qtyFederationShip}`);
+       debugLog(`nextMission> gameState.qtyFederationShip=${gameState.qtyFederationShip}`);
 
        const { list, newIdx } = saveHighScore(
          gameState.score, gameState.turn, clearedMission,
@@ -2438,7 +2450,7 @@
       * ゲームオーバー
       */
      function gameOver(from="?", msg="?", clear=false) {
-       console.log(`from=${from}, msg=${msg}, clear=${clear}`);
+       debugLog(`from=${from}, msg=${msg}, clear=${clear}`);
        const msgstr = from + ">" + msg;
        gameState.isGameOver = true;
        gameState.flagClear = clear;
