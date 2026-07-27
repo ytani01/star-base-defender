@@ -513,12 +513,13 @@
      } // drawBoundary()
 
      /**
-      * メッセージの表示（複数行スクロール対応）
+      * 戦況ログに1行追加する（複数行スクロール対応）。
+      * 発信者を必ず伴わせることで、どの担当からの報告かを一目で判別できるようにする。
+      * @param {string} from 発信者（操舵手・戦術士官・機関部など）
       * @param {string} msg 表示するテキスト（空文字の場合はログを全消去）
-      * @param {string} fg 文字色
-      * @param {string} bg 行の背景色
+      * @param {string} fg 文字色。緊急度を色で示すために使う
       */
-     function setMsg(from="", msg="", fg="#0ff", bg="transparent") {
+     function setMsg(from="", msg="", fg="#0ff") {
        const el = document.getElementById('logStatus');
        
        // msgが空文字（ゲームオーバー時などの画面クリア命令）の場合は全消去
@@ -540,7 +541,6 @@
        const line = document.createElement('div');
        line.className = 'log-line';
        line.style.color = fg;
-       line.style.backgroundColor = (bg !== "#444") ? bg : "transparent";
        line.textContent = msgstr;
 
        // ログ領域の末尾に追加
@@ -658,12 +658,9 @@
          this.enemies = this.enemies.filter(e => e !== enemy);
        }
 
-       // 連邦艦の追加・削除を管理
+       // 連邦艦の追加を管理
        addFederation(ship) {
          this.federationShips.push(ship);
-       }
-       removeFederation(ship) {
-         this.federationShips = this.federationShips.filter(e => e !== ship);
        }
 
        // 衝突判定や描画ループで使用する障害物リストを生成
@@ -733,7 +730,6 @@
 
        get src_w() {return this.sprite.width;}
        get src_h() {return this.sprite.height;}
-       get src_r() {return (this.src_w + this.src_h) / 4;}
 
        get w() {return this.src_w * this.scale;}
        get h() {return this.src_h * this.scale;}
@@ -1273,7 +1269,6 @@
       */
      class Star extends GameObj {
        static W = 40;
-       static R = Star.W / 2 * SCALE;
        static RANGE = {
          MIN: 0.25,
          MAX: 0.85,
@@ -1339,7 +1334,6 @@
       */
      class EnemyShip extends NPCShip {
        static W = 60;
-       static R = EnemyShip.W / 2 * SCALE;
        static SPEED = 40 * SCALE;
 
        static SHIELD_MAX = 300;
@@ -1462,7 +1456,6 @@
       */
      class FederationShip extends NPCShip {
        static W = 60;
-       static R = FederationShip.W / 2 * SCALE;
        static SPEED = 80 * SCALE;
 
        static SHIELD_MAX = 400;
