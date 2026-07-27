@@ -475,7 +475,9 @@
      } // getActiveFederationShipCount()
 
      /**
-      *
+      * 生存中の敵艦の数。
+      * 配列には撃破・撤退済みの艦が残っている場合があるため、
+      * 表示や判定には必ずこの関数を通した数を使う。
       */
      function getActiveEnemyCount() {
        return gameObjs.enemies.filter(enemy => enemy.active).length;
@@ -712,7 +714,9 @@
      } // class Weapon
 
      /**
-      *
+      * 空間に存在する全オブジェクトの基底クラス。
+      * 座標とサイズは Phaser のスプライトへ委譲しており、ゲームロジック側は
+      * スプライトの存在を意識せずに x / y / r だけを扱えるようにしている。
       */
      class GameObj {
        constructor(scene, x, y, texture, scale=SCALE) {
@@ -748,7 +752,8 @@
      } // class GameObj
 
      /**
-      *
+      * シールドを持つオブジェクト（艦船・基地）の基底クラス。
+      * 残量の可視化（艦を囲む円とゲージ）と被弾処理をここに集約する。
       */
      class ObjWithShield extends GameObj {
        static SHIELD_MAX = 1; // dummy
@@ -808,28 +813,30 @@
        } // update()
 
        /**
-        *
+        * シールドの残量比（0.0〜1.0）
         */
        shieldPercent() {
          return (this.shield / this.constructor.SHIELD_MAX);
        }
 
        /**
-        *
+        * 恐怖度（0.0〜1.0）。士気の裏返しであり、逃走に転じる閾値になる。
         */
        fear() {
          return (1.0 - this.spirit);
        }
 
        /**
-        *
+        * 逃走中かどうか。シールド残量が恐怖度を下回ると逃走に転じる。
+        * 士気が高いほど、より深く削られるまで戦い続けることになる。
         */
        isFleeing() {
          return this.shieldPercent() < this.fear();
        }
 
        /**
-        *
+        * 被弾処理。シールドが尽きた場合は撃破としてスコアを減点する。
+        * 「破壊は割に合わない」というこのゲームの中核ルールを担保する箇所。
         */
        takeDamage(amount) {
          this.shield -= amount;
@@ -840,7 +847,9 @@
        } // takeDamage()
 
        /**
-        *
+        * 消滅処理。撃破と宇宙域からの離脱（撤退）の両方から呼ばれる。
+        * 描画用のグラフィックスはスプライトとは別管理のため、
+        * 個別に破棄しないとシールド円とゲージだけが画面に残ってしまう。
         */
        die() {
          this.shield = 0;
@@ -1226,7 +1235,9 @@
      } // class NPCShip
 
      /**
-      *
+      * エネルギーを持つ艦の基底クラス（現状は自機のみが継承する）。
+      * 移動・攻撃・シールド回復の全てが同一のエネルギーを消費するため、
+      * 残量をシールドゲージの直下に並べて常時見えるようにしている。
       */
      class ObjWithEnergy extends SpaceShip {
        static ENERGY_MAX = 1;
@@ -1265,7 +1276,7 @@
      } // class ObjWithEnergy
 
      /**
-      *
+      * 恒星。移動を妨げ、射線を遮る障害物として機能する。
       */
      class Star extends GameObj {
        static W = 40;
@@ -1279,7 +1290,9 @@
      } // class Star
 
      /**
-      *
+      * 防衛対象の宇宙基地。
+      * プレイヤーにとっては補給地点であると同時に、射線を遮る障害物でもある。
+      * 基地のシールドが尽きるとゲームオーバーになる。
       */
      class StarBase extends ObjWithShield {
        static W = 100;
@@ -1330,7 +1343,7 @@
      } // class StarBase
 
      /**
-      *
+      * 敵艦。撃破ではなく、宇宙域の外へ撤退させることが目的の対象。
       */
      class EnemyShip extends NPCShip {
        static W = 60;
@@ -1530,7 +1543,7 @@
      } // class FederationShip
 
      /**
-      *
+      * プレイヤーが操作する防衛艦。
       */
      class PlayerShip extends ObjWithEnergy {
        static W = 60;
@@ -1639,7 +1652,7 @@
      new Phaser.Game(config);
 
      /**
-      *
+      * 連邦艦（味方NPC）を1隻、他の物体と重ならない位置に出現させる。
       */
      function newFederationShip(scene, dist_min=0.3, dist_max=0.6) {
        let p = getSafeRandPos(dist_min, dist_max);
@@ -1846,7 +1859,10 @@
      } // update()
 
      /**
-      *
+      * 既存の物体と重ならないランダム座標を返す。
+      * 中心（基地）からの距離を比率で指定することで、「外縁部に増援を出す」
+      * 「中心付近に自機を配置する」を同じ関数で出し分けている。
+      * 条件を満たす座標が見つからない場合も、試行回数の上限で必ず打ち切る。
       */
      function getSafeRandPos(dist_min, dist_max){
        let x, y, distToCenter;
@@ -1902,7 +1918,9 @@
      } // intersectSegmentCircle()
 
      /**
-      *
+      * src から dst への線分が obj に遮られるか。
+      * 始点・終点のごく近傍（t < 0.05 / t > 0.95）は射手自身や目標との接触なので、
+      * 遮蔽とはみなさない。
       */
      function hasObstacleOnPath(src, dst, obj) {
        const dx = dst.x - src.x, dy = dst.y - src.y;
@@ -1936,7 +1954,9 @@
      } // isLOSBlocked()
 
      /**
-      *
+      * クリック（タップ）操作の受け口。
+      * 「何をクリックしたか」だけで行動が決まる設計のため、まず対象オブジェクトへ
+      * 処理を委ね、どこからも処理されなかった場合にのみ移動へフォールバックする。
       */
      function handlePointerDown(pointer) {
        if (gameState.isGameOver || !gameState.isPlayerTurn) return;
@@ -2004,10 +2024,8 @@
      } // canDock()
 
      /**
-      *
-      */
-     /**
-      * ドッキング処理：自機を基地の「中央」に移動させる
+      * ドッキング処理：自機を基地の「中央」に移動させる。
+      * 補給と引き換えに攻撃手段を失うため、明示的な操作でのみ実行される。
       */
      function dockShip(scene) {
        gameObjs.player.is_docked = true;
@@ -2173,7 +2191,8 @@
      } // attemptPlayerMove()
 
      /**
-      *
+      * ビームの描画と発射音の再生。
+      * 一定時間後に自動で破棄される、その場限りのグラフィックスとして描く。
       */
      function fireBeam(scene, srcObj, targetObj, color) {
        const beam = scene.add.graphics();
