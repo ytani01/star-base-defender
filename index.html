@@ -1984,26 +1984,20 @@
      } // handlePointerDown()
 
      /**
-      * ドッキングできるか確認
+      * 指定した艦が基地に接触している（ドッキング可能な距離にいる）かどうかを判定する。
+      * プレイヤー・連邦艦、共通で使用する。
+      */
+     function isAdjacentToBase(ship, base) {
+       const dist = Phaser.Math.Distance.Between(ship.x, ship.y, base.x, base.y);
+       const contactDist = base.r + ship.r + 1.5;
+       return dist <= contactDist;
+     } // isAdjacentToBase()
+
+     /**
+      * 自機が基地に接しており、ドッキングできるかを確認する
       */
      function canDock() {
-       // 到達距離
-       const dist = Phaser.Math.Distance.Between(
-         gameObjs.player.x, gameObjs.player.y,
-         gameObjs.starBase.x, gameObjs.starBase.y
-       );
-
-       if (dist - StarBase.W / 2 > PlayerShip.SPEED) {
-         return false;
-       }
-
-       // 経路上に有効(active)な障害物が1つでもあれば false を返す (パターンB)
-       const hasObstacle = [
-         ...gameObjs.stars, ...gameObjs.enemies, ...gameObjs.federationShips
-       ].some(
-         obj => obj.active && hasObstacleOnPath(gameObjs.player, gameObjs.starBase, obj)
-       );
-       return !hasObstacle;
+       return isAdjacentToBase(gameObjs.player, gameObjs.starBase);
      } // canDock()
 
      /**
@@ -2053,7 +2047,7 @@
      /**
       * ドッキング状態に応じて自機の移動先を解決する。
       * ドッキング解除時は基地から一定距離だけ強制的に離す「押し出し」処理を行う。
-      * @return {{destX:number, destY:number, skipAutoDock:boolean, ignoreObjs:Array,
+      * @return {{destX:number, destY:number, ignoreObjs:Array,
       *           precomputedDirectDest:?{x:number,y:number}}}
       */
      function resolvePlayerDestination(desiredX, desiredY, moveDist) {
@@ -2076,7 +2070,7 @@
            destX = gameObjs.starBase.x + Math.cos(pushAngle) * minPushDist;
            destY = gameObjs.starBase.y + Math.sin(pushAngle) * minPushDist;
          }
-         return { destX, destY, skipAutoDock: true, ignoreObjs, precomputedDirectDest: null };
+         return { destX, destY, ignoreObjs, precomputedDirectDest: null };
        }
 
        // 通常移動およびドッキングを目的とする移動
@@ -2084,7 +2078,6 @@
        return {
          destX: finalDest.x,
          destY: finalDest.y,
-         skipAutoDock: false,
          ignoreObjs: [],
          precomputedDirectDest: finalDest,
        };
@@ -2148,7 +2141,6 @@
          return;
        }
        const { destX, destY, actualDist, isRerouted } = stuck;
-       const { skipAutoDock } = resolved;
 
        const speed_p = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
        const cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
@@ -2171,24 +2163,6 @@
        gameState.isPlayerTurn = false;
 
        gameObjs.player.moveTo(destX, destY, TIMING.TURN_DELAY, () => {
-         if (!skipAutoDock) {
-           const dockDist = Phaser.Math.Distance.Between(
-             gameObjs.player.x, gameObjs.player.y,
-             gameObjs.starBase.x, gameObjs.starBase.y
-           );
-           const contactDist = StarBase.R + PlayerShip.R + 1.5;
-
-           const canDockNow = (
-             !gameObjs.player.is_docked
-             && dockDist <= contactDist
-             && gameObjs.starBase.active
-             && gameObjs.starBase.shield > 0
-             && target_is_base
-           );
-           if (canDockNow) {
-             dockShip(scene);
-           }
-         }
          scene.time.delayedCall(delayBeforeEnemyTurn, () => npcTurn(scene));
        });
 
@@ -2263,19 +2237,19 @@
 
        const base = gameObjs.starBase;
        const isBaseActive = base && base.active && base.shield > 0;
-       const distToBase = Phaser.Math.Distance.Between(npc.x, npc.y, base.x, base.y);
+       // 連邦艦が、すでに基地に接している（＝前のターンまでに到着済み）かどうか
+       const dockableNow = npc instanceof FederationShip && isBaseActive
+         && isAdjacentToBase(npc, base);
 
        if (context.isFleeing) {
-         // 連邦艦かつ移動可能距離内に有効な基地がある場合、ドッキング移動を最優先する
-         if (npc instanceof FederationShip && isBaseActive) {
-           if (distToBase - StarBase.W / 2 <= npc.constructor.SPEED) {
-             // ドッキング
-             dest = { x: base.x, y: base.y };
-             isDocking = true;
-           }
+         // 連邦艦はすでに基地に接していれば、移動せずドッキング（回復）する
+         if (dockableNow) {
+           dest = { x: npc.x, y: npc.y };
+           isDocking = true;
          }
 
-         // ドッキング対象でない場合は、通常の逃走（敵・障害物回避）経路を計算
+         // ドッキングしない場合は、通常の逃走（敵・障害物回避）経路を計算。
+         // 基地は障害物として扱われるため、連邦艦は接する位置で自然に停止する。
          if (!isDocking) {
            let threats = [gameObjs.player, base];
            if (npc instanceof FederationShip) {
@@ -2289,18 +2263,14 @@
            // ターゲットがいれば追跡
            const targetDest = { x: context.target.x, y: context.target.y};
            dest = npc.calculateDestination(targetDest, context.isFleeing);
+         } else if (dockableNow) {
+           // ターゲットがおらず、すでに基地に接していればドッキング（回復）する
+           dest = { x: npc.x, y: npc.y };
+           isDocking = true;
          } else {
-           // ターゲットがいなければ基地へ向かう
+           // ターゲットがいなければ基地へ向かう（接する位置で自然に停止する）
            const targetDest = { x: base.x, y: base.y };
            dest = npc.calculateDestination(targetDest, context.isFleeing);
-
-           if ( npc instanceof FederationShip ) {
-             if (distToBase - StarBase.W / 2 <= npc.constructor.SPEED) {
-               // ドッキング
-               dest = { x: base.x, y: base.y };
-               isDocking = true;
-             }
-           }
          }
        } // if (context.isFleeing)
 
