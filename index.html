@@ -468,11 +468,11 @@
      // ---------------------------------------------------------
 
      /**
-      *
+      * 生存中の連邦艦の数（自機は含まない）
       */
      function getActiveFederationShipCount() {
-       return gameObjs.federationShips.filter(f => f.active).length + 1;
-     }
+       return gameObjs.federationShips.filter(f => f.active).length;
+     } // getActiveFederationShipCount()
 
      /**
       *
@@ -2351,7 +2351,7 @@
        gameState.turn++;
        // 減点
        gameState.score -= gameObjs.enemies.filter(e => e.active).length;
-       gameState.score -= gameObjs.federationShips.filter(e => e.active).length;
+       gameState.score -= getActiveFederationShipCount();
 
        // 増援の出現
        if (gameState.turn % NEW_ENEMY_INTERVAL === 0) {
@@ -2366,11 +2366,14 @@
        }
        if ( gameState.turn % NEW_FEDERATION_INTERVAL === 0 ) {
          // XXX TBD 連邦の援軍が出現する条件
+         // gameState.qtyFederationShip はミッション開始時点のスナップショットのため
+         // ここでは使わず、現在生存中の連邦艦数をその場で数える
          const qty_enemies = gameObjs.enemies.filter(e => e.active).length;
+         const qty_federation = getActiveFederationShipCount();
          debugLog(
-           `qtyFederationShip=${gameState.qtyFederationShip}, qty_enemies=${qty_enemies}`
+           `qty_federation=${qty_federation}, qty_enemies=${qty_enemies}`
          );
-         if ( gameState.qtyFederationShip < qty_enemies / 2 ) {
+         if ( qty_federation < qty_enemies / 2 ) {
            setMsg("通信士", "味方が到着しました！", "#0f0");
            newFederationShip(scene, 0.8, 0.95);
          }
@@ -2412,7 +2415,7 @@
        const PlayerEnergy = gameObjs.player.energy > 0 ? gameObjs.player.energy : 0;
        const PlayerShield = gameObjs.player.shield > 0 ? gameObjs.player.shield : 0;
        const baseShield = gameObjs.starBase.shield > 0 ? gameObjs.starBase.shield : 0;
-       const federationCount = getActiveFederationShipCount();
+       const federationCount = getActiveFederationShipCount() + 1; // 自機を含めて表示
        const enemyCount = getActiveEnemyCount();
 
        document.getElementById('statusTurn').textContent = `${gameState.turn}`;
@@ -2439,7 +2442,7 @@
        gameState.score += bonus;
        debugLog(`nextMission> bonus=${bonus}, gameState.score=${gameState.score}`);
 
-       gameState.qtyFederationShip = gameObjs.federationShips.filter(o => o.active).length;
+       gameState.qtyFederationShip = getActiveFederationShipCount();
        debugLog(`nextMission> gameState.qtyFederationShip=${gameState.qtyFederationShip}`);
 
        const { list, newIdx } = saveHighScore(
