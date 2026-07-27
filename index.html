@@ -925,45 +925,53 @@
        /**
         * 進行方向に障害物がある場合、少しずつ角度をずらして迂回ルートを探す
         */
-       resolveMovement(desiredX, desiredY, speed, ignoreObjs = []) {
+       resolveMovement(desiredX, desiredY, speed, ignoreObjs = [], precomputedDirectDest = null) {
          const x = this.x;
          const y = this.y;
 
          let dx = desiredX - x;
          let dy = desiredY - y;
          let reqDistSq = dx * dx + dy * dy;
-         
-         // 自身の clampDest を呼び出す
-         let directDest = this.clampDest(desiredX, desiredY, ignoreObjs);
+
+         // 直線移動（clampDest）の結果。呼び出し側ですでに計算済みならそれを使い回し、
+         // 同じ入力に対する重複計算を避ける（clampDestは副作用のない純粋な計算）。
+         let directDest = precomputedDirectDest || this.clampDest(desiredX, desiredY, ignoreObjs);
          let directMoveSq = (directDest.x - x)**2 + (directDest.y - y)**2;
-         
+
+         // 直線移動だけで目的距離の95%以上進めるなら、迂回探索はせずそのまま確定
          if (directMoveSq >= reqDistSq * 0.95) {
            return directDest;
          }
 
+         // ここから先は「直線ではほとんど進めない」場合の迂回探索。
+         // 目的方向を基準に、左右(sign = 1 / -1)それぞれ5°刻みで最大90°まで振り、
+         // 迂回できる角度を総当たりで探す（見つかった中で目的地に最も近い、または
+         // 直進よりマシに動ける角度を採用する）。
          speed /= 2;
          let baseAngle = Math.atan2(dy, dx);
          let bestDest = directDest;
          let minTargetDistSq = (directDest.x - desiredX)**2 + (directDest.y - desiredY)**2;
 
-         for (let sign of [1, -1]) {
-           for (let i = 5; i <= 90; i += 5) {
+         for (let sign of [1, -1]) { // 左右どちら向きにも振ってみる
+           for (let i = 5; i <= 90; i += 5) { // 5°刻みで角度を広げていく
              let offset = (i * Math.PI) / 180;
              let testAngle = baseAngle + offset * sign;
-             
+
              let testX = x + Math.cos(testAngle) * speed;
              let testY = y + Math.sin(testAngle) * speed;
-             
+
              let clamped = this.clampDest(testX, testY, ignoreObjs);
-             
+
              let moveDistSq = (clamped.x - x)**2 + (clamped.y - y)**2;
-             // console.log('moveDistSq', moveDistSq );
              let distToTargetSq = (clamped.x - desiredX)**2 + (clamped.y - desiredY)**2;
 
+             // ほとんど動けない角度は候補にしない
              if (moveDistSq < 10 * 10) {  // XXX TBD
                continue;
              }
 
+             // 現在のベスト候補がほぼ動けていない（スタック中）場合は、
+             // 目的地への近さより「動けること」を優先して採用する
              let currentBestMoveSq = (bestDest.x - x)**2 + (bestDest.y - y)**2;
              debugLog('currentBestMoveSq', currentBestMoveSq);
              let stuck = currentBestMoveSq < 1.0;
@@ -974,8 +982,9 @@
                bestDest = clamped;
              }
 
+             // 十分な速度で動ける角度が見つかったら、この振り幅(sign)側の探索は打ち切る
              if (moveDistSq >= (speed * 0.95)**2) {
-               break; 
+               break;
              }
            } // for(i)
          } // for (sign)
@@ -1016,11 +1025,20 @@
        } // getAvoidanceVector()
 
        /**
+        * 逃走時、通常の脅威回避ベクトルに加えて引き寄せられる対象（味方・基地など）を返す。
+        * 既定では「なし」。艦種ごとに異なる挙動が必要な場合はオーバーライドする。
+        * @return {Array<{target: GameObj, weightMultiplier: number}>}
+        */
+       getAttractionTargets() {
+         return [];
+       } // getAttractionTargets()
+
+       /**
         * ターゲットへの方向ベクトル（追尾・逃走）を算出する
         */
        getTargetVector(target, isFleeing) {
          let dirX = 0, dirY = 0;
-         
+
          if (isFleeing && Array.isArray(target)) {
            target.forEach(t => {
              let dx = this.x - t.x;
@@ -1032,35 +1050,24 @@
                dirY += (dy / dist) * weight;
              }
            });
-           // FederationShipの場合、StarBaseやPlayerShipに近づくようにする。
-           if ( this instanceof FederationShip ) {
-             let obj = [...gameObjs.federationShips].filter(f => f !==this);
-             obj.push(gameObjs.starBase);
-             obj.push(gameObjs.player);
-             debugLog(obj);
-             obj.forEach(t => {
-               let dx = t.x - this.x;
-               let dy = t.y - this.y;
-               let dist = Math.hypot(dx, dy);
-               if (dist > 0.001) {
-                 let weight = 1.0 / dist;
-                 if ( t === gameObjs.player ) {
-                   weight *= 2;
-                 }
-                 if ( t === gameObjs.starBase ) {
-                   weight *= 7;
-                 }
-                 dirX += (dx / dist) * weight;
-                 dirY += (dy / dist) * weight;
-               }
-             });
-           } // if (FederationShip)
+           // 艦種ごとの追加の引き寄せ対象（例: 連邦艦は基地・自機・僚艦に引き寄せられる）
+           this.getAttractionTargets().forEach(({ target: t, weightMultiplier }) => {
+             if (!t) return;
+             let dx = t.x - this.x;
+             let dy = t.y - this.y;
+             let dist = Math.hypot(dx, dy);
+             if (dist > 0.001) {
+               let weight = (1.0 / dist) * weightMultiplier;
+               dirX += (dx / dist) * weight;
+               dirY += (dy / dist) * weight;
+             }
+           });
 
            let fDist = Math.hypot(dirX, dirY);
            if (fDist > 0.000001) {
              dirX /= fDist;
              dirY /= fDist;
-           } // if (FederationShip)
+           }
          } else {
            let dx = target.x - this.x;
            let dy = target.y - this.y;
@@ -1504,10 +1511,26 @@
          return [...gameObjs.enemies];
        }
 
-       // 連邦艦は逃走中の敵を追撃・攻撃しない 
+       // 連邦艦は逃走中の敵を追撃・攻撃しない
        shouldIgnoreTarget(target) {
          return target.isFleeing();
        }
+
+       /**
+        * override: 逃走中は他の連邦艦・基地・自機に引き寄せられる。
+        * 基地への引力を最も強く、自機への引力をその次に強くする。
+        */
+       getAttractionTargets() {
+         const targets = [
+           ...gameObjs.federationShips
+             .filter(f => f !== this)
+             .map(f => ({ target: f, weightMultiplier: 1 })),
+           { target: gameObjs.starBase, weightMultiplier: 7 },
+           { target: gameObjs.player, weightMultiplier: 2 },
+         ];
+         debugLog(targets);
+         return targets;
+       } // getAttractionTargets()
 
      } // class FederationShip
 
@@ -2029,6 +2052,9 @@
        let skipAutoDock = false;
        let ignoreObjs = [];
        let isRerouted = false;
+       // 通常移動時のclampDest結果。スタック判定でresolveMovement()を呼ぶ際に
+       // 使い回し、同じ直線移動の再計算を避ける（ドッキング解除時はnullのまま）。
+       let precomputedDirectDest = null;
 
        // 2. ドッキング解除時（離脱時）の特別ロジック
        if (gameObjs.player.is_docked) {
@@ -2059,6 +2085,7 @@
          const finalDest = gameObjs.player.clampDest(desiredX, desiredY, []);
          destX = finalDest.x;
          destY = finalDest.y;
+         precomputedDirectDest = finalDest;
        }
 
        let actualDist = Phaser.Math.Distance.Between(
@@ -2068,9 +2095,10 @@
        
        // スタック（完全停止）判定時の自動回避処理
        if ( actualDist < 10 ) { // XXX TBD
-         // 扇形探索（resolveMovement）を利用して迂回進路を再計算
+         // 扇形探索（resolveMovement）を利用して迂回進路を再計算。
+         // 通常移動時は直前に計算済みのclampDest結果を渡し、同じ計算を繰り返さない。
          const avoidDest = gameObjs.player.resolveMovement(
-           desiredX, desiredY, moveDist, ignoreObjs
+           desiredX, desiredY, moveDist, ignoreObjs, precomputedDirectDest
          );
          destX = avoidDest.x;
          destY = avoidDest.y;
