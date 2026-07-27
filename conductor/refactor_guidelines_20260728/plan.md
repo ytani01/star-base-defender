@@ -14,17 +14,17 @@
 
 コミット種別: `refactor:` / 参照ゼロを `grep` で確認済みのため、挙動は変化しない。
 
-- [ ] Task: 未参照の static プロパティ `Star.R` (1276行) / `EnemyShip.R` (1342行) / `FederationShip.R` (1465行) を削除する。`GameObj.get r()` (740行) があるため実際には使われていない。※ `StarBase.R` `PlayerShip.R` は使用中のため残す 〔JS: 不要なものを残さない〕
-- [ ] Task: 未参照のゲッター `GameObj.get src_r()` (736行) を削除する 〔JS: 同上〕
-- [ ] Task: 未参照のメソッド `GameObjs.removeFederation()` (665行) を削除する。※ `getObstacles()` (670行) も未参照だが Phase 5 で `clampDest()` と統合するため、ここでは削除しない 〔JS: 同上〕
-- [ ] Task: `setMsg()` の未使用引数 `bg` (521行) と、それに依存する 543行の分岐（`(bg !== "#444") ? bg : "transparent"`）を削除する。4引数で呼んでいる箇所は存在しない 〔JS: 不要なものを残さない〕
-- [ ] Task: `setMsg()` の JSDoc (515〜520行) を実際の引数（`from` / `msg` / `fg`）に合わせて書き直す 〔JS: JSDoc〕
-- [ ] Task: `dockShip()` 直前 (2016〜2018行) の重複した空 JSDoc を1つにする 〔JS: 中身のない JSDoc を残さない〕
-- [ ] Task: ファイル全体の空 JSDoc（19箇所。477 / 717 / 754 / 814 / 1232 / 1286 / 1539 / 1890 / 1945 / 2182行 ほか）に説明を書く。「何をするか」ではなく「なぜそうするか」を書く 〔JS: JSDoc〕
-- [ ] Task: 動作しないボタン `#misc1` (338行) を HTML から削除する。JS からの参照が一切なく、押しても何も起きない 〔HTML/CSS: 不要なものを残さない / Product Guidelines: 常時表示は必要最小限に〕
-- [ ] Task: 対応する DOM 要素が存在しない CSS ルール `#creditUI` (154〜163行) を削除する 〔HTML/CSS: 対応する要素が存在しない CSS ルールを残さない〕
-- [ ] Task: CSS からも JS からも参照されていない `id` 属性（`#turn` 308行 / `#statusShip1` 315行 / `#statusShip2` 320行 / `#shipCount1` 330行 / `#shipCount2` 334行）を削除する。要素とレイアウトは維持する 〔HTML/CSS: どちらからも参照されない id を残さない〕
-- [ ] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
+- [x] Task: 未参照の static プロパティ `Star.R` (1276行) / `EnemyShip.R` (1342行) / `FederationShip.R` (1465行) を削除する。`GameObj.get r()` (740行) があるため実際には使われていない。※ `StarBase.R` `PlayerShip.R` は使用中のため残す 〔JS: 不要なものを残さない〕 [f21256a]
+- [x] Task: 未参照のゲッター `GameObj.get src_r()` (736行) を削除する 〔JS: 同上〕 [f21256a]
+- [x] Task: 未参照のメソッド `GameObjs.removeFederation()` (665行) を削除する。※ `getObstacles()` (670行) も未参照だが Phase 5 で `clampDest()` と統合するため、ここでは削除しない 〔JS: 同上〕 [f21256a]
+- [x] Task: `setMsg()` の未使用引数 `bg` (521行) と、それに依存する 543行の分岐（`(bg !== "#444") ? bg : "transparent"`）を削除する。4引数で呼んでいる箇所は存在しない 〔JS: 不要なものを残さない〕 [f21256a]
+- [x] Task: `setMsg()` の JSDoc (515〜520行) を実際の引数（`from` / `msg` / `fg`）に合わせて書き直す 〔JS: JSDoc〕 [f21256a]
+- [x] Task: `dockShip()` 直前 (2016〜2018行) の重複した空 JSDoc を1つにする 〔JS: 中身のない JSDoc を残さない〕 [3c88e56]
+- [x] Task: ファイル全体の空 JSDoc（19箇所。477 / 717 / 754 / 814 / 1232 / 1286 / 1539 / 1890 / 1945 / 2182行 ほか）に説明を書く。「何をするか」ではなく「なぜそうするか」を書く 〔JS: JSDoc〕 [3c88e56]
+- [x] Task: 動作しないボタン `#misc1` (338行) を HTML から削除する。JS からの参照が一切なく、押しても何も起きない 〔HTML/CSS: 不要なものを残さない / Product Guidelines: 常時表示は必要最小限に〕 [ee1ace4]
+- [x] Task: 対応する DOM 要素が存在しない CSS ルール `#creditUI` (154〜163行) を削除する 〔HTML/CSS: 対応する要素が存在しない CSS ルールを残さない〕 [ee1ace4]
+- [x] Task: CSS からも JS からも参照されていない `id` 属性（`#turn` 308行 / `#statusShip1` 315行 / `#statusShip2` 320行 / `#shipCount1` 330行 / `#shipCount2` 334行、および実施時に追加で発見した `#statusBase` / `#statusFederationShip` / `#statusEnemyShip`）を削除する。要素とレイアウトは維持する 〔HTML/CSS: どちらからも参照されない id を残さない〕 [ee1ace4]
+- [~] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
 
 ---
 
