@@ -2,6 +2,7 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>Starbase Defender</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
@@ -27,7 +28,8 @@
      #gameContainer {
        display: flex;
        flex-direction: column;
-       height: 100vh;
+       height: 100vh; /* dvh未対応ブラウザ向けのフォールバック */
+       height: 100dvh; /* ツールバーの表示/非表示に追従する実際の可視高さ */
      }
      
      #statusPanel {
@@ -277,7 +279,8 @@
        }
        #statusPanel {
          width: 320px; /* 適切な固定幅を指定 */
-         height: 100vh;
+         height: 100vh; /* dvh未対応ブラウザ向けのフォールバック */
+         height: 100dvh; /* ツールバーの表示/非表示に追従する実際の可視高さ */
          border-bottom: none;
          border-right: 2px solid var(--color-accent);
        }
