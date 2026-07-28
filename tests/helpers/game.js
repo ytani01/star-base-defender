@@ -248,6 +248,7 @@ async function readStatusPanel(page) {
       shipEnergy: text('statusShipEnergy'),
       baseShield: text('statusBaseShield'),
       federation: text('statusFederationShipCount'),
+      docked: text('statusFederationShipDocked'),
       enemy: text('statusEnemyShipCount'),
     };
   });

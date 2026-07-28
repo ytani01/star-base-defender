@@ -2,7 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const {
   openGame, waitForPlayerTurn, waitForIdle, snapshot, clickWorld, readLog,
-  collectConsoleIssues,
+  readStatusPanel, collectConsoleIssues,
 } = require('./helpers/game');
 
 /**
@@ -209,6 +209,14 @@ test.describe('ターン進行と戦況', () => {
     expect(after.dist, '基地の中心へ移動する').toBeLessThan(1);
     expect(after.targeted, '敵の標的から外れる').toBe(false);
     expect((await readLog(page, 4)).join('\n')).toContain('味方が基地にドッキング');
+
+    // ステータス欄の Dock は、ゲーム本体とは別に数え直した値と一致する
+    const dockedShips = await page.evaluate(() =>
+      gameObjs.federationShips.filter((f) => f.active && f.isDocked).length
+        + (gameObjs.player.isDocked ? 1 : 0));
+    expect(dockedShips, '少なくとも1隻は入っている').toBeGreaterThanOrEqual(1);
+    expect((await readStatusPanel(page)).docked,
+           'ドッキング中の連邦艦が数に出る').toBe(`${dockedShips}`);
   });
 
   test('シールドを削られた敵は逃走し、移動しながら回復する', async ({ page }) => {

@@ -301,7 +301,7 @@
       <div id="statusPanel">
         <div class="status-header">
           <span class="game-title" id="gameTitle">StarBase Defender</span>
-          <div class="game-credits">&copy; 2026 Yoichi Tanibayashi</div>
+          <div class="game-credits">&copy; 2026 ytani01</div>
         </div>
         <div>
           Turn
@@ -328,6 +328,7 @@
         <div>
           Federation
           <span id="statusFederationShipCount">1</span>
+          (Dock <span id="statusFederationShipDocked">0</span>)
         </div>
         <div>
           Enemy
@@ -382,7 +383,7 @@
 
      // リリースのたびに更新する。表示は起動時に .game-title へ流し込む
      const GAME_NAME = 'StarBase Defender';
-     const VERSION = 'v0.4.0';
+     const VERSION = 'v0.4.2';
 
      const TIMING = {
        BEAM_DUR: 400,
@@ -670,6 +671,18 @@
      function getActiveFederationShipCount() {
        return gameObjs.federationShips.filter(f => f.active).length;
      } // getActiveFederationShipCount()
+
+     /**
+      * 基地にドッキング中の艦の数。
+      * ドッキング中の艦は補給を受ける代わりに戦力から外れるため、
+      * 「Federation の数のうち何隻が今は戦えないか」として表示する。
+      * Federation の表示数が自機を含むので、こちらも自機を含めて数える。
+      */
+     function getDockedShipCount() {
+       const federationDocked =
+         gameObjs.federationShips.filter(f => f.active && f.isDocked).length;
+       return federationDocked + (gameObjs.player.isDocked ? 1 : 0);
+     } // getDockedShipCount()
 
      /**
       * 生存中の敵艦の数。
@@ -985,7 +998,7 @@
          scene, x, y, texture,
          shield, shieldGaugeColor,
          scale=SCALE
-      ) {
+       ) {
          super(scene, x, y, texture, scale);
          this.shield = shield;
          this.shieldGaugeColor = shieldGaugeColor;
@@ -1085,7 +1098,7 @@
          scene, x, y, texture,
          shield, shieldColor, scale,
          weaponPower, weaponAreaR, weaponCost=0
-      ) {
+       ) {
          super(scene, x, y, texture, shield, shieldColor, scale);
          this.weapon = new Weapon(weaponPower, weaponAreaR, weaponCost);
        }
@@ -1158,7 +1171,7 @@
        resolveMovement(
          desiredX, desiredY, speed, ignoreObjs = [],
          precomputedDirectDest = null, destTarget = null
-      ) {
+       ) {
          const x = this.x;
          const y = this.y;
 
@@ -1169,7 +1182,7 @@
          // 直線移動（clampDest）の結果。呼び出し側ですでに計算済みならそれを使い回し、
          // 同じ入力に対する重複計算を避ける（clampDestは副作用のない純粋な計算）。
          const directDest = precomputedDirectDest
-           || this.clampDest(desiredX, desiredY, ignoreObjs, destTarget);
+                         || this.clampDest(desiredX, desiredY, ignoreObjs, destTarget);
          const directMoveSq = (directDest.x - x)**2 + (directDest.y - y)**2;
 
          // 直線移動だけで目的距離の95%以上進めるなら、迂回探索はせずそのまま確定
@@ -1512,7 +1525,7 @@
          energy, energyColor,
          scale = SCALE,
          weaponPower = 0, weaponAreaR = 0, weaponCost = 0
-      ) {
+       ) {
          // 親クラス (SpaceShip) へパラメータを渡す
          super(
            scene, x, y, texture, shield, gaugeColor, scale, weaponPower, weaponAreaR, weaponCost
@@ -1827,8 +1840,8 @@
        getAttractionTargets() {
          const targets = [
            ...gameObjs.federationShips
-             .filter(f => f !== this)
-             .map(f => ({ target: f, weightMultiplier: 1 })),
+           .filter(f => f !== this)
+           .map(f => ({ target: f, weightMultiplier: 1 })),
            { target: gameObjs.starBase, weightMultiplier: 7 },
            { target: gameObjs.player, weightMultiplier: 2 },
          ];
@@ -2169,7 +2182,7 @@
          if(!obj || !obj.active) return;
          
          let color = obj.isFriendly()
-           ? DRAW_COLOR.RANGE_FRIENDLY : DRAW_COLOR.RANGE_ENEMY;
+                   ? DRAW_COLOR.RANGE_FRIENDLY : DRAW_COLOR.RANGE_ENEMY;
 
          gameObjs.rangeGraphics.lineStyle(1, color, 0.5);
          gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.effectiveRange());
@@ -2270,7 +2283,7 @@
          Phaser.Math.Distance.Between(
            pointer.worldX, pointer.worldY, AREA_CENTER.X, AREA_CENTER.Y
          ) >= AREA_R
-      ) {
+       ) {
          return;
        }
 
@@ -2765,7 +2778,7 @@
      function updateGaugeDisplay(valueElId, gaugeElId, value, max) {
        const ratio = value / max;
        const color = ratio < DISPLAY_THRESHOLD.GAUGE_DANGER
-         ? MSG_COLOR.DANGER : MSG_COLOR.GOOD;
+                           ? MSG_COLOR.DANGER : MSG_COLOR.GOOD;
        document.getElementById(valueElId).style.color = color;
        document.getElementById(valueElId).textContent = value;
        document.getElementById(gaugeElId).style.width = (ratio * 100) + '%';
@@ -2780,6 +2793,7 @@
        const PlayerShield = gameObjs.player.shield > 0 ? gameObjs.player.shield : 0;
        const baseShield = gameObjs.starBase.shield > 0 ? gameObjs.starBase.shield : 0;
        const federationCount = getActiveFederationShipCount() + 1; // 自機を含めて表示
+       const dockedCount = getDockedShipCount();
        const enemyCount = getActiveEnemyCount();
 
        document.getElementById('statusTurn').textContent = `${gameState.turn}`;
@@ -2788,6 +2802,9 @@
 
        document.getElementById('statusFederationShipCount').style.color = MSG_COLOR.WARN;
        document.getElementById('statusFederationShipCount').textContent = `${federationCount}`;
+
+       document.getElementById('statusFederationShipDocked').style.color = MSG_COLOR.WARN;
+       document.getElementById('statusFederationShipDocked').textContent = `${dockedCount}`;
 
        document.getElementById('statusEnemyShipCount').style.color = MSG_COLOR.WARN;
        document.getElementById('statusEnemyShipCount').textContent = `${enemyCount}`;
