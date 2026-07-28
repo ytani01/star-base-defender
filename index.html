@@ -869,9 +869,18 @@
        }
 
        /**
-        * なにか衝突したら停止するように座標を計算
+        * なにか衝突したら停止するように座標を計算。
+        * destTarget に「到達したい対象」（基地など）を渡すと、その対象に
+        * 接触して止まる場合だけ STOP_MARGIN を適用せず、接触位置ちょうどで
+        * 止める。手前で止めると停止位置と接触判定の閾値が重なり、ドッキング
+        * できるかどうかが座標の丸め誤差で決まってしまうため。
+        * @param {number} destX 目的座標
+        * @param {number} destY 目的座標
+        * @param {Array} ignoreObjs 障害物とみなさないオブジェクト
+        * @param {?GameObj} destTarget 到達したい対象（障害物ではなく目的地）
+        * @return {{x:number, y:number}} 停止する座標
         */
-       clampDest(destX, destY, ignoreObjs = []) {
+       clampDest(destX, destY, ignoreObjs = [], destTarget = null) {
          const startX = this.x;
          const startY = this.y;
 
@@ -893,7 +902,10 @@
          const lenSq = dx * dx + dy * dy;
          if (lenSq < 0.0001) return { x: destX, y: destY };
 
-         let minT = 1.0; 
+         let minT = 1.0;
+         // 最も手前で当たるものが destTarget 自身かどうか（＝到達して止まるのか、
+         // 途中の障害物に阻まれて止まるのか）
+         let stopsAtDestTarget = false;
 
          for (const tgt of targets) {
            let R = (this.w + tgt.w) / 2;
@@ -902,7 +914,8 @@
              const toTargetX = tgt.x - startX;
              const toTargetY = tgt.y - startY;
              if (dx * toTargetX + dy * toTargetY > 0) {
-               minT = 0; 
+               minT = 0;
+               stopsAtDestTarget = false;
              }
              continue;
            }
@@ -911,12 +924,16 @@
            const fy = startY - tgt.y;
            const hit = intersectSegmentCircle(dx, dy, lenSq, fx, fy, R);
            if (!hit) continue;
-           if (hit.t1 > 0 && hit.t1 < minT) minT = hit.t1;
+           if (hit.t1 > 0 && hit.t1 < minT) {
+             minT = hit.t1;
+             stopsAtDestTarget = (tgt === destTarget);
+           }
          } // for(tgt)
 
          if (minT < 1.0) {
            const len = Math.sqrt(lenSq);
-           const stopT = Math.max(0, minT - SpaceShip.STOP_MARGIN / len);
+           const margin = stopsAtDestTarget ? 0 : SpaceShip.STOP_MARGIN;
+           const stopT = Math.max(0, minT - margin / len);
            return { x: startX + dx * stopT, y: startY + dy * stopT };
          }
          return { x: destX, y: destY };
@@ -925,7 +942,10 @@
        /**
         * 進行方向に障害物がある場合、少しずつ角度をずらして迂回ルートを探す
         */
-       resolveMovement(desiredX, desiredY, speed, ignoreObjs = [], precomputedDirectDest = null) {
+       resolveMovement(
+         desiredX, desiredY, speed, ignoreObjs = [],
+         precomputedDirectDest = null, destTarget = null
+       ) {
          const x = this.x;
          const y = this.y;
 
@@ -935,7 +955,8 @@
 
          // 直線移動（clampDest）の結果。呼び出し側ですでに計算済みならそれを使い回し、
          // 同じ入力に対する重複計算を避ける（clampDestは副作用のない純粋な計算）。
-         let directDest = precomputedDirectDest || this.clampDest(desiredX, desiredY, ignoreObjs);
+         let directDest = precomputedDirectDest
+           || this.clampDest(desiredX, desiredY, ignoreObjs, destTarget);
          let directMoveSq = (directDest.x - x)**2 + (directDest.y - y)**2;
 
          // 直線移動だけで目的距離の95%以上進めるなら、迂回探索はせずそのまま確定
@@ -960,7 +981,7 @@
              let testX = x + Math.cos(testAngle) * speed;
              let testY = y + Math.sin(testAngle) * speed;
 
-             let clamped = this.clampDest(testX, testY, ignoreObjs);
+             let clamped = this.clampDest(testX, testY, ignoreObjs, destTarget);
 
              let moveDistSq = (clamped.x - x)**2 + (clamped.y - y)**2;
              let distToTargetSq = (clamped.x - desiredX)**2 + (clamped.y - desiredY)**2;
@@ -1085,9 +1106,10 @@
        } // getTargetVector()
 
        /**
-        * ステアリング計算と障害物回避を統合し、移動先の座標を算出する
+        * ステアリング計算と障害物回避を統合し、移動先の座標を算出する。
+        * destTarget には「到達したい対象」を渡す（clampDest 参照）。
         */
-       calculateDestination(targetPos, isFleeing = false) {
+       calculateDestination(targetPos, isFleeing = false, destTarget = null) {
          let targetVec = this.getTargetVector(targetPos, isFleeing);
          let avoidVec = this.getAvoidanceVector(gameObjs.stars);
          
@@ -1106,7 +1128,7 @@
          let desiredX = this.x + (finalX / finalDist) * speed;
          let desiredY = this.y + (finalY / finalDist) * speed;
 
-         return this.resolveMovement(desiredX, desiredY, speed);
+         return this.resolveMovement(desiredX, desiredY, speed, [], null, destTarget);
        } // calculateDestination()
 
        /**
@@ -2097,7 +2119,7 @@
       * @return {{destX:number, destY:number, ignoreObjs:Array,
       *           precomputedDirectDest:?{x:number,y:number}}}
       */
-     function resolvePlayerDestination(desiredX, desiredY, moveDist) {
+     function resolvePlayerDestination(desiredX, desiredY, moveDist, destTarget = null) {
        if (gameObjs.player.is_docked) {
          gameObjs.player.is_docked = false;
          gameObjs.player.shield = PlayerShip.SHIELD_MAX;
@@ -2112,16 +2134,18 @@
            destY: pushed.y,
            ignoreObjs,
            precomputedDirectDest: null,
+           destTarget: null,
          };
        }
 
        // 通常移動およびドッキングを目的とする移動
-       const finalDest = gameObjs.player.clampDest(desiredX, desiredY, []);
+       const finalDest = gameObjs.player.clampDest(desiredX, desiredY, [], destTarget);
        return {
          destX: finalDest.x,
          destY: finalDest.y,
          ignoreObjs: [],
          precomputedDirectDest: finalDest,
+         destTarget,
        };
      } // resolvePlayerDestination()
 
@@ -2130,7 +2154,7 @@
       * 迂回を試みても動けない場合は cancelled:true を返す。
       */
      function resolveStuckAvoidance(desiredX, desiredY, moveDist, resolved) {
-       const { ignoreObjs, precomputedDirectDest } = resolved;
+       const { ignoreObjs, precomputedDirectDest, destTarget } = resolved;
        let destX = resolved.destX;
        let destY = resolved.destY;
 
@@ -2144,7 +2168,7 @@
        // 扇形探索（resolveMovement）を利用して迂回進路を再計算。
        // 通常移動時は直前に計算済みのclampDest結果を渡し、同じ計算を繰り返さない。
        const avoidDest = gameObjs.player.resolveMovement(
-         desiredX, desiredY, moveDist, ignoreObjs, precomputedDirectDest
+         desiredX, desiredY, moveDist, ignoreObjs, precomputedDirectDest, destTarget
        );
        destX = avoidDest.x;
        destY = avoidDest.y;
@@ -2175,7 +2199,13 @@
        );
        const target_is_base = dist_target_to_base <= StarBase.R;
 
-       const resolved = resolvePlayerDestination(desiredX, desiredY, moveDist);
+       // 基地を目指す移動では、基地を障害物ではなく目的地として扱い、
+       // 接触位置ちょうどで停止させる（canDock() が確実に成立する）
+       const destTarget = target_is_base ? gameObjs.starBase : null;
+
+       const resolved = resolvePlayerDestination(
+         desiredX, desiredY, moveDist, destTarget
+       );
        const stuck = resolveStuckAvoidance(desiredX, desiredY, moveDist, resolved);
        if (stuck.cancelled) {
          setMsg("操舵手", "障害物に接近しすぎてコース設定できません", "#0f0");
@@ -2282,9 +2312,13 @@
 
        const base = gameObjs.starBase;
        const isBaseActive = base && base.active && base.shield > 0;
-       // 連邦艦が、すでに基地に接している（＝前のターンまでに到着済み）かどうか
-       const dockableNow = npc instanceof FederationShip && isBaseActive
-         && isAdjacentToBase(npc, base);
+       // 連邦艦にとって基地は「障害物」ではなく「目的地」である。
+       // これを destTarget として渡すと、接触位置ちょうどで停止するため、
+       // 次のターンに必ず isAdjacentToBase() が成立する。
+       const canUseDock = npc instanceof FederationShip && isBaseActive;
+       const dockTarget = canUseDock ? base : null;
+       // すでに基地に接している（＝前のターンまでに到着済み）かどうか
+       const dockableNow = canUseDock && isAdjacentToBase(npc, base);
 
        if (context.isFleeing) {
          // 連邦艦はすでに基地に接していれば、自機と同じくドックへ入る
@@ -2294,14 +2328,14 @@
          }
 
          // ドッキングしない場合は、通常の逃走（敵・障害物回避）経路を計算。
-         // 基地は障害物として扱われるため、連邦艦は接する位置で自然に停止する。
+         // 連邦艦は基地に引き寄せられるため、接触位置で停止して次ターンに入渠する。
          if (!isDocking) {
            let threats = [gameObjs.player, base];
-           if (npc instanceof FederationShip) {
+           if (canUseDock) {
              threats = gameObjs.enemies.filter(e => e.active && e !== npc);
            }
            const targetDest = threats.map(t => ({ x: t.x, y: t.y }));
-           dest = npc.calculateDestination(targetDest, context.isFleeing);
+           dest = npc.calculateDestination(targetDest, context.isFleeing, dockTarget);
          }
        } else { // 逃走中でない場合
          if ( context.target ) {
@@ -2313,9 +2347,9 @@
            dest = { x: base.x, y: base.y };
            isDocking = true;
          } else {
-           // ターゲットがいなければ基地へ向かう（接する位置で自然に停止する）
+           // ターゲットがいなければ基地へ向かう（接触位置ちょうどで停止する）
            const targetDest = { x: base.x, y: base.y };
-           dest = npc.calculateDestination(targetDest, context.isFleeing);
+           dest = npc.calculateDestination(targetDest, context.isFleeing, dockTarget);
          }
        } // if (context.isFleeing)
 
