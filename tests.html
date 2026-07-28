@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Starbase Defender — 計算のテスト</title>
+    <style>
+     :root {
+       --color-primary: #0ff;
+       --color-pass: #0f0;
+       --color-fail: #f00;
+       --color-bg-dark: #111;
+     }
+     body {
+       margin: 0;
+       padding: 20px;
+       background: #000;
+       color: var(--color-primary);
+       font-family: monospace;
+       font-size: 15px;
+       line-height: 1.5;
+     }
+     h1 {
+       font-size: 1.4em;
+       margin: 0 0 4px;
+       color: #fff;
+     }
+     .lead {
+       color: #8ff;
+       margin: 0 0 20px;
+     }
+     .summary {
+       border: 2px solid var(--color-primary);
+       padding: 12px 16px;
+       margin-bottom: 20px;
+       font-size: 1.2em;
+     }
+     .summary.pass {
+       border-color: var(--color-pass);
+       color: var(--color-pass);
+     }
+     .summary.fail {
+       border-color: var(--color-fail);
+       color: var(--color-fail);
+     }
+     .group {
+       margin-bottom: 18px;
+     }
+     .group-name {
+       color: #fff;
+       border-bottom: 1px dashed var(--color-primary);
+       padding-bottom: 2px;
+       margin-bottom: 6px;
+     }
+     .case {
+       padding: 1px 0 1px 1.6em;
+       text-indent: -1.6em;
+     }
+     .case.pass::before {
+       content: 'OK  ';
+       color: var(--color-pass);
+     }
+     .case.fail::before {
+       content: 'NG  ';
+       color: var(--color-fail);
+     }
+     .case.fail {
+       color: var(--color-fail);
+     }
+     .detail {
+       color: #ff0;
+       padding-left: 1.6em;
+     }
+     /* ゲーム本体を読み込むための枠。見せる必要はないが、
+        Phaser が描画できるよう大きさは持たせる。 */
+     #target {
+       position: absolute;
+       left: -9999px;
+       width: 400px;
+       height: 400px;
+       border: 0;
+     }
+    </style>
+  </head>
+  <body>
+    <h1>Starbase Defender — 計算のテスト</h1>
+    <p class="lead">
+      グローバル状態に依存しない計算だけを対象にしています。
+      操作や決着の確認は <code>tests/</code> のシナリオテストが担当します。
+    </p>
+    <div id="summary" class="summary">読み込み中...</div>
+    <div id="results"></div>
+
+    <iframe id="target" title="テスト対象のゲーム本体"></iframe>
+
+    <script>
+     "use strict";
+
+     // ---------------------------------------------------------
+     // ごく小さなテストの仕組み
+     //
+     // フレームワークは使わない（Tech Stack「tests.html は依存ゼロを
+     // 保つ」）。失敗したときに「何を期待して何が返ったか」が分かれば
+     // 十分なので、必要な最小限だけを用意する。
+     // ---------------------------------------------------------
+
+     const groups = [];
+     let curGroup = null;
+
+     /** テストのまとまりを宣言する */
+     function describe(name, body) {
+       curGroup = { name, cases: [] };
+       groups.push(curGroup);
+       body();
+       curGroup = null;
+     }
+
+     /** 1件のテスト。body が投げなければ成功 */
+     function it(name, body) {
+       const c = { name, ok: true, detail: '' };
+       try {
+         body();
+       } catch (e) {
+         c.ok = false;
+         c.detail = String(e && e.message ? e.message : e);
+       }
+       curGroup.cases.push(c);
+     }
+
+     function fail(msg) {
+       throw new Error(msg);
+     }
+
+     /** 厳密等価。数値の比較には近い値を許す assertClose を使うこと */
+     function assertEqual(actual, expected, what = '') {
+       if (actual !== expected) {
+         fail(`${what ? what + ': ' : ''}期待 ${format(expected)} / 実際 ${format(actual)}`);
+       }
+     }
+
+     /** 浮動小数点の比較 */
+     function assertClose(actual, expected, tolerance = 1e-9, what = '') {
+       if (typeof actual !== 'number' || !isFinite(actual)) {
+         fail(`${what ? what + ': ' : ''}数値ではない (${format(actual)})`);
+       }
+       if (Math.abs(actual - expected) > tolerance) {
+         fail(`${what ? what + ': ' : ''}期待 ${expected}±${tolerance} / 実際 ${actual}`);
+       }
+     }
+
+     function assertTrue(actual, what = '') {
+       if (actual !== true) {
+         fail(`${what ? what + ': ' : ''}true を期待したが ${format(actual)}`);
+       }
+     }
+
+     function assertFalse(actual, what = '') {
+       if (actual !== false) {
+         fail(`${what ? what + ': ' : ''}false を期待したが ${format(actual)}`);
+       }
+     }
+
+     function format(v) {
+       if (typeof v === 'object' && v !== null) {
+         return JSON.stringify(v);
+       }
+       return String(v);
+     }
+
+     // ---------------------------------------------------------
+     // テスト対象の取り込み
+     //
+     // ゲーム本体は単一ファイルのままで export を持たない（Tech Stack
+     // 「ゲーム本体には何も足さない」）。iframe で読み込み、その realm で
+     // 式を評価することで、トップレベルの const や function に触る。
+     // ---------------------------------------------------------
+
+     /** 対象の realm で式を評価する */
+     let evalInGame = null;
+
+     function loadGame() {
+       return new Promise((resolve, reject) => {
+         const frame = document.getElementById('target');
+         frame.addEventListener('load', () => {
+           try {
+             const win = frame.contentWindow;
+             // クラス宣言やトップレベルの const は window のプロパティに
+             // ならないため、対象 realm の eval を通して参照する。
+             evalInGame = (expr) => win.eval(expr);
+             evalInGame('1');
+             resolve();
+           } catch (e) {
+             reject(e);
+           }
+         }, { once: true });
+         frame.addEventListener('error', () => reject(new Error('読み込みに失敗')),
+                                { once: true });
+         // キャッシュを避ける（Tech Stack「シナリオテストを書くときの注意」）
+         frame.src = 'index.html?test=' + Date.now();
+       });
+     }
+
+     // ---------------------------------------------------------
+     // 結果の表示
+     // ---------------------------------------------------------
+
+     function render() {
+       const results = document.getElementById('results');
+       const summary = document.getElementById('summary');
+       let total = 0, failed = 0;
+
+       results.innerHTML = '';
+       for (const g of groups) {
+         const gEl = document.createElement('div');
+         gEl.className = 'group';
+         const nameEl = document.createElement('div');
+         nameEl.className = 'group-name';
+         nameEl.textContent = g.name;
+         gEl.appendChild(nameEl);
+
+         for (const c of g.cases) {
+           total++;
+           if (!c.ok) {
+             failed++;
+           }
+           const cEl = document.createElement('div');
+           cEl.className = 'case ' + (c.ok ? 'pass' : 'fail');
+           cEl.textContent = c.name;
+           gEl.appendChild(cEl);
+           if (!c.ok) {
+             const dEl = document.createElement('div');
+             dEl.className = 'detail';
+             dEl.textContent = c.detail;
+             gEl.appendChild(dEl);
+           }
+         }
+         results.appendChild(gEl);
+       }
+
+       summary.className = 'summary ' + (failed === 0 ? 'pass' : 'fail');
+       summary.textContent = failed === 0
+         ? `全 ${total} 件が成功`
+         : `${total} 件中 ${failed} 件が失敗`;
+       // シナリオテスト側から結果を読めるようにしておく
+       window.__testResult = { total, failed, groups };
+     }
+
+     // ---------------------------------------------------------
+     // テスト本体
+     // ---------------------------------------------------------
+
+     function runTests() {
+       const g = evalInGame;
+
+       describe('テストの土台', () => {
+         it('ゲーム本体を読み込み、その中の関数を呼べる', () => {
+           assertEqual(typeof g('intersectSegmentCircle'), 'function',
+                       'intersectSegmentCircle');
+           assertEqual(typeof g('calcTurnPenalty'), 'function', 'calcTurnPenalty');
+         });
+         it('トップレベルの定数を参照できる', () => {
+           assertEqual(g('SCORE.DESTROY_PENALTY'), 50, 'SCORE.DESTROY_PENALTY');
+         });
+       });
+
+       // -------------------------------------------------------
+       // 幾何計算
+       // -------------------------------------------------------
+
+       // 始点(0,0) から (dx,dy) へ向かう線分と、中心 (cx,cy) 半径 r の円。
+       // intersectSegmentCircle の引数は
+       // (dx, dy, 線分長の2乗, 始点から見た円中心の逆ベクトル, 半径)。
+       const hit = (dx, dy, cx, cy, r) => g(
+         `intersectSegmentCircle(${dx}, ${dy}, ${dx * dx + dy * dy},` +
+         ` ${-cx}, ${-cy}, ${r})`
+       );
+
+       describe('幾何計算 — 線分と円の交差', () => {
+         it('進路の真上にある円と交差する', () => {
+           const h = hit(100, 0, 50, 0, 10);
+           assertTrue(h !== null, '交差が検出される');
+           assertClose(h.t1, 0.4, 1e-9, '手前側の交点');
+           assertClose(h.t2, 0.6, 1e-9, '奥側の交点');
+         });
+         it('離れた円とは交差しない', () => {
+           assertEqual(hit(100, 0, 50, 100, 10), null, '交差なし');
+         });
+         it('接するだけの円は1点で交わる（t1 と t2 が一致する）', () => {
+           const h = hit(100, 0, 50, 10, 10);
+           assertTrue(h !== null, '接触が検出される');
+           assertClose(h.t1, h.t2, 1e-6, 't1 と t2');
+         });
+         it('線分の延長線上にある円は t > 1 として返る（判定は呼び出し側の責任）', () => {
+           const h = hit(100, 0, 200, 0, 10);
+           assertTrue(h !== null, '交差の計算自体は成立する');
+           assertTrue(h.t1 > 1, 't1 が線分の外');
+         });
+       });
+
+       describe('幾何計算 — 射線の遮蔽', () => {
+         const blocked = (sx, sy, tx, ty, ox, oy, or_) => g(
+           `hasObstacleOnPath({x:${sx}, y:${sy}}, {x:${tx}, y:${ty}},` +
+           ` {x:${ox}, y:${oy}, r:${or_}})`
+         );
+         it('射線の中ほどにある障害物は遮蔽とみなす', () => {
+           assertTrue(blocked(0, 0, 100, 0, 50, 0, 10), '中央の障害物');
+         });
+         it('射線から外れた障害物は遮蔽にならない', () => {
+           assertFalse(blocked(0, 0, 100, 0, 50, 40, 10), '離れた障害物');
+         });
+         it('射手自身に重なる位置は遮蔽とみなさない', () => {
+           // t < 0.05 の近傍。自分自身や密着した相手で撃てなくならないための除外
+           assertFalse(blocked(0, 0, 100, 0, 1, 0, 3), '始点のごく近く');
+         });
+         it('目標に重なる位置は遮蔽とみなさない', () => {
+           // t > 0.95 の近傍。目標そのものを遮蔽と数えないための除外
+           assertFalse(blocked(0, 0, 100, 0, 99, 0, 3), '終点のごく近く');
+         });
+         it('始点と終点が同じなら遮蔽なし', () => {
+           assertFalse(blocked(50, 50, 50, 50, 50, 50, 10), '長さゼロの射線');
+         });
+       });
+
+       describe('幾何計算 — 複数の障害物', () => {
+         const anyBlocked = (obstacles) => g(
+           `isPathBlockedBy({x:0, y:0}, {x:100, y:0}, ${JSON.stringify(obstacles)})`
+         );
+         it('障害物がなければ遮られない', () => {
+           assertFalse(anyBlocked([]), '空のリスト');
+         });
+         it('1つでも遮っていれば遮蔽とみなす', () => {
+           assertTrue(anyBlocked([
+             {x: 50, y: 40, r: 10},
+             {x: 50, y: 0, r: 10},
+           ]), '2つ目が遮る');
+         });
+         it('どれも遮っていなければ通る', () => {
+           assertFalse(anyBlocked([
+             {x: 50, y: 40, r: 10},
+             {x: 50, y: -40, r: 10},
+           ]), 'どちらも射線の外');
+         });
+       });
+
+       // -------------------------------------------------------
+       // スコア計算（Product Guide「スコアの考え方」と対応）
+       // -------------------------------------------------------
+
+       describe('スコア — 時間経過は減点要因である', () => {
+         it('宇宙域に残っている艦の数だけ減る', () => {
+           assertEqual(g('calcTurnPenalty(3, 2)'), -5, '敵3 味方2');
+         });
+         it('艦がいなければ減らない', () => {
+           assertEqual(g('calcTurnPenalty(0, 0)'), 0, '誰もいない');
+         });
+         it('敵と味方を同じ重みで数える', () => {
+           assertEqual(g('calcTurnPenalty(4, 0)'), g('calcTurnPenalty(0, 4)'),
+                       '内訳が違っても合計が同じなら同じ');
+         });
+       });
+
+       describe('スコア — 艦の喪失は減点要因である', () => {
+         it('1隻失うと DESTROY_PENALTY の分だけ減る', () => {
+           assertEqual(g('calcShipLossPenalty()'), -g('SCORE.DESTROY_PENALTY'),
+                       '減点幅');
+         });
+         it('減点なので負の値である', () => {
+           assertTrue(g('calcShipLossPenalty()') < 0, '符号');
+         });
+       });
+
+       describe('スコア — クリアは深いほど大きく加点される', () => {
+         it('ミッション番号に比例する', () => {
+           assertEqual(g('calcMissionClearBonus(1)'),
+                       g('SCORE.CLEAR_BONUS_PER_MISSION'), 'ミッション1');
+           assertEqual(g('calcMissionClearBonus(3)'),
+                       g('SCORE.CLEAR_BONUS_PER_MISSION') * 3, 'ミッション3');
+         });
+         it('進むほど大きくなる', () => {
+           assertTrue(g('calcMissionClearBonus(5) > calcMissionClearBonus(4)'),
+                      '単調増加');
+         });
+         it('加点なので正の値である', () => {
+           assertTrue(g('calcMissionClearBonus(1)') > 0, '符号');
+         });
+       });
+
+       // -------------------------------------------------------
+       // 威力減衰（Product Guide「距離のジレンマ」と対応）
+       // -------------------------------------------------------
+
+       describe('武器 — 威力は距離とともに急激に減衰する', () => {
+         // 有効射程 100、最大威力 1000 の武器を作って調べる
+         const w = (expr) => g(`(() => { const w = new Weapon(1000, 100); return ${expr}; })()`);
+
+         it('至近距離では最大威力に近い', () => {
+           assertClose(w('w.Effectiveness(0)'), 1.0, 1e-9, '距離0の有効度');
+         });
+         it('有効射程で威力が半減する', () => {
+           assertClose(w('w.Effectiveness(w.EffectiveRange())'), 0.5, 1e-9,
+                       '有効射程での有効度');
+         });
+         it('最大射程で MAX_DAMAGE_RATIO まで落ちる', () => {
+           const ratio = g('Weapon.MAX_DAMAGE_RATIO');
+           // MaxRange() は floor しているため、厳密には ratio をわずかに上回る
+           assertClose(w('w.Effectiveness(w.MaxRange())'), ratio, 0.01,
+                       '最大射程での有効度');
+         });
+         it('最大射程は有効射程より遠い', () => {
+           assertTrue(w('w.MaxRange() > w.EffectiveRange()'), '射程の大小');
+         });
+         it('距離が延びるほどダメージが減る（単調減少）', () => {
+           const dmg = [0, 25, 50, 100, 200, 300].map(d => w(`w.CalcDamage(${d})`));
+           for (let i = 1; i < dmg.length; i++) {
+             assertTrue(dmg[i] <= dmg[i - 1],
+                        `距離 ${[0, 25, 50, 100, 200, 300][i]} のダメージが前より小さい`);
+           }
+         });
+         it('ダメージは整数で返る', () => {
+           const d = w('w.CalcDamage(37)');
+           assertEqual(d, Math.floor(d), '整数');
+         });
+         it('有効射程が同じなら威力に比例する', () => {
+           const a = g('new Weapon(1000, 100).CalcDamage(50)');
+           const b = g('new Weapon(2000, 100).CalcDamage(50)');
+           // CalcDamage は floor するため、2倍したときに 1 だけずれうる
+           assertTrue(Math.abs(b - a * 2) <= 1, `威力2倍: ${a} と ${b}`);
+         });
+       });
+     }
+
+     loadGame()
+       .then(() => {
+         runTests();
+         render();
+       })
+       .catch((e) => {
+         const summary = document.getElementById('summary');
+         summary.className = 'summary fail';
+         summary.textContent = 'テストを実行できませんでした: ' + e.message
+           + '（file:// で開くと iframe の中を読めません。'
+           + 'ローカルサーバで配信してください）';
+       });
+    </script>
+  </body>
+</html>
