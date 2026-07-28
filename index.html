@@ -37,6 +37,10 @@
        color: var(--color-primary);
        padding:15px;
        flex: 0 0 auto;
+       /* padding と border を高さに含める。既定の content-box では
+          max-height: 40dvh に padding 30px と border 2px が上乗せされ、
+          上限のつもりの指定が実際には 40dvh を超えてしまう。 */
+       box-sizing: border-box;
        /* 縦画面ではステータス欄が肥大化して宇宙域を圧迫しないよう上限を設ける
           （横画面では下の @media で解除し、これまで通りサイドパネル全高を使う） */
        max-height: 40vh;
@@ -58,7 +62,7 @@
        align-items: flex-end;
        border-bottom: 1px dashed var(--color-primary);
        padding-bottom: 6px;
-       margin-bottom: 10px !important;
+       margin-bottom: 10px;
        flex-wrap: wrap;
      }
      #statusPanel .status-header span {
@@ -70,7 +74,6 @@
        color: #fff;
        letter-spacing: 1px;
      }
-     #statusPanel .game-version,
      #statusPanel .game-credits {
        font-size: 0.8em;
        color: var(--color-accent)
@@ -93,14 +96,14 @@
        margin: 0;
      }
 
-     #logStatus {
+     #statusPanel #logStatus {
        height: 90px;
        line-height: 1.2;
        overflow-y: auto;
        background: #000;
        border: 1px solid rgba(0, 255, 255, 0.2);
        padding: 4px;
-       margin-top: 5px !important;
+       margin-top: 5px;
      }
      #logStatus .log-line {
        margin: 2px 0;
@@ -111,7 +114,13 @@
      #gameWrapper {
        position: relative;
        flex: 1;
+       /* flex アイテムの既定は min-width / min-height: auto のため、中身の
+          最小サイズより小さくならない。宇宙域は正方形なので、横画面では
+          「画面の高さ」がそのまま最小幅として効いてしまい、ステータス欄を
+          除いた残り幅を超えて右へはみ出す。縦横どちらの並びでも縮められる
+          よう、両方を 0 にする。 */
        min-height: 0;
+       min-width: 0;
        display: flex;             /* 追加: フレックスボックス化 */
        justify-content: flex-start; /* 追加: 左詰め */
        align-items: flex-start;     /* 追加: 上詰め */
@@ -149,17 +158,6 @@
      #zoomUI button:active {
        background: rgba(0, 255, 255, 0.8);
        color: #000;
-     }
-
-     #creditUI {
-       position: absolute;
-       bottom: 10px;
-       right: 15px;
-       color: rgba(0, 255, 255, 0.6);
-       font-family: var(--font-mono);
-       font-size: 28px;
-       pointer-events: none; /* クリックイベントをキャンバスへ透過させる */
-       z-index: 1000;
      }
 
      .panel-btn {
@@ -302,40 +300,39 @@
     <div id="gameContainer">
       <div id="statusPanel">
         <div class="status-header">
-          <span class="game-title">StarBase Defender v0.3.17</span>
+          <span class="game-title" id="gameTitle">StarBase Defender</span>
           <div class="game-credits">&copy; 2026 Yoichi Tanibayashi</div>
         </div>
-        <div id="turn">
+        <div>
           Turn
           <span id="statusMission">1</span>-<span id="statusTurn">1</span>
           <button class="panel-btn" id="viewScoresBtn">SCORE
             <span id="statusScore">100</span>
           </button>
         </div>
-        <div id="statusShip1">
-          Shield 
+        <div>
+          Shield
           <div class="status-gauge"><div id="gaugeShipShield" class="status-gauge-fill"></div></div>
           <span id="statusShipShield">0</span>
         </div>
-        <div id="statusShip2">
+        <div>
           Energy
           <div class="status-gauge"><div id="gaugeShipEnergy" class="status-gauge-fill"></div></div>
           <span id="statusShipEnergy">0</span>
         </div>
-        <div id="statusBase">
+        <div>
           Base Shield
           <div class="status-gauge"><div id="gaugeBaseShield" class="status-gauge-fill"></div></div>
           <span id="statusBaseShield">0</span>
         </div>
-        <div id="shipCount1">
-          <span id="statusFederationShip">Federation</span>
+        <div>
+          Federation
           <span id="statusFederationShipCount">1</span>
         </div>
-        <div id="shipCount2">
-          <span id="statusEnemyShip">Enemy</span>
+        <div>
+          Enemy
           <span id="statusEnemyShipCount">1</span>
         </div>
-        <button class="panel-btn" id="misc1">----</button>
         <div id="logStatus"></div>
       </div>
       
@@ -383,6 +380,10 @@
      // ---------------------------------------------------------
      const GAME_ID = Phaser.Utils.String.UUID();
 
+     // リリースのたびに更新する。表示は起動時に .game-title へ流し込む
+     const GAME_NAME = 'StarBase Defender';
+     const VERSION = 'v0.4.0';
+
      const TIMING = {
        BEAM_DUR: 400,
        TURN_DELAY: 400,
@@ -393,7 +394,9 @@
 
      const QTY = {
        STAR: 30,
-       ENEMY: 3,
+       // ミッション1の敵の数。以降のミッションでは1隻ずつ増えるが、
+       // 現在の数は実行時の状態なので gameState.enemyQty が持つ。
+       ENEMY_INIT: 3,
      };
 
      const NEW_ENEMY_INTERVAL = 25;
@@ -417,15 +420,77 @@
        ZOOM_MAX: 4.0,
        STEP: 2.0,
      };
-     let CurZoom = 1.0;
 
      const SCORE = {
        INIT: 100,
        DESTROY_PENALTY: 50,
+       // ミッションクリアのボーナス。深いミッションほど大きく加点する
+       CLEAR_BONUS_PER_MISSION: 100,
      };
      const HIGHSCORE = {
        MAX_ENTRIES: 5,
        STORAGE_KEY: 'starbaseDefenderScores'
+     };
+
+     // ログの色。色は装飾ではなく意味を持つ（Product Guidelines 参照）。
+     // 新しい色を足す前に、既存の意味で表現できないか検討すること。
+     const MSG_COLOR = {
+       INFO: '#0ff',      // シアン: 通常の情報（既定）
+       SELF: '#8ff',      // 淡いシアン: 自機の状態変化
+       FRIENDLY: '#88f',  // 青紫: 味方（連邦艦）に関する報告
+       WARN: '#ff0',      // 黄: 警告・注意
+       DANGER: '#f00',    // 赤: 危険・致命
+       GOOD: '#0f0',      // 緑: 良好・安全
+       RETREAT: '#0f8',   // 青緑: 敵の撤退（こちらに有利な戦況変化）
+       ENEMY: '#f40',     // オレンジ: 敵に起きた出来事
+       PLAIN: '#fff',     // 白: 意味の色を持たせない告知
+     };
+
+     // ログの発信者。担当は Product Guidelines の一覧と1対1で対応する。
+     const SPEAKER = {
+       HELM: '操舵手',          // 移動・進路・コース変更
+       TACTICAL: '戦術士官',    // 攻撃・射程・敵の検知
+       ENGINE: '機関部',        // エネルギー・自機シールド
+       COMMS: '通信士',         // 味方（連邦艦）に関する報告
+       XO: '副長',              // 戦況全体の要約
+       BASE: '基地',            // 基地からの通信・ドッキング
+       COMMAND: '司令部',       // ミッションの成否
+       COMPUTER: 'コンピュータ', // 自動的な状況判定・緊急時の宣告
+     };
+
+     // ログとして保持する行数。超えた分は古いものから捨てる。
+     const LOG_MAX_LINES = 50;
+
+     // 宇宙域に描く色（Phaser の 0xRRGGBB 形式）。CSS 用の MSG_COLOR とは
+     // 別に持つが、意味の割り当ては Product Guidelines に従う。
+     const DRAW_COLOR = {
+       BEAM_PLAYER: 0x00ffff,      // シアン: 自機のフェイザー
+       BEAM_FEDERATION: 0x0088ff,  // 青: 味方のフェイザー
+       BEAM_ENEMY: 0xff00ff,       // マゼンタ: 敵のフェイザー
+       BEAM_NEUTRAL: 0xffffff,     // 白: 艦種を特定しない既定のビーム
+       BEAM_MISS: 0x444444,        // 灰: 無駄撃ち（射程外・障害物）
+       SHIELD_OK: 0xffffff,        // 白: シールドに余裕がある
+       SHIELD_LOW: 0xffff00,       // 黄: シールド低下
+       SHIELD_CRITICAL: 0xff0000,  // 赤: シールド危険
+       RANGE_FRIENDLY: 0x00ffff,   // シアン: 自軍の射程円
+       RANGE_ENEMY: 0xffff00,      // 黄: 敵の射程円
+       BOUNDARY: 0x0088ff,         // 青: 宇宙域の境界
+       DOCKING_RING: 0x02ffff,     // シアン: ドッキング中を示す輪
+     };
+
+     // 残量に応じて表示を切り替える比率（0.0〜1.0）
+     const DISPLAY_THRESHOLD = {
+       SHIELD_LOW: 0.5,       // シールド円が黄に変わる
+       SHIELD_CRITICAL: 0.25, // シールド円が赤に変わる
+       GAUGE_DANGER: 0.3,     // ステータス欄のゲージが赤に変わる
+     };
+
+     // 乗員が報告を上げる残量（％）。読み手に危機感を伝えるための区切りであり、
+     // ゲームバランスそのものではない。
+     const REPORT_THRESHOLD = {
+       SHIELD_WARN: 60,    // これを下回ると被弾を報告し始める
+       SHIELD_DANGER: 30,  // これ以下は危険として強い色で告げる
+       ENERGY_WARN: 30,    // ターン終了時にエネルギー残量を警告する
      };
 
      // デバッグログの有効/無効切り替え。開発時に true にすると各種ログが出力される。
@@ -455,13 +520,145 @@
          this.pendingScene = null;
          this.curScene = null;
          this.qtyFederationShip = 0;
+         // 現在のミッションで出現させる敵の数（ミッションごとに増える）
+         this.enemyQty = QTY.ENEMY_INIT;
+         // 現在のカメラ倍率
+         this.zoom = CAMERA.ZOOM_MIN;
+       }
+
+       /**
+        * スコアを増減させる。計算そのものは calc*() 側にあり、ここは
+        * 適用するだけ。書き換えの入口をひとつに保つ。
+        * @param {number} delta 増減値（減点なら負の値）
+        */
+       addScore(delta) {
+         this.score += delta;
+       }
+
+       /**
+        * 次のミッションを開始できる状態にする（NEXT MISSION から呼ばれる）。
+        * スコア・ミッション番号・敵の数は nextMission() が更新済みのため
+        * ここでは触らない。ミッションクリア経由でしか到達しないので、
+        * isGameOver / flagClear も落とす必要がない。
+        */
+       resetForNewMission() {
+         this.turn = 1;
+         this.isPlayerTurn = true;
+         this.pendingScene = null;
+       }
+
+       /**
+        * ハイスコアの記録から再開できる状態にする。
+        * 記録されたミッションの「次」から始めるため、敗北状態の解除まで
+        * 含めてここで面倒を見る（敗北後の画面から呼ばれるため）。
+        * @param {{score:number, mission:(number|undefined)}} record ハイスコア1件
+        */
+       resumeFrom(record) {
+         this.score = record.score;
+         this.curMission = (record.mission !== undefined ? record.mission : 1) + 1;
+         this.turn = 1;
+         // 敵の初期生成数を、再開するミッションに合わせて再計算する
+         this.enemyQty = QTY.ENEMY_INIT + (this.curMission - 1);
+         this.isGameOver = false;
+         this.flagClear = false;
+         this.isPlayerTurn = true;
+         this.pendingScene = null;
        }
      } // class GameState
 
      // グローバルなゲーム進行状態インスタンス
      const gameState = new GameState();
 
-     let rangeGraphics, boundaryGraphics;
+     // ---------------------------------------------------------
+     // 純粋な計算
+     //
+     // ここに置く関数は gameState / gameObjs を参照せず、引数だけで
+     // 結果が決まる。将来テストを導入するとしたら、まずこの範囲が対象に
+     // なる（Tech Stack「テストと静的解析」参照）。
+     // ここへ関数を足すときは、グローバル状態を読まないことを守ること。
+     // ---------------------------------------------------------
+
+     /**
+      * 線分（始点からdx,dy方向へ、長さの2乗がa）と円（中心が始点からfx,fy、半径radius）
+      * の交差判定。線分をt=0(始点)〜t=1(終点)としてパラメータ化した交点位置を返す。
+      * 交差しない場合は null。
+      * clampDest()（衝突による移動停止）と hasObstacleOnPath()（LOS/経路上の障害物判定）
+      * で共通して使う、線分と円の交差の二次方程式を解く部分だけを切り出したもの。
+      */
+     function intersectSegmentCircle(dx, dy, a, fx, fy, radius) {
+       const b = 2 * (fx * dx + fy * dy);
+       const c = fx * fx + fy * fy - radius * radius;
+       const disc = b * b - 4 * a * c;
+       if (disc < 0) {
+         return null;
+       }
+       const sqrtDisc = Math.sqrt(disc);
+       return {
+         t1: (-b - sqrtDisc) / (2 * a),
+         t2: (-b + sqrtDisc) / (2 * a),
+       };
+     } // intersectSegmentCircle()
+
+     /**
+      * src から dst への線分が obj に遮られるか。
+      * 始点・終点のごく近傍（t < 0.05 / t > 0.95）は射手自身や目標との接触なので、
+      * 遮蔽とはみなさない。
+      */
+     function hasObstacleOnPath(src, dst, obj) {
+       const dx = dst.x - src.x, dy = dst.y - src.y;
+       const a = dx * dx + dy * dy;
+       if (a < 0.001) {
+         return false;
+       }
+       const fx = src.x - obj.x, fy = src.y - obj.y;
+       const hit = intersectSegmentCircle(dx, dy, a, fx, fy, obj.r);
+       if (!hit) {
+         return false;
+       }
+       return (hit.t1 > 0.05 && hit.t1 < 0.95) || (hit.t2 > 0.05 && hit.t2 < 0.95);
+     } // hasObstacleOnPath()
+
+     /**
+      * src から dst への射線が、渡された障害物のいずれかに遮られるか。
+      * 「どれを障害物とみなすか」は状況によって変わるため、集める側と
+      * 判定する側を分けてある（集める側は isLOSBlocked()）。
+      * @param {{x:number, y:number}} src 始点
+      * @param {{x:number, y:number}} dst 終点
+      * @param {Array<GameObj>} obstacles 遮蔽物の候補
+      * @return {boolean} 遮られていれば true
+      */
+     function isPathBlockedBy(src, dst, obstacles) {
+       return obstacles.some(o => hasObstacleOnPath(src, dst, o));
+     } // isPathBlockedBy()
+
+     /**
+      * ターン経過による減点。宇宙域に艦が残っているほど不利になり、
+      * もたつくと損をする（Product Guide「スコアの考え方」）。
+      * @param {number} enemyCount 生存している敵艦の数
+      * @param {number} federationCount 生存している連邦艦の数
+      * @return {number} スコアの増減（負の値）
+      */
+     function calcTurnPenalty(enemyCount, federationCount) {
+       return -(enemyCount + federationCount);
+     } // calcTurnPenalty()
+
+     /**
+      * 艦を1隻失ったときの減点。撃破も戦場からの離脱も同じ扱いとし、
+      * 「破壊は割に合わない」という中核ルールを支える。
+      * @return {number} スコアの増減（負の値）
+      */
+     function calcShipLossPenalty() {
+       return -SCORE.DESTROY_PENALTY;
+     } // calcShipLossPenalty()
+
+     /**
+      * ミッションクリアのボーナス。到達の深さを評価する。
+      * @param {number} mission クリアしたミッション番号
+      * @return {number} スコアの増減（正の値）
+      */
+     function calcMissionClearBonus(mission) {
+       return mission * SCORE.CLEAR_BONUS_PER_MISSION;
+     } // calcMissionClearBonus()
 
      // ---------------------------------------------------------
      // グローバルメソッド
@@ -475,7 +672,9 @@
      } // getActiveFederationShipCount()
 
      /**
-      *
+      * 生存中の敵艦の数。
+      * 配列には撃破・撤退済みの艦が残っている場合があるため、
+      * 表示や判定には必ずこの関数を通した数を使う。
       */
      function getActiveEnemyCount() {
        return gameObjs.enemies.filter(enemy => enemy.active).length;
@@ -486,7 +685,7 @@
       */     
      function drawGauge(g, cx, cy, width, height, ratio, color) {
        g.clear();
-       if ( !isFinite(cy) ) {
+       if (!isFinite(cy)) {
          return;
        }
 
@@ -507,18 +706,19 @@
       * 宇宙域境界の描画
       */
      function drawBoundary(){
-       boundaryGraphics.clear();
-       boundaryGraphics.lineStyle(2, 0x0088ff, 1);
-       boundaryGraphics.strokeCircle(AREA_CENTER.X, AREA_CENTER.Y, AREA_R);
+       gameObjs.boundaryGraphics.clear();
+       gameObjs.boundaryGraphics.lineStyle(2, DRAW_COLOR.BOUNDARY, 1);
+       gameObjs.boundaryGraphics.strokeCircle(AREA_CENTER.X, AREA_CENTER.Y, AREA_R);
      } // drawBoundary()
 
      /**
-      * メッセージの表示（複数行スクロール対応）
+      * 戦況ログに1行追加する（複数行スクロール対応）。
+      * 発信者を必ず伴わせることで、どの担当からの報告かを一目で判別できるようにする。
+      * @param {string} from 発信者（操舵手・戦術士官・機関部など）
       * @param {string} msg 表示するテキスト（空文字の場合はログを全消去）
-      * @param {string} fg 文字色
-      * @param {string} bg 行の背景色
+      * @param {string} fg 文字色。緊急度を色で示すために使う
       */
-     function setMsg(from="", msg="", fg="#0ff", bg="transparent") {
+     function setMsg(from="", msg="", fg=MSG_COLOR.INFO) {
        const el = document.getElementById('logStatus');
        
        // msgが空文字（ゲームオーバー時などの画面クリア命令）の場合は全消去
@@ -540,15 +740,13 @@
        const line = document.createElement('div');
        line.className = 'log-line';
        line.style.color = fg;
-       line.style.backgroundColor = (bg !== "#444") ? bg : "transparent";
        line.textContent = msgstr;
 
        // ログ領域の末尾に追加
        el.appendChild(line);
 
        // メモリ及びパフォーマンス対策: ログが50行を超えたら古い行から削除
-       const maxLines = 50;
-       while (el.children.length > maxLines) {
+       while (el.children.length > LOG_MAX_LINES) {
          el.removeChild(el.firstChild);
        }
 
@@ -573,7 +771,7 @@
 
        // ビームの持続時間（TIMING.BEAM_DURに合わせて500ms）
        let duration = TIMING.BEAM_DUR / 1000;
-       if ( ! isPlayer ) {
+       if (! isPlayer) {
          duration = TIMING.BEAM_DUR / 1000 / 3 * 2;
        }
 
@@ -589,7 +787,7 @@
        // 2. メインオシレーター（鋸歯状波で厚みのある音色を作る）
        const osc = ctx.createOscillator();
        osc.type = 'sawtooth';
-       if ( isPlayer ) {
+       if (isPlayer) {
          osc.frequency.setValueAtTime(800, now);
        } else {
          osc.frequency.setValueAtTime(600, now);
@@ -639,6 +837,9 @@
          this.federationShips = [];
          this.enemies = [];
          this.stars = [];
+         // 射程円・宇宙域の境界を描くための描画用オブジェクト
+         this.rangeGraphics = null;
+         this.boundaryGraphics = null;
        }
 
        findObjectAt(x, y) {
@@ -650,6 +851,14 @@
          });
        }
 
+       /**
+        * 撃破・撤退した敵を配列から取り除く。配列の入れ替えを
+        * このクラスの中に閉じ込め、外から代入させないための入口。
+        */
+       purgeInactive() {
+         this.enemies = this.enemies.filter(e => e.active);
+       }
+
        // 敵の追加・削除を管理
        addEnemy(enemy) {
          this.enemies.push(enemy);
@@ -658,22 +867,25 @@
          this.enemies = this.enemies.filter(e => e !== enemy);
        }
 
-       // 連邦艦の追加・削除を管理
+       // 連邦艦の追加を管理
        addFederation(ship) {
          this.federationShips.push(ship);
        }
-       removeFederation(ship) {
-         this.federationShips = this.federationShips.filter(e => e !== ship);
-       }
 
-       // 衝突判定や描画ループで使用する障害物リストを生成
-       getObstacles(ignoreObj = null) {
+       /**
+        * 移動の妨げになるものの一覧。動く側から見れば「自分以外のすべて」
+        * なので艦種で場合分けはせず、除外したいものを ignore で渡す。
+        * @param {Array<GameObj>=} ignore 障害物とみなさないもの（通常は自分自身）
+        * @return {Array<GameObj>} 生存している障害物
+        */
+       getObstacles(ignore = []) {
          return [
            this.starBase,
            ...this.stars,
            ...this.enemies,
-           ...this.federationShips
-         ].filter(o => o && o.active && o !== ignoreObj);
+           ...this.federationShips,
+           this.player,
+         ].filter(o => o && o.active && !ignore.includes(o));
        }
      } // GameObjs
 
@@ -686,36 +898,38 @@
      class Weapon {
        static MAX_DAMAGE_RATIO = 0.2;  // 最大射程距離のダメージ比率
        
-       constructor(max_power, area_r, cost=0) {
-         debugLog(`Weapon> max_power=${max_power}, area_r=${area_r}, const=${cost}`);
-         this.max_power = max_power;
-         this.area_r = area_r;
+       constructor(maxPower, areaR, cost=0) {
+         debugLog(`Weapon> maxPower=${maxPower}, areaR=${areaR}, const=${cost}`);
+         this.maxPower = maxPower;
+         this.areaR = areaR;
          this.cost = cost;
        }
        
-       EffectiveRange() {
-         return this.area_r;
+       effectiveRange() {
+         return this.areaR;
        }
        
-       MaxRange() {
-         return Math.floor(this.area_r * Math.sqrt(1 / this.constructor.MAX_DAMAGE_RATIO - 1));
+       maxRange() {
+         return Math.floor(this.areaR * Math.sqrt(1 / this.constructor.MAX_DAMAGE_RATIO - 1));
        }
 
        /**
         * 距離に応じた武器の威力減衰率（有効度）を計算する
         */
-       Effectiveness(distance) {
-         const x = distance / this.area_r;
+       effectiveness(distance) {
+         const x = distance / this.areaR;
          return 1 / (1 + x * x);
        }
 
-       CalcDamage(distance) {
-         return Math.floor(this.max_power * this.Effectiveness(distance));
+       calcDamage(distance) {
+         return Math.floor(this.maxPower * this.effectiveness(distance));
        }
      } // class Weapon
 
      /**
-      *
+      * 空間に存在する全オブジェクトの基底クラス。
+      * 座標とサイズは Phaser のスプライトへ委譲しており、ゲームロジック側は
+      * スプライトの存在を意識せずに x / y / r だけを扱えるようにしている。
       */
      class GameObj {
        constructor(scene, x, y, texture, scale=SCALE) {
@@ -731,12 +945,11 @@
        get y() {return this.sprite.y;}
        set y(val) {this.sprite.y = val;}
 
-       get src_w() {return this.sprite.width;}
-       get src_h() {return this.sprite.height;}
-       get src_r() {return (this.src_w + this.src_h) / 4;}
+       get srcW() {return this.sprite.width;}
+       get srcH() {return this.sprite.height;}
 
-       get w() {return this.src_w * this.scale;}
-       get h() {return this.src_h * this.scale;}
+       get w() {return this.srcW * this.scale;}
+       get h() {return this.srcH * this.scale;}
        get r() {return (this.w + this.h) / 4;}
 
        destroy() {
@@ -749,10 +962,19 @@
          return false;
        }
 
+       /**
+        * 連邦側（自機・味方）かどうか。敵味方で色や効果音を変える箇所が
+        * 複数あるため、呼び出し側で instanceof を並べずに済ませる。
+        */
+       isFriendly() {
+         return false;
+       }
+
      } // class GameObj
 
      /**
-      *
+      * シールドを持つオブジェクト（艦船・基地）の基底クラス。
+      * 残量の可視化（艦を囲む円とゲージ）と被弾処理をここに集約する。
       */
      class ObjWithShield extends GameObj {
        static SHIELD_MAX = 1; // dummy
@@ -761,28 +983,26 @@
 
        constructor(
          scene, x, y, texture,
-         shield, shield_gauge_color,
+         shield, shieldGaugeColor,
          scale=SCALE
-       ) {
+      ) {
          super(scene, x, y, texture, scale);
          this.shield = shield;
-         this.shield_gauge_color = shield_gauge_color;
+         this.shieldGaugeColor = shieldGaugeColor;
 
-         this.gauge_h = this.constructor.GAUGE_H * scale;
-         this.gauge_y = this.h + this.constructor.GAUGE_Y_OFFSET * scale;
-         this.gauge_w = this.w;
+         this.gaugeH = this.constructor.GAUGE_H * scale;
+         this.gaugeY = this.h + this.constructor.GAUGE_Y_OFFSET * scale;
+         this.gaugeW = this.w;
 
-         this.shield_gauge = this.scene.add.graphics();
-         this.shield_circle = this.scene.add.graphics();
-
-         this.spirit = 0.5;
+         this.shieldGauge = this.scene.add.graphics();
+         this.shieldCircle = this.scene.add.graphics();
        }
 
        update() {
-         if (! this.active ) {
-           if (this.shield_gauge) {
-             this.shield_gauge.destroy();
-             this.shield_circle.destroy();
+         if (! this.active) {
+           if (this.shieldGauge) {
+             this.shieldGauge.destroy();
+             this.shieldCircle.destroy();
            }
            return;
          }
@@ -790,70 +1010,59 @@
          //
          // draw Shield circle
          //
-         const shield_ratio = this.shield / this.constructor.SHIELD_MAX;
-         let shield_color = 0xffffff;
-         if ( shield_ratio < 0.5 ) {
-           shield_color = 0xffff00;
+         const shieldRatio = this.shield / this.constructor.SHIELD_MAX;
+         let shieldColor = DRAW_COLOR.SHIELD_OK;
+         if (shieldRatio < DISPLAY_THRESHOLD.SHIELD_LOW) {
+           shieldColor = DRAW_COLOR.SHIELD_LOW;
          }
-         if ( shield_ratio < 0.25 ) {
-           shield_color = 0xff0000;
+         if (shieldRatio < DISPLAY_THRESHOLD.SHIELD_CRITICAL) {
+           shieldColor = DRAW_COLOR.SHIELD_CRITICAL;
          }
-         this.shield_circle.clear();
-         this.shield_circle.lineStyle(3 * shield_ratio, shield_color, 1);
-         this.shield_circle.strokeCircle(this.x, this.y, this.r);
+         this.shieldCircle.clear();
+         this.shieldCircle.lineStyle(3 * shieldRatio, shieldColor, 1);
+         this.shieldCircle.strokeCircle(this.x, this.y, this.r);
 
          drawGauge(
-           this.shield_gauge,
-           this.x, this.y + (this.gauge_y * this.scale),
-           this.gauge_w, this.gauge_h,
+           this.shieldGauge,
+           this.x, this.y + (this.gaugeY * this.scale),
+           this.gaugeW, this.gaugeH,
            this.shield / this.constructor.SHIELD_MAX,
-           this.shield_gauge_color
+           this.shieldGaugeColor
          );
        } // update()
 
        /**
-        *
+        * シールドの残量比（0.0〜1.0）
         */
        shieldPercent() {
          return (this.shield / this.constructor.SHIELD_MAX);
        }
 
        /**
-        *
-        */
-       fear() {
-         return (1.0 - this.spirit);
-       }
-
-       /**
-        *
-        */
-       isFleeing() {
-         return this.shieldPercent() < this.fear();
-       }
-
-       /**
-        *
+        * 被弾処理。シールドが尽きた場合は撃破としてスコアを減点する。
+        * 「破壊は割に合わない」というこのゲームの中核ルールを担保する箇所。
         */
        takeDamage(amount) {
          this.shield -= amount;
          if (this.shield <= 0) {
-           gameState.score -= SCORE.DESTROY_PENALTY;
+           gameState.addScore(calcShipLossPenalty());
            this.die();
          }
        } // takeDamage()
 
        /**
-        *
+        * 消滅処理。撃破と宇宙域からの離脱（撤退）の両方から呼ばれる。
+        * 描画用のグラフィックスはスプライトとは別管理のため、
+        * 個別に破棄しないとシールド円とゲージだけが画面に残ってしまう。
         */
        die() {
          this.shield = 0;
          this.active = false;
-         if ( this.shield_gauge ) {
-           this.shield_gauge.destroy();
+         if (this.shieldGauge) {
+           this.shieldGauge.destroy();
          }
-         if ( this.shield_circle ) {
-           this.shield_circle.destroy();
+         if (this.shieldCircle) {
+           this.shieldCircle.destroy();
          }
          this.destroy();
        } // die()
@@ -863,41 +1072,53 @@
       * 全ての艦船の基底クラス (SpaceShip)
       */
      class SpaceShip extends ObjWithShield {
+       // 障害物に接触する手前で止まる余裕。ぴったり接触させると、次の移動で
+       // 重なった状態から始まってしまうため、常にこの分だけ離して停止する。
+       static STOP_MARGIN = 1.5;
+       // これ未満しか進めない移動は「ほぼ動けていない」とみなす
+       static MIN_MOVE_DIST = 10;
+       // 目的距離（または速度）のこの割合まで進めれば十分とみなし、
+       // 迂回路の探索を打ち切る
+       static ENOUGH_MOVE_RATIO = 0.95;
+
        constructor(
          scene, x, y, texture,
-         shield, shield_color, scale,
-         weapon_power, weapon_area_r, weapon_cost=0
-       ) {
-         super(scene, x, y, texture, shield, shield_color, scale);
-         this.weapon = new Weapon(weapon_power, weapon_area_r, weapon_cost);
+         shield, shieldColor, scale,
+         weaponPower, weaponAreaR, weaponCost=0
+      ) {
+         super(scene, x, y, texture, shield, shieldColor, scale);
+         this.weapon = new Weapon(weaponPower, weaponAreaR, weaponCost);
        }
 
        /**
-        * なにか衝突したら停止するように座標を計算
+        * なにか衝突したら停止するように座標を計算。
+        * destTarget に「到達したい対象」（基地など）を渡すと、その対象に
+        * 接触して止まる場合だけ STOP_MARGIN を適用せず、接触位置ちょうどで
+        * 止める。手前で止めると停止位置と接触判定の閾値が重なり、ドッキング
+        * できるかどうかが座標の丸め誤差で決まってしまうため。
+        * @param {number} destX 目的座標
+        * @param {number} destY 目的座標
+        * @param {Array} ignoreObjs 障害物とみなさないオブジェクト
+        * @param {?GameObj} destTarget 到達したい対象（障害物ではなく目的地）
+        * @return {{x:number, y:number}} 停止する座標
         */
-       clampDest(destX, destY, ignoreObjs = []) {
+       clampDest(destX, destY, ignoreObjs = [], destTarget = null) {
          const startX = this.x;
          const startY = this.y;
 
-         const targets = [
-           gameObjs.starBase,
-           ...gameObjs.federationShips,
-           ...gameObjs.enemies,
-           ...gameObjs.stars
-         ].filter(
-           e => e && e.active && e !== this && !ignoreObjs.includes(e)
-         );
-
-         if (this instanceof FederationShip || this instanceof EnemyShip) {
-           targets.push(gameObjs.player);
-         }
+         // 自分自身は障害物にならない。自機が呼んだ場合も、ここで自機が
+         // 除かれるため艦種による場合分けは要らない。
+         const targets = gameObjs.getObstacles([this, ...ignoreObjs]);
 
          const dx = destX - startX;
          const dy = destY - startY;
          const lenSq = dx * dx + dy * dy;
          if (lenSq < 0.0001) return { x: destX, y: destY };
 
-         let minT = 1.0; 
+         let minT = 1.0;
+         // 最も手前で当たるものが destTarget 自身かどうか（＝到達して止まるのか、
+         // 途中の障害物に阻まれて止まるのか）
+         let stopsAtDestTarget = false;
 
          for (const tgt of targets) {
            let R = (this.w + tgt.w) / 2;
@@ -906,7 +1127,8 @@
              const toTargetX = tgt.x - startX;
              const toTargetY = tgt.y - startY;
              if (dx * toTargetX + dy * toTargetY > 0) {
-               minT = 0; 
+               minT = 0;
+               stopsAtDestTarget = false;
              }
              continue;
            }
@@ -915,12 +1137,16 @@
            const fy = startY - tgt.y;
            const hit = intersectSegmentCircle(dx, dy, lenSq, fx, fy, R);
            if (!hit) continue;
-           if (hit.t1 > 0 && hit.t1 < minT) minT = hit.t1;
+           if (hit.t1 > 0 && hit.t1 < minT) {
+             minT = hit.t1;
+             stopsAtDestTarget = (tgt === destTarget);
+           }
          } // for(tgt)
 
          if (minT < 1.0) {
            const len = Math.sqrt(lenSq);
-           const stopT = Math.max(0, minT - 1.5 / len); 
+           const margin = stopsAtDestTarget ? 0 : SpaceShip.STOP_MARGIN;
+           const stopT = Math.max(0, minT - margin / len);
            return { x: startX + dx * stopT, y: startY + dy * stopT };
          }
          return { x: destX, y: destY };
@@ -929,21 +1155,25 @@
        /**
         * 進行方向に障害物がある場合、少しずつ角度をずらして迂回ルートを探す
         */
-       resolveMovement(desiredX, desiredY, speed, ignoreObjs = [], precomputedDirectDest = null) {
+       resolveMovement(
+         desiredX, desiredY, speed, ignoreObjs = [],
+         precomputedDirectDest = null, destTarget = null
+      ) {
          const x = this.x;
          const y = this.y;
 
          let dx = desiredX - x;
          let dy = desiredY - y;
-         let reqDistSq = dx * dx + dy * dy;
+         const reqDistSq = dx * dx + dy * dy;
 
          // 直線移動（clampDest）の結果。呼び出し側ですでに計算済みならそれを使い回し、
          // 同じ入力に対する重複計算を避ける（clampDestは副作用のない純粋な計算）。
-         let directDest = precomputedDirectDest || this.clampDest(desiredX, desiredY, ignoreObjs);
-         let directMoveSq = (directDest.x - x)**2 + (directDest.y - y)**2;
+         const directDest = precomputedDirectDest
+           || this.clampDest(desiredX, desiredY, ignoreObjs, destTarget);
+         const directMoveSq = (directDest.x - x)**2 + (directDest.y - y)**2;
 
          // 直線移動だけで目的距離の95%以上進めるなら、迂回探索はせずそのまま確定
-         if (directMoveSq >= reqDistSq * 0.95) {
+         if (directMoveSq >= reqDistSq * SpaceShip.ENOUGH_MOVE_RATIO) {
            return directDest;
          }
 
@@ -952,31 +1182,31 @@
          // 迂回できる角度を総当たりで探す（見つかった中で目的地に最も近い、または
          // 直進よりマシに動ける角度を採用する）。
          speed /= 2;
-         let baseAngle = Math.atan2(dy, dx);
+         const baseAngle = Math.atan2(dy, dx);
          let bestDest = directDest;
          let minTargetDistSq = (directDest.x - desiredX)**2 + (directDest.y - desiredY)**2;
 
          for (let sign of [1, -1]) { // 左右どちら向きにも振ってみる
            for (let i = 5; i <= 90; i += 5) { // 5°刻みで角度を広げていく
-             let offset = (i * Math.PI) / 180;
-             let testAngle = baseAngle + offset * sign;
+             const offset = (i * Math.PI) / 180;
+             const testAngle = baseAngle + offset * sign;
 
-             let testX = x + Math.cos(testAngle) * speed;
-             let testY = y + Math.sin(testAngle) * speed;
+             const testX = x + Math.cos(testAngle) * speed;
+             const testY = y + Math.sin(testAngle) * speed;
 
-             let clamped = this.clampDest(testX, testY, ignoreObjs);
+             const clamped = this.clampDest(testX, testY, ignoreObjs, destTarget);
 
-             let moveDistSq = (clamped.x - x)**2 + (clamped.y - y)**2;
-             let distToTargetSq = (clamped.x - desiredX)**2 + (clamped.y - desiredY)**2;
+             const moveDistSq = (clamped.x - x)**2 + (clamped.y - y)**2;
+             const distToTargetSq = (clamped.x - desiredX)**2 + (clamped.y - desiredY)**2;
 
              // ほとんど動けない角度は候補にしない
-             if (moveDistSq < 10 * 10) {  // XXX TBD
+             if (moveDistSq < SpaceShip.MIN_MOVE_DIST ** 2) {
                continue;
              }
 
              // 現在のベスト候補がほぼ動けていない（スタック中）場合は、
              // 目的地への近さより「動けること」を優先して採用する
-             let currentBestMoveSq = (bestDest.x - x)**2 + (bestDest.y - y)**2;
+             const currentBestMoveSq = (bestDest.x - x)**2 + (bestDest.y - y)**2;
              debugLog('currentBestMoveSq', currentBestMoveSq);
              let stuck = currentBestMoveSq < 1.0;
 
@@ -987,7 +1217,7 @@
              }
 
              // 十分な速度で動ける角度が見つかったら、この振り幅(sign)側の探索は打ち切る
-             if (moveDistSq >= (speed * 0.95)**2) {
+             if (moveDistSq >= (speed * SpaceShip.ENOUGH_MOVE_RATIO) ** 2) {
                break;
              }
            } // for(i)
@@ -1010,7 +1240,7 @@
            let dist = Math.hypot(dx, dy);
            
            if (dist > 0 && dist < avoidRadius) {
-             let force = 1.0 - (dist / avoidRadius);
+             const force = 1.0 - (dist / avoidRadius);
              accX += (dx / dist) * force * repulsionWeight - (dy / dist) * force * tangentialWeight;
              accY += (dy / dist) * force * repulsionWeight + (dx / dist) * force * tangentialWeight;
            }
@@ -1023,8 +1253,8 @@
         * 障害物や他ユニットからの回避・分離ベクトルを算出する
         */
        getAvoidanceVector(obstacles) {
-         let avoid = this.calcAvoidanceForce(obstacles, 2.2, 0.8, 1.2);
-         let sep = this.calcAvoidanceForce(gameObjs.enemies, 2.5, 2.0, 0.0);
+         const avoid = this.calcAvoidanceForce(obstacles, 2.2, 0.8, 1.2);
+         const sep = this.calcAvoidanceForce(gameObjs.enemies, 2.5, 2.0, 0.0);
          return { x: avoid.x + sep.x, y: avoid.y + sep.y };
        } // getAvoidanceVector()
 
@@ -1049,7 +1279,7 @@
              let dy = this.y - t.y;
              let dist = Math.hypot(dx, dy);
              if (dist > 0.001) {
-               let weight = 1.0 / dist;
+               const weight = 1.0 / dist;
                dirX += (dx / dist) * weight;
                dirY += (dy / dist) * weight;
              }
@@ -1061,13 +1291,13 @@
              let dy = t.y - this.y;
              let dist = Math.hypot(dx, dy);
              if (dist > 0.001) {
-               let weight = (1.0 / dist) * weightMultiplier;
+               const weight = (1.0 / dist) * weightMultiplier;
                dirX += (dx / dist) * weight;
                dirY += (dy / dist) * weight;
              }
            });
 
-           let fDist = Math.hypot(dirX, dirY);
+           const fDist = Math.hypot(dirX, dirY);
            if (fDist > 0.000001) {
              dirX /= fDist;
              dirY /= fDist;
@@ -1089,28 +1319,29 @@
        } // getTargetVector()
 
        /**
-        * ステアリング計算と障害物回避を統合し、移動先の座標を算出する
+        * ステアリング計算と障害物回避を統合し、移動先の座標を算出する。
+        * destTarget には「到達したい対象」を渡す（clampDest 参照）。
         */
-       calculateDestination(targetPos, isFleeing = false) {
-         let targetVec = this.getTargetVector(targetPos, isFleeing);
-         let avoidVec = this.getAvoidanceVector(gameObjs.stars);
+       calculateDestination(targetPos, isFleeing = false, destTarget = null) {
+         const targetVec = this.getTargetVector(targetPos, isFleeing);
+         const avoidVec = this.getAvoidanceVector(gameObjs.stars);
          
          let finalX = targetVec.x * 1.0 + avoidVec.x;
          let finalY = targetVec.y * 1.0 + avoidVec.y;
 
          let finalDist = Math.hypot(finalX, finalY);
          if (finalDist < 0.001) {
-           let randomAngle = Math.random() * Math.PI * 2;
+           const randomAngle = Math.random() * Math.PI * 2;
            finalX = Math.cos(randomAngle);
            finalY = Math.sin(randomAngle);
            finalDist = 1.0;
          }
 
          const speed = this.constructor.SPEED;
-         let desiredX = this.x + (finalX / finalDist) * speed;
-         let desiredY = this.y + (finalY / finalDist) * speed;
+         const desiredX = this.x + (finalX / finalDist) * speed;
+         const desiredY = this.y + (finalY / finalDist) * speed;
 
-         return this.resolveMovement(desiredX, desiredY, speed);
+         return this.resolveMovement(desiredX, desiredY, speed, [], null, destTarget);
        } // calculateDestination()
 
        /**
@@ -1131,8 +1362,8 @@
       * NPC用基底クラス (SpaceShip を継承)
       */
      class NPCShip extends SpaceShip {
-       constructor(scene, x, y, texture, shield, shield_color, scale, weapon_power, weapon_area_r) {
-         super(scene, x, y, texture, shield, shield_color, scale, weapon_power, weapon_area_r);
+       constructor(scene, x, y, texture, shield, shieldColor, scale, weaponPower, weaponAreaR) {
+         super(scene, x, y, texture, shield, shieldColor, scale, weaponPower, weaponAreaR);
 
          // 子クラス(EnemyShip / FederationShip) が持つスタティックプロパティを参照して士気を初期化
          this.spirit = this.constructor.SPIRIT.INIT;
@@ -1143,7 +1374,7 @@
         * ビームの色（子クラスでオーバーライド）
         */
        getBeamColor() {
-         return 0xffffff; 
+         return DRAW_COLOR.BEAM_NEUTRAL;
        }
        
        /**
@@ -1153,7 +1384,7 @@
          // 自身の scene と getBeamColor() を使用してビームを描画
          fireBeam(this.scene, this, target, this.getBeamColor());
          
-         const damage = this.weapon.CalcDamage(distance);
+         const damage = this.weapon.calcDamage(distance);
          target.takeDamage(damage);
 
          // 艦種ごとの攻撃後処理（メッセージ通知や撃破判定）を呼び出し
@@ -1194,7 +1425,7 @@
            if (!t || !t.active) return;
            if (this.shouldIgnoreTarget(t)) return;
 
-           let d = Phaser.Math.Distance.Between(this.x, this.y, t.x, t.y);
+           const d = Phaser.Math.Distance.Between(this.x, this.y, t.x, t.y);
            
            // 最短距離の対象を記録（攻撃不可の場合の追跡目標）
            if (d < closestDist) {
@@ -1203,8 +1434,8 @@
            }
 
            // 攻撃可能な対象を評価
-           if (!isFleeing && d <= this.weapon.MaxRange() * (1.0 - this.spirit)) {
-             let checkBaseObstacle = (t !== gameObjs.starBase);
+           if (!isFleeing && d <= this.weapon.maxRange() * (1.0 - this.spirit)) {
+             const checkBaseObstacle = (t !== gameObjs.starBase);
              if (!isLOSBlocked(this, t, checkBaseObstacle)) {
                if (d < bestAttackableDist) {
                  bestAttackableDist = d;
@@ -1227,53 +1458,92 @@
          return { target, distToTarget, canAttack, isFleeing };
        } // evaluateTactics()
 
+       /**
+        * 恐怖度（0.0〜1.0）。士気の裏返しであり、逃走に転じる閾値になる。
+        */
+       fear() {
+         return (1.0 - this.spirit);
+       }
+
+       /**
+        * 逃走中かどうか。シールド残量が恐怖度を下回ると逃走に転じる。
+        * 士気が高いほど、より深く削られるまで戦い続けることになる。
+        */
+       isFleeing() {
+         return this.shieldPercent() < this.fear();
+       }
+
+       /**
+        * 基地のドックを使えるか。使えるのは連邦艦だけなので既定は false。
+        */
+       canDockAtBase() {
+         return false;
+       }
+
+       /**
+        * 逃走時に距離を取りたい相手。「何を怖がるか」は艦種で異なるため、
+        * 呼び出し側で艦種を見分けずに済むようクラス側に持たせる。
+        * @return {Array<GameObj>} 距離を取る対象
+        */
+       getFleeThreats() {
+         return [gameObjs.player, gameObjs.starBase];
+       }
+
+       /**
+        * 宇宙域の外へ出たときの処理。撤退が戦局に与える意味は艦種で
+        * 正反対のため、サブクラスで実装する。既定では何もしない。
+        */
+       onLeaveArea() {
+       }
+
      } // class NPCShip
 
      /**
-      *
+      * エネルギーを持つ艦の基底クラス（現状は自機のみが継承する）。
+      * 移動・攻撃・シールド回復の全てが同一のエネルギーを消費するため、
+      * 残量をシールドゲージの直下に並べて常時見えるようにしている。
       */
      class ObjWithEnergy extends SpaceShip {
        static ENERGY_MAX = 1;
 
        constructor(
          scene, x, y, texture,
-         shield, gauge_color,
-         energy, energy_color,
+         shield, gaugeColor,
+         energy, energyColor,
          scale = SCALE,
-         weapon_power = 0, weapon_area_r = 0, weapon_cost = 0
-       ) {
+         weaponPower = 0, weaponAreaR = 0, weaponCost = 0
+      ) {
          // 親クラス (SpaceShip) へパラメータを渡す
          super(
-           scene, x, y, texture, shield, gauge_color, scale, weapon_power, weapon_area_r, weapon_cost
+           scene, x, y, texture, shield, gaugeColor, scale, weaponPower, weaponAreaR, weaponCost
          );
          this.energy = energy;
-         this.energy_gauge_color = energy_color;
+         this.energyGaugeColor = energyColor;
 
-         this.energy_gauge = this.scene.add.graphics();
+         this.energyGauge = this.scene.add.graphics();
        }
 
-       energy_p() {
+       energyPercent() {
          return Math.floor(this.energy / this.constructor.ENERGY_MAX * 100);
        }
 
        update() {
          super.update();
          drawGauge(
-           this.energy_gauge,
-           this.x, this.y + (this.gauge_y * this.scale) + this.gauge_h + 1,
-           this.gauge_w, this.gauge_h,
+           this.energyGauge,
+           this.x, this.y + (this.gaugeY * this.scale) + this.gaugeH + 1,
+           this.gaugeW, this.gaugeH,
            this.energy / this.constructor.ENERGY_MAX,
-           this.energy_gauge_color
+           this.energyGaugeColor
          );          
        }
      } // class ObjWithEnergy
 
      /**
-      *
+      * 恒星。移動を妨げ、射線を遮る障害物として機能する。
       */
      class Star extends GameObj {
        static W = 40;
-       static R = Star.W / 2 * SCALE;
        static RANGE = {
          MIN: 0.25,
          MAX: 0.85,
@@ -1284,7 +1554,9 @@
      } // class Star
 
      /**
-      *
+      * 防衛対象の宇宙基地。
+      * プレイヤーにとっては補給地点であると同時に、射線を遮る障害物でもある。
+      * 基地のシールドが尽きるとゲームオーバーになる。
       */
      class StarBase extends ObjWithShield {
        static W = 100;
@@ -1293,22 +1565,25 @@
        static SHIELD_RECOVERY_RATE = 0.005;
        static SHIELD_COLOR = 0x00ffff;
        static DOCKING_RANGE = 50 * SCALE;
+       // 接触したとみなす許容差。NPC は移動後に座標を整数へ丸めるため、
+       // 接触位置ちょうどで止めても最大 √2 だけ離れうる。それを吸収する。
+       static CONTACT_TOLERANCE = 1.5;
 
        constructor(scene, x, y) {
          super(scene, x, y, 'baseImg', StarBase.SHIELD_MAX, StarBase.SHIELD_COLOR);
 
-         this.gauge_y = this.gauge_y + this.gauge_h / 2 * 3;
+         this.gaugeY = this.gaugeY + this.gaugeH / 2 * 3;
          this.sprite.setDepth(1);
-         this.shield_gauge.setDepth(1);
+         this.shieldGauge.setDepth(1);
        }
 
        update() {
          super.update();
 
          // ドッキング状態
-         if ( gameObjs.player.is_docked ) {
-           rangeGraphics.lineStyle(5, 0x02ffff, 1);
-           rangeGraphics.strokeCircle(
+         if (gameObjs.player.isDocked) {
+           gameObjs.rangeGraphics.lineStyle(5, DRAW_COLOR.DOCKING_RING, 1);
+           gameObjs.rangeGraphics.strokeCircle(
              gameObjs.starBase.x, gameObjs.starBase.y, StarBase.DOCKING_RANGE - 3
            );
          }
@@ -1316,8 +1591,8 @@
 
        // 基地に対するクリック操作
        onInteract(player, scene, endTurn) {
-         if (player.is_docked) {
-           setMsg("基地", "ドッキング中");
+         if (player.isDocked) {
+           setMsg(SPEAKER.BASE, "ドッキング中");
            endTurn();
            return true;
          }
@@ -1335,11 +1610,10 @@
      } // class StarBase
 
      /**
-      *
+      * 敵艦。撃破ではなく、宇宙域の外へ撤退させることが目的の対象。
       */
      class EnemyShip extends NPCShip {
        static W = 60;
-       static R = EnemyShip.W / 2 * SCALE;
        static SPEED = 40 * SCALE;
 
        static SHIELD_MAX = 300;
@@ -1368,44 +1642,70 @@
        }
 
        getBeamColor() {
-         return 0xff00ff;
+         return DRAW_COLOR.BEAM_ENEMY;
        }
 
        // --- 敵艦が攻撃した後の処理 ---
        onAfterAttack(target) {
-         const t_shield_p = Math.floor(target.shieldPercent() * 100);
+         const targetShieldPercent = Math.floor(target.shieldPercent() * 100);
 
-         if (target === gameObjs.player && t_shield_p < 60) {
-           if (t_shield_p > 30) {
-             setMsg("機関部", `シールド ${t_shield_p}% に低下`, "#ff0");
+         if (target === gameObjs.player
+             && targetShieldPercent < REPORT_THRESHOLD.SHIELD_WARN) {
+           if (targetShieldPercent > REPORT_THRESHOLD.SHIELD_DANGER) {
+             setMsg(SPEAKER.ENGINE, `シールド ${targetShieldPercent}% に低下`, MSG_COLOR.WARN);
            } else {
-             setMsg("機関部", `艦長！シールド ${t_shield_p}% 危険です！`, "#f00");
+             setMsg(SPEAKER.ENGINE, `艦長！シールド ${targetShieldPercent}% 危険です！`, MSG_COLOR.DANGER);
            }
            updateStatus();
          }
-         if (target === gameObjs.starBase && t_shield_p < 60) {
-           setMsg("基地", `シールド ${t_shield_p}%、至急救援を求む！`, "#ff0");
-           if (t_shield_p <= 30) {
-             setMsg("基地", `シールド ${t_shield_p}%、至急救援を求む！`, "#f00");
+         if (target === gameObjs.starBase
+             && targetShieldPercent < REPORT_THRESHOLD.SHIELD_WARN) {
+           setMsg(SPEAKER.BASE, `シールド ${targetShieldPercent}%、至急救援を求む！`, MSG_COLOR.WARN);
+           if (targetShieldPercent <= REPORT_THRESHOLD.SHIELD_DANGER) {
+             setMsg(SPEAKER.BASE, `シールド ${targetShieldPercent}%、至急救援を求む！`, MSG_COLOR.DANGER);
            }
            updateStatus();
          }
          if (target.shield <= 0 && !gameState.isGameOver) {
            if (target === gameObjs.starBase) {
-             gameOver("基地", "シールド消失！基地が崩壊...");
+             gameOver(SPEAKER.BASE, "シールド消失！基地が崩壊...");
            } else if (target === gameObjs.player) {
-             gameOver("機関部", "シールド消失！ 船体が崩壊...");
+             gameOver(SPEAKER.ENGINE, "シールド消失！ 船体が崩壊...");
            } else if (target instanceof FederationShip) { // 【修正】配列比較のバグを解消
-             setMsg("通信士", "味方との通信が途絶えました", "#f00");
+             setMsg(SPEAKER.COMMS, "味方との通信が途絶えました", MSG_COLOR.DANGER);
              updateStatus();
            }
          }
        } // onAfterAttack()
 
+       /**
+        * override: 敵艦が撤退すると、残った敵の士気が下がる。
+        * 「撃破ではなく追い返す」ことに報いるための処理。
+        */
+       onLeaveArea() {
+         gameObjs.enemies.forEach(e => {
+           e.spirit = Math.max(
+             EnemyShip.SPIRIT.MIN, e.spirit - EnemyShip.SPIRIT.STEP
+           );
+         });
+         if (gameState.isGameOver) {
+           return;
+         }
+         if (getActiveEnemyCount() > 0) {
+           setMsg(SPEAKER.XO, "敵艦が戦場から離脱しました", MSG_COLOR.RETREAT);
+         } else {
+           setMsg(SPEAKER.XO, "すべての敵艦が撤退しました！", MSG_COLOR.WARN);
+         }
+       } // onLeaveArea()
+
        // --- 敵艦のターゲット候補 ---
+       // ドッキング中の艦は基地の中にいるため狙わない（攻撃は基地が受ける）
        getPotentialTargets() {
-         const targets = [gameObjs.starBase, ...gameObjs.federationShips];
-         if (!gameObjs.player.is_docked) {
+         const targets = [
+           gameObjs.starBase,
+           ...gameObjs.federationShips.filter(f => !f.isDocked),
+         ];
+         if (!gameObjs.player.isDocked) {
            targets.push(gameObjs.player);
          }
          return targets;
@@ -1413,12 +1713,12 @@
 
        // 敵艦に対するクリック操作（攻撃）
        onInteract(player, scene, endTurn) {
-         if (player.is_docked) {
-           setMsg("戦術士官", "ドッキング中のため兵器は使用できません。", "#ff0");
+         if (player.isDocked) {
+           setMsg(SPEAKER.TACTICAL, "ドッキング中のため兵器は使用できません。", MSG_COLOR.WARN);
            return true;
          }
          if (player.energy < player.weapon.cost) {
-           setMsg("戦術士官", "エネルギー不足で攻撃できません！", "#f00");
+           setMsg(SPEAKER.TACTICAL, "エネルギー不足で攻撃できません！", MSG_COLOR.DANGER);
            return true;
          }
 
@@ -1426,30 +1726,30 @@
          player.energy -= player.weapon.cost;
          const dist = Phaser.Math.Distance.Between(player.x, player.y, this.x, this.y);
 
-         if (dist > player.weapon.MaxRange()) {
-           setMsg("戦術士官", "射程範囲外のため敵艦にダメージなし", "#ff0");
-           fireBeam(scene, player, this, 0x444444);
+         if (dist > player.weapon.maxRange()) {
+           setMsg(SPEAKER.TACTICAL, "射程範囲外のため敵艦にダメージなし", MSG_COLOR.WARN);
+           fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
            endTurn();
            return true;
          }
          if (isLOSBlocked(player, this, false)) {
-           setMsg("戦術士官", "障害物に遮られました", "#ff0");
-           fireBeam(scene, player, this, 0x444444);
+           setMsg(SPEAKER.TACTICAL, "障害物に遮られました", MSG_COLOR.WARN);
+           fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
            endTurn();
            return true;
          }
 
          // 命中
-         //setMsg("戦術士官", "攻撃命中！ 敵艦シールド低下！", "#f80");
-         const damage = player.weapon.CalcDamage(dist);
+         //setMsg(SPEAKER.TACTICAL, "攻撃命中！ 敵艦シールド低下！", "#f80");
+         const damage = player.weapon.calcDamage(dist);
          this.takeDamage(damage);
-         fireBeam(scene, player, this, 0x00ffff);
+         fireBeam(scene, player, this, DRAW_COLOR.BEAM_PLAYER);
 
          if (!this.active) {
            // 撃墜
            gameObjs.removeEnemy(this);
            spawnEnemy(scene, 0.8, 0.95);
-           setMsg("戦術士官", "敵艦を撃破！ 別の新たな敵艦を検知しました！", "#ff0");
+           setMsg(SPEAKER.TACTICAL, "敵艦を撃破！ 別の新たな敵艦を検知しました！", MSG_COLOR.WARN);
          }
          endTurn();
          return true;
@@ -1462,7 +1762,6 @@
       */
      class FederationShip extends NPCShip {
        static W = 60;
-       static R = FederationShip.W / 2 * SCALE;
        static SPEED = 80 * SCALE;
 
        static SHIELD_MAX = 400;
@@ -1488,13 +1787,16 @@
            FederationShip.SHIELD_MAX, FederationShip.SHIELD_COLOR, SCALE,
            FederationShip.WEAPON.POWER, FederationShip.WEAPON.AREA_R
          );
+
+         // 自機と同じく、基地にドッキングしている間は攻撃せず、敵にも狙われない
+         this.isDocked = false;
        }
 
        /**
         * override
         */
        getBeamColor() {
-         return 0x0088ff;
+         return DRAW_COLOR.BEAM_FEDERATION;
        }
 
        /**
@@ -1503,7 +1805,7 @@
        onAfterAttack(target) {
          if (!target.active) {
            gameObjs.removeEnemy(target);
-           setMsg("通信士", "連邦艦が敵艦を撃破しました！", "#f40");
+           setMsg(SPEAKER.COMMS, "連邦艦が敵艦を撃破しました！", MSG_COLOR.ENEMY);
            updateStatus();
          }
        } // onAfterAttack()
@@ -1534,10 +1836,40 @@
          return targets;
        } // getAttractionTargets()
 
+       /**
+        * override: 連邦艦は基地のドックに入れる。
+        */
+       canDockAtBase() {
+         return true;
+       }
+
+       /**
+        * override: 連邦艦が距離を取りたいのは敵艦であって、基地や自機ではない
+        * （むしろそちらへは getAttractionTargets() で引き寄せられる）。
+        */
+       getFleeThreats() {
+         return gameObjs.enemies.filter(e => e.active && e !== this);
+       }
+
+       /**
+        * override: 味方の離脱は戦力の喪失なので減点する。
+        */
+       onLeaveArea() {
+         setMsg(SPEAKER.COMMS, "味方が戦場から離脱しました", MSG_COLOR.FRIENDLY);
+         gameState.addScore(calcShipLossPenalty());
+       }
+
+       /**
+        * override
+        */
+       isFriendly() {
+         return true;
+       }
+
      } // class FederationShip
 
      /**
-      *
+      * プレイヤーが操作する防衛艦。
       */
      class PlayerShip extends ObjWithEnergy {
        static W = 60;
@@ -1573,33 +1905,40 @@
 
          // ※ this.weapon = new Weapon(...) は SpaceShip で行われるため削除！
 
-         this.is_docked = false;
+         this.isDocked = false;
          
          this.sprite.setDepth(10);
-         this.shield_gauge.setDepth(10);
+         this.shieldGauge.setDepth(10);
        }
 
        // 自機に対するクリック操作（シールド強化）
        onInteract(player, scene, endTurn) {
-         const d_shield = PlayerShip.SHIELD_MAX - this.shield;
-         if (d_shield <= 0) {
-           setMsg("機関部", "シールドはすでに最大です。", "#fff");
+         const shieldDeficit = PlayerShip.SHIELD_MAX - this.shield;
+         if (shieldDeficit <= 0) {
+           setMsg(SPEAKER.ENGINE, "シールドはすでに最大です。", MSG_COLOR.PLAIN);
            return true;
          }
 
-         const energy_supply = Math.min(this.energy, d_shield);
-         if (energy_supply <= 0) {
-           setMsg("機関部", "エネルギー不足により、シールドを補強できません！");
+         const energySupply = Math.min(this.energy, shieldDeficit);
+         if (energySupply <= 0) {
+           setMsg(SPEAKER.ENGINE, "エネルギー不足により、シールドを補強できません！");
            return true;
          }
 
-         this.energy -= energy_supply;
-         this.shield += energy_supply;
+         this.energy -= energySupply;
+         this.shield += energySupply;
 
-         setMsg("機関部", `シールドアップ。エネルギー残り ${this.energy_p()}%`, "#8ff");
+         setMsg(SPEAKER.ENGINE, `シールドアップ。エネルギー残り ${this.energyPercent()}%`, MSG_COLOR.SELF);
          endTurn();
          return true;
        } // onInteract()
+
+       /**
+        * override
+        */
+       isFriendly() {
+         return true;
+       }
 
      } // class PlayerShip
 
@@ -1607,22 +1946,22 @@
       * ズーム倍率変更
       */
      function changeZoom(scene, amount) {
-       let nextZoom = CurZoom;
+       let nextZoom = gameState.zoom;
        if (amount > 0) {
-         nextZoom = CurZoom * amount;
+         nextZoom = gameState.zoom * amount;
        } else if (amount < 0) {
-         nextZoom = CurZoom / -amount;
+         nextZoom = gameState.zoom / -amount;
        }
        
        // 最小倍率を 1.0 に強制固定（1倍以下はない）
-       CurZoom = Phaser.Math.Clamp(nextZoom, 1.0, CAMERA.ZOOM_MAX);
+       gameState.zoom = Phaser.Math.Clamp(nextZoom, CAMERA.ZOOM_MIN, CAMERA.ZOOM_MAX);
        
        // ターゲットの切り替えを実行
        updateCameraTarget(scene);
        
        scene.tweens.add({
          targets: scene.cameras.main,
-         zoom: CurZoom,
+         zoom: gameState.zoom,
          duration: 250,
          ease: 'Sine.easeInOut'
        });
@@ -1646,10 +1985,10 @@
      new Phaser.Game(config);
 
      /**
-      *
+      * 連邦艦（味方NPC）を1隻、他の物体と重ならない位置に出現させる。
       */
-     function newFederationShip(scene, dist_min=0.3, dist_max=0.6) {
-       let p = getSafeRandPos(dist_min, dist_max);
+     function newFederationShip(scene, distMin=0.3, distMax=0.6) {
+       let p = getSafeRandPos(distMin, distMax);
        const newFed = new FederationShip(scene, p.x, p.y);
        gameObjs.addFederation(newFed);
        updateStatus();
@@ -1658,8 +1997,8 @@
      /**
       * 敵艦を1隻、安全な位置に生成して gameObjs に登録する
       */
-     function spawnEnemy(scene, dist_min, dist_max) {
-       const p = getSafeRandPos(dist_min, dist_max);
+     function spawnEnemy(scene, distMin, distMax) {
+       const p = getSafeRandPos(distMin, distMax);
        const enemy = new EnemyShip(scene, p.x, p.y);
        gameObjs.addEnemy(enemy);
        return enemy;
@@ -1709,7 +2048,7 @@
        g.lineTo(6,40);
        g.lineTo(28,55);
        g.fillPath();
-       g.fillRect(26,10,8,35)
+       g.fillRect(26,10,8,35);
        g.fillEllipse(30,15,18,19);
        g.generateTexture('enemyImg',60,60);
 
@@ -1718,9 +2057,9 @@
        // Base
        const CX_STARBASE = StarBase.W / 2;
        const CY_STARBASE = StarBase.W / 2;
-       const base_color = 0x88ffff;
-       g.fillStyle(base_color);
-       g.lineStyle(8, base_color, 1);
+       const baseColor = 0x88ffff;
+       g.fillStyle(baseColor);
+       g.lineStyle(8, baseColor, 1);
        g.fillEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * .2, StarBase.W * 0.9);
        g.fillEllipse(CX_STARBASE, CY_STARBASE - 30, StarBase.W * 0.25, StarBase.W * 0.25);
        g.fillEllipse(CX_STARBASE, CY_STARBASE + 30, StarBase.W * 0.25, StarBase.W * 0.25);
@@ -1747,8 +2086,8 @@
       */
      function updateCameraTarget(scene) {
        // 1倍以下のズーム倍率は存在しないように制限
-       if (CurZoom <= 1.0) {
-         CurZoom = 1.0;
+       if (gameState.zoom <= CAMERA.ZOOM_MIN) {
+         gameState.zoom = CAMERA.ZOOM_MIN;
          // 1倍のときはスターベース（AREA_CENTER）を中心とし、追従を解除
          scene.cameras.main.stopFollow();
          scene.cameras.main.centerOn(AREA_CENTER.X, AREA_CENTER.Y);
@@ -1763,8 +2102,8 @@
       */
      function create() {
        gameState.curScene = this;
-       rangeGraphics = this.add.graphics();
-       boundaryGraphics = this.add.graphics();
+       gameObjs.rangeGraphics = this.add.graphics();
+       gameObjs.boundaryGraphics = this.add.graphics();
        drawBoundary();
 
        setMsg("", "");
@@ -1782,7 +2121,7 @@
 
        // Enemies
        gameObjs.enemies = [];
-       for (let i=0; i < QTY.ENEMY; i++) {
+       for (let i=0; i < gameState.enemyQty; i++) {
          spawnEnemy(this, 0.6, 0.9);
        }
 
@@ -1793,25 +2132,22 @@
        }
        
        // Player
-       let pp = getSafeRandPos(0.1, 0.3);
+       const pp = getSafeRandPos(0.1, 0.3);
        gameObjs.player = new PlayerShip(this, pp.x, pp.y);
 
        // Camera
        this.cameras.main.removeBounds();
        // 初期倍率を1.0倍とし、ターゲット切り替え関数を適用する
-       CurZoom = 1.0;
-       this.cameras.main.setZoom(CurZoom);
+       gameState.zoom = CAMERA.ZOOM_MIN;
+       this.cameras.main.setZoom(gameState.zoom);
        updateCameraTarget(this);
 
        updateStatus();
 
        this.input.on('pointerdown', handlePointerDown, this);
 
-       document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
-       document.getElementById('zoomOut').onclick = () => changeZoom(this, -CAMERA.STEP);
-
        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
-         let zoomAmount = deltaY > 0 ? -CAMERA.STEP : CAMERA.STEP;
+         const zoomAmount = deltaY > 0 ? -CAMERA.STEP : CAMERA.STEP;
          changeZoom(this, zoomAmount);
        });
 
@@ -1822,7 +2158,7 @@
       * フレーム更新
       */
      function update() {
-       rangeGraphics.clear();
+       gameObjs.rangeGraphics.clear();
 
        // 障害物リストをコンテキストから取得するように変更
        const allObjects = [
@@ -1832,30 +2168,32 @@
        allObjects.forEach((obj) => {
          if(!obj || !obj.active) return;
          
-         let color = (
-           obj === gameObjs.player || obj instanceof FederationShip
-         ) ? 0x00ffff : 0xffff00;
+         let color = obj.isFriendly()
+           ? DRAW_COLOR.RANGE_FRIENDLY : DRAW_COLOR.RANGE_ENEMY;
 
-         rangeGraphics.lineStyle(1, color, 0.5);
-         rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.EffectiveRange());
+         gameObjs.rangeGraphics.lineStyle(1, color, 0.5);
+         gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.effectiveRange());
          
-         if ( obj === gameObjs.player ) {  
-           rangeGraphics.lineStyle(1, color, 0.3);
-           rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.MaxRange());
+         if (obj === gameObjs.player) {  
+           gameObjs.rangeGraphics.lineStyle(1, color, 0.3);
+           gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.maxRange());
          }
        });
 
-       if ( gameObjs.player ) gameObjs.player.update();
-       if ( gameObjs.starBase ) gameObjs.starBase.update();
+       if (gameObjs.player ) gameObjs.player.update();
+       if (gameObjs.starBase ) gameObjs.starBase.update();
        
        gameObjs.federationShips.forEach(e => e.update());
        gameObjs.enemies.forEach(e => e.update());
      } // update()
 
      /**
-      *
+      * 既存の物体と重ならないランダム座標を返す。
+      * 中心（基地）からの距離を比率で指定することで、「外縁部に増援を出す」
+      * 「中心付近に自機を配置する」を同じ関数で出し分けている。
+      * 条件を満たす座標が見つからない場合も、試行回数の上限で必ず打ち切る。
       */
-     function getSafeRandPos(dist_min, dist_max){
+     function getSafeRandPos(distMin, distMax){
        let x, y, distToCenter;
        let safe = false;
        let attempts = 0;
@@ -1868,7 +2206,7 @@
          y = Phaser.Math.Between(AREA_CENTER.Y - AREA_R, AREA_CENTER.Y + AREA_R);
          distToCenter = Phaser.Math.Distance.Between(x, y, AREA_CENTER.X, AREA_CENTER.Y);
          
-         if ( distToCenter < AREA_R * dist_min || distToCenter > AREA_R * dist_max ) {
+         if (distToCenter < AREA_R * distMin || distToCenter > AREA_R * distMax) {
            continue;
          }
          
@@ -1887,63 +2225,42 @@
        return { x, y };
      } // getSafeRandPos()
 
-     /**
-      * 線分（始点からdx,dy方向へ、長さの2乗がa）と円（中心が始点からfx,fy、半径radius）
-      * の交差判定。線分をt=0(始点)〜t=1(終点)としてパラメータ化した交点位置を返す。
-      * 交差しない場合は null。
-      * clampDest()（衝突による移動停止）と hasObstacleOnPath()（LOS/経路上の障害物判定）
-      * で共通して使う、線分と円の交差の二次方程式を解く部分だけを切り出したもの。
-      */
-     function intersectSegmentCircle(dx, dy, a, fx, fy, radius) {
-       const b = 2 * (fx * dx + fy * dy);
-       const c = fx * fx + fy * fy - radius * radius;
-       const disc = b * b - 4 * a * c;
-       if (disc < 0) {
-         return null;
-       }
-       const sqrtDisc = Math.sqrt(disc);
-       return {
-         t1: (-b - sqrtDisc) / (2 * a),
-         t2: (-b + sqrtDisc) / (2 * a),
-       };
-     } // intersectSegmentCircle()
-
-     /**
-      *
-      */
-     function hasObstacleOnPath(src, dst, obj) {
-       const dx = dst.x - src.x, dy = dst.y - src.y;
-       const a = dx * dx + dy * dy;
-       if (a < 0.001) {
-         return false;
-       }
-       const fx = src.x - obj.x, fy = src.y - obj.y;
-       const hit = intersectSegmentCircle(dx, dy, a, fx, fy, obj.r);
-       if (!hit) {
-         return false;
-       }
-       return (hit.t1 > 0.05 && hit.t1 < 0.95) || (hit.t2 > 0.05 && hit.t2 < 0.95);
-     } // hasObstacleOnPath()
 
      /**
       * LOS(Line of Sight、射線)がブロックされてないか？
       */
      function isLOSBlocked(srcObj, targetObj, checkBase = true) {
-       // 1. 星（障害物）による遮蔽の判定
-       let hitStar = gameObjs.stars.some(s => s.active && hasObstacleOnPath(srcObj, targetObj, s));
-       if (hitStar) return true;
-
-       // 2. 基地による遮蔽の判定（基地の見た目のサイズで正確に判定）
-       if (checkBase && gameObjs.starBase && gameObjs.starBase.active && gameObjs.starBase.shield > 0) {
-         if (hasObstacleOnPath(srcObj, targetObj, gameObjs.starBase)) {
-           return true;
-         }
+       // 遮蔽物を集めるところだけがグローバル状態に触れる。
+       // 実際の判定は純粋な isPathBlockedBy() に任せる。
+       const obstacles = gameObjs.stars.filter(s => s.active);
+       const base = gameObjs.starBase;
+       if (checkBase && base && base.active && base.shield > 0) {
+         obstacles.push(base);
        }
-       return false;
+       return isPathBlockedBy(srcObj, targetObj, obstacles);
      } // isLOSBlocked()
 
      /**
-      *
+      * エネルギーが最小活動限界を下回っていれば敗北させる。
+      * 行動の前後どちらでも起こりうるため関数にまとめてある。
+      * ドッキング中は基地から供給を受けられるので対象外。
+      * @param {string} msg 「コンピュータ」が告げる文言（前後で使い分ける）
+      * @return {boolean} 敗北させたかどうか
+      */
+     function checkEnergyDepleted(msg) {
+       const player = gameObjs.player;
+       if (player.energy >= PlayerShip.ENERGY_MIN || player.isDocked) {
+         return false;
+       }
+       updateStatus();
+       gameOver(SPEAKER.COMPUTER, msg);
+       return true;
+     } // checkEnergyDepleted()
+
+     /**
+      * クリック（タップ）操作の受け口。
+      * 「何をクリックしたか」だけで行動が決まる設計のため、まず対象オブジェクトへ
+      * 処理を委ね、どこからも処理されなかった場合にのみ移動へフォールバックする。
       */
      function handlePointerDown(pointer) {
        if (gameState.isGameOver || !gameState.isPlayerTurn) return;
@@ -1953,16 +2270,13 @@
          Phaser.Math.Distance.Between(
            pointer.worldX, pointer.worldY, AREA_CENTER.X, AREA_CENTER.Y
          ) >= AREA_R
-       ) {
+      ) {
          return;
        }
 
-       if (gameObjs.player.energy < PlayerShip.ENERGY_MIN && !gameObjs.player.is_docked) {
-         updateStatus();
-         gameOver(
-           "コンピュータ",
-           "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信し機体を放棄します..."
-         );
+       if (checkEnergyDepleted(
+         "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信し機体を放棄します..."
+       )) {
          return;
        }
 
@@ -1985,12 +2299,9 @@
        const targetY = clickedObj ? clickedObj.y : pointer.worldY;
        attemptPlayerMove(this, targetX, targetY, TIMING.TURN_DELAY);
 
-       if (gameObjs.player.energy < PlayerShip.ENERGY_MIN && !gameObjs.player.is_docked) {
-         updateStatus();
-         gameOver(
-           "コンピュータ", "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信します..."
-         );
-       }
+       checkEnergyDepleted(
+         "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信します..."
+       );
      } // handlePointerDown()
 
      /**
@@ -1999,7 +2310,7 @@
       */
      function isAdjacentToBase(ship, base) {
        const dist = Phaser.Math.Distance.Between(ship.x, ship.y, base.x, base.y);
-       const contactDist = base.r + ship.r + 1.5;
+       const contactDist = base.r + ship.r + StarBase.CONTACT_TOLERANCE;
        return dist <= contactDist;
      } // isAdjacentToBase()
 
@@ -2011,13 +2322,11 @@
      } // canDock()
 
      /**
-      *
-      */
-     /**
-      * ドッキング処理：自機を基地の「中央」に移動させる
+      * ドッキング処理：自機を基地の「中央」に移動させる。
+      * 補給と引き換えに攻撃手段を失うため、明示的な操作でのみ実行される。
       */
      function dockShip(scene) {
-       gameObjs.player.is_docked = true;
+       gameObjs.player.isDocked = true;
 
        // 補給
        gameObjs.player.shield = PlayerShip.SHIELD_MAX;
@@ -2031,9 +2340,34 @@
          duration: 200,
          ease: 'Sine.easeInOut'
        });
-       setMsg("基地", "ドッキング完了。エネルギー補給開始。", "#0ff");
+       setMsg(SPEAKER.BASE, "ドッキング完了。エネルギー補給開始。", MSG_COLOR.INFO);
        updateStatus();
      } // dockShip()
+
+     /**
+      * ドックを出る艦の移動先を、基地の外へ押し出した座標に補正する。
+      * ドッキング中の艦は基地の中心に重なっているため、そのまま動かすと
+      * 基地を障害物とする判定に引っかかって身動きが取れなくなる。
+      * @param {SpaceShip} ship 押し出す艦
+      * @param {{x:number, y:number}} dest 押し出し前の移動先
+      * @return {{x:number, y:number}} 押し出し後の移動先
+      */
+     function pushOutFromBase(ship, dest) {
+       const base = gameObjs.starBase;
+       const minPushDist = StarBase.R + ship.r;
+       const distFromBase = Phaser.Math.Distance.Between(
+         base.x, base.y, dest.x, dest.y
+       );
+       if (distFromBase >= minPushDist) {
+         return dest;
+       }
+       debugLog('distFromBase', distFromBase, 'minPushDist', minPushDist);
+       const pushAngle = Math.atan2(dest.y - base.y, dest.x - base.x);
+       return {
+         x: base.x + Math.cos(pushAngle) * minPushDist,
+         y: base.y + Math.sin(pushAngle) * minPushDist,
+       };
+     } // pushOutFromBase()
 
      /**
       * 自機の速度を考慮した目的座標を計算する。
@@ -2060,36 +2394,33 @@
       * @return {{destX:number, destY:number, ignoreObjs:Array,
       *           precomputedDirectDest:?{x:number,y:number}}}
       */
-     function resolvePlayerDestination(desiredX, desiredY, moveDist) {
-       if (gameObjs.player.is_docked) {
-         gameObjs.player.is_docked = false;
+     function resolvePlayerDestination(desiredX, desiredY, moveDist, destTarget = null) {
+       if (gameObjs.player.isDocked) {
+         gameObjs.player.isDocked = false;
          gameObjs.player.shield = PlayerShip.SHIELD_MAX;
 
          const ignoreObjs = [gameObjs.starBase];
-         let { x: destX, y: destY } = gameObjs.player.resolveMovement(
+         const moved = gameObjs.player.resolveMovement(
            desiredX, desiredY, moveDist, ignoreObjs
          );
-
-         const distFromBase = Phaser.Math.Distance.Between(
-           gameObjs.starBase.x, gameObjs.starBase.y, destX, destY
-         );
-         const minPushDist = StarBase.R + PlayerShip.R;
-         if (distFromBase < minPushDist) {
-           debugLog('distFromBase', distFromBase, 'minPushDist', minPushDist);
-           const pushAngle = Math.atan2(destY - gameObjs.starBase.y, destX - gameObjs.starBase.x);
-           destX = gameObjs.starBase.x + Math.cos(pushAngle) * minPushDist;
-           destY = gameObjs.starBase.y + Math.sin(pushAngle) * minPushDist;
-         }
-         return { destX, destY, ignoreObjs, precomputedDirectDest: null };
+         const pushed = pushOutFromBase(gameObjs.player, moved);
+         return {
+           destX: pushed.x,
+           destY: pushed.y,
+           ignoreObjs,
+           precomputedDirectDest: null,
+           destTarget: null,
+         };
        }
 
        // 通常移動およびドッキングを目的とする移動
-       const finalDest = gameObjs.player.clampDest(desiredX, desiredY, []);
+       const finalDest = gameObjs.player.clampDest(desiredX, desiredY, [], destTarget);
        return {
          destX: finalDest.x,
          destY: finalDest.y,
          ignoreObjs: [],
          precomputedDirectDest: finalDest,
+         destTarget,
        };
      } // resolvePlayerDestination()
 
@@ -2098,21 +2429,21 @@
       * 迂回を試みても動けない場合は cancelled:true を返す。
       */
      function resolveStuckAvoidance(desiredX, desiredY, moveDist, resolved) {
-       const { ignoreObjs, precomputedDirectDest } = resolved;
+       const { ignoreObjs, precomputedDirectDest, destTarget } = resolved;
        let destX = resolved.destX;
        let destY = resolved.destY;
 
        let actualDist = Phaser.Math.Distance.Between(gameObjs.player.x, gameObjs.player.y, destX, destY);
        debugLog('actualDist', actualDist);
 
-       if (actualDist >= 10) { // XXX TBD
+       if (actualDist >= SpaceShip.MIN_MOVE_DIST) {
          return { destX, destY, actualDist, isRerouted: false, cancelled: false };
        }
 
        // 扇形探索（resolveMovement）を利用して迂回進路を再計算。
        // 通常移動時は直前に計算済みのclampDest結果を渡し、同じ計算を繰り返さない。
        const avoidDest = gameObjs.player.resolveMovement(
-         desiredX, desiredY, moveDist, ignoreObjs, precomputedDirectDest
+         desiredX, desiredY, moveDist, ignoreObjs, precomputedDirectDest, destTarget
        );
        destX = avoidDest.x;
        destY = avoidDest.y;
@@ -2138,24 +2469,30 @@
        const { desiredX, desiredY, moveDist } = desired;
 
        // 目的座標が「基地」かどうかの判定
-       const dist_target_to_base = Phaser.Math.Distance.Between(
+       const distTargetToBase = Phaser.Math.Distance.Between(
          targetX, targetY, gameObjs.starBase.x, gameObjs.starBase.y
        );
-       const target_is_base = dist_target_to_base <= StarBase.R;
+       const targetIsBase = distTargetToBase <= StarBase.R;
 
-       const resolved = resolvePlayerDestination(desiredX, desiredY, moveDist);
+       // 基地を目指す移動では、基地を障害物ではなく目的地として扱い、
+       // 接触位置ちょうどで停止させる（canDock() が確実に成立する）
+       const destTarget = targetIsBase ? gameObjs.starBase : null;
+
+       const resolved = resolvePlayerDestination(
+         desiredX, desiredY, moveDist, destTarget
+       );
        const stuck = resolveStuckAvoidance(desiredX, desiredY, moveDist, resolved);
        if (stuck.cancelled) {
-         setMsg("操舵手", "障害物に接近しすぎてコース設定できません", "#0f0");
+         setMsg(SPEAKER.HELM, "障害物に接近しすぎてコース設定できません", MSG_COLOR.GOOD);
          updateStatus();
          return;
        }
        const { destX, destY, actualDist, isRerouted } = stuck;
 
-       const speed_p = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
+       const speedPercent = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
        const cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
-       if ( gameObjs.player.energy - cost < 0 ) {
-         setMsg("機関部", "エネルギー不足です", '#ff0');
+       if (gameObjs.player.energy - cost < 0) {
+         setMsg(SPEAKER.ENGINE, "エネルギー不足です", MSG_COLOR.WARN);
          updateStatus();
          return;
        }
@@ -2163,9 +2500,9 @@
        // コース変更時のメッセージ
        const shiftDist = Phaser.Math.Distance.Between(desiredX, desiredY, destX, destY);
        if (isRerouted) {
-         setMsg("操舵手", `障害物回避のためコース調整。推力 ${speed_p}%`, "#ff0");
-       } else if (shiftDist > 5.0 && !target_is_base) {
-         setMsg("操舵手", `進路上に障害物。安全距離にて停止。推力 ${speed_p}%`, "#ff0");
+         setMsg(SPEAKER.HELM, `障害物回避のためコース調整。推力 ${speedPercent}%`, MSG_COLOR.WARN);
+       } else if (shiftDist > 5.0 && !targetIsBase) {
+         setMsg(SPEAKER.HELM, `進路上に障害物。安全距離にて停止。推力 ${speedPercent}%`, MSG_COLOR.WARN);
        }
        updateStatus();
 
@@ -2180,7 +2517,8 @@
      } // attemptPlayerMove()
 
      /**
-      *
+      * ビームの描画と発射音の再生。
+      * 一定時間後に自動で破棄される、その場限りのグラフィックスとして描く。
       */
      function fireBeam(scene, srcObj, targetObj, color) {
        const beam = scene.add.graphics();
@@ -2188,7 +2526,7 @@
        beam.lineBetween(srcObj.x, srcObj.y, targetObj.x, targetObj.y);
        scene.time.delayedCall(TIMING.BEAM_DUR, () => beam.destroy());
 
-       playBeamSound(srcObj === gameObjs.player || srcObj instanceof FederationShip);
+       playBeamSound(srcObj.isFriendly());
      } // fireBeam(..)
 
      // ---------------------------------------------------------
@@ -2210,7 +2548,7 @@
          scene.time.delayedCall(startDelay, () => execNPCAction(scene, npc));
        });
 
-       let totalDelay = (
+       const totalDelay = (
          TIMING.TURN_DELAY + TIMING.TURN_MARGIN + TIMING.ENEMY_DELAY_MAX
        );
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
@@ -2231,127 +2569,152 @@
 
        if (context.isFleeing) {
          npcMove(scene, npc, context);
-       } else if (context.canAttack) {
+       } else if (context.canAttack && !npc.isDocked) {
          npc.attack(context.target, context.distToTarget);
        } else {
+         // ドッキング中は自機と同じく兵器を使用できないため、攻撃したい
+         // 状況ならまずドックを出る（npcMove() が押し出しを行う）
          npcMove(scene, npc, context);
        }
      } // execNPCAction()
 
      /**
+      * NPC の移動先を決める。
+      * 「どこへ向かうか」と「ドックに入るのか」を同時に返すのは、
+      * 両者が同じ条件（基地に接しているか）から導かれるため。
+      * @param {NPCShip} npc 移動させる艦
+      * @param {Object} context evaluateTactics() の結果
+      * @return {{dest:{x:number, y:number}, isDocking:boolean}} 移動先とドッキングするか
+      */
+     function resolveNpcDestination(npc, context) {
+       const base = gameObjs.starBase;
+       const isBaseActive = base && base.active && base.shield > 0;
+       // 連邦艦にとって基地は「障害物」ではなく「目的地」である。
+       // これを destTarget として渡すと、接触位置ちょうどで停止するため、
+       // 次のターンに必ず isAdjacentToBase() が成立する。
+       const canUseDock = npc.canDockAtBase() && isBaseActive;
+       const dockTarget = canUseDock ? base : null;
+       // すでに基地に接している（＝前のターンまでに到着済み）かどうか
+       const dockableNow = canUseDock && isAdjacentToBase(npc, base);
+       const enterDock = { dest: { x: base.x, y: base.y }, isDocking: true };
+
+       if (context.isFleeing) {
+         // 連邦艦はすでに基地に接していれば、自機と同じくドックへ入る
+         if (dockableNow) {
+           return enterDock;
+         }
+         // それ以外は通常の逃走（敵・障害物回避）経路を計算する。
+         // 連邦艦は基地に引き寄せられるため、接触位置で停止して次のターンに
+         // ドッキングする。
+         const targetDest = npc.getFleeThreats().map(t => ({ x: t.x, y: t.y }));
+         return {
+           dest: npc.calculateDestination(targetDest, context.isFleeing, dockTarget),
+           isDocking: false,
+         };
+       }
+
+       // 逃走中でない場合
+       if (context.target) {
+         // ターゲットがいれば追跡
+         const targetDest = { x: context.target.x, y: context.target.y };
+         return {
+           dest: npc.calculateDestination(targetDest, context.isFleeing),
+           isDocking: false,
+         };
+       }
+       if (dockableNow) {
+         // ターゲットがおらず、すでに基地に接していればドックへ入る
+         return enterDock;
+       }
+       // ターゲットがいなければ基地へ向かう（接触位置ちょうどで停止する）
+       const targetDest = { x: base.x, y: base.y };
+       return {
+         dest: npc.calculateDestination(targetDest, context.isFleeing, dockTarget),
+         isDocking: false,
+       };
+     } // resolveNpcDestination()
+
+     /**
+      * 移動が完了したあとの後始末。宇宙域からの離脱判定と、
+      * シールド・士気の回復をまとめて行う。
+      * @param {NPCShip} npc 移動を終えた艦
+      * @param {Object} context evaluateTactics() の結果
+      * @param {boolean} isDocking ドックに入る移動だったか
+      */
+     function onNpcMoveComplete(npc, context, isDocking) {
+       npc.x = Math.floor(npc.x);
+       npc.y = Math.floor(npc.y);
+
+       const distFromCenter = Phaser.Math.Distance.Between(
+         npc.x, npc.y, AREA_CENTER.X, AREA_CENTER.Y
+       );
+       if (distFromCenter > AREA_R) {
+         npc.die();
+         npc.onLeaveArea();
+       }
+
+       // シールド回復処理
+       if (isDocking) {
+         npc.shield = npc.constructor.SHIELD_MAX;
+       } else {
+         npc.shield = Math.min(
+           npc.constructor.SHIELD_MAX,
+           npc.shield + (npc.constructor.SHIELD_MAX * npc.constructor.SHIELD_RECOVERY_RATE)
+         );
+       }
+
+       // spirit 回復
+       if (context.isFleeing) {
+         npc.spirit = Math.min(
+           npc.constructor.SPIRIT.MAX,
+           (npc.spirit + npc.constructor.SPIRIT.RECOVERY)
+         );
+         debugLog(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
+       }
+     } // onNpcMoveComplete()
+
+     /**
       * NPC 移動処理とシールド回復
       */
      function npcMove(scene, npc, context) {
-       let dest;
-       let isDocking = false;
+       let { dest, isDocking } = resolveNpcDestination(npc, context);
 
-       const base = gameObjs.starBase;
-       const isBaseActive = base && base.active && base.shield > 0;
-       // 連邦艦が、すでに基地に接している（＝前のターンまでに到着済み）かどうか
-       const dockableNow = npc instanceof FederationShip && isBaseActive
-         && isAdjacentToBase(npc, base);
+       // ドッキング・発進の状態遷移。敵の標的選定はターン中に参照されるため、
+       // 移動の完了を待たずにこの時点でフラグを切り替える（自機の
+       // dockShip() が即座に isDocked を立てるのと同じ扱い）。
+       if (isDocking && !npc.isDocked) {
+         npc.isDocked = true;
+         setMsg(SPEAKER.COMMS, "味方が基地にドッキングしました", MSG_COLOR.FRIENDLY);
+       } else if (npc.isDocked && !isDocking) {
+         npc.isDocked = false;
+         dest = pushOutFromBase(npc, dest);
+         setMsg(SPEAKER.COMMS, "味方が基地から発進しました", MSG_COLOR.FRIENDLY);
+       }
 
-       if (context.isFleeing) {
-         // 連邦艦はすでに基地に接していれば、移動せずドッキング（回復）する
-         if (dockableNow) {
-           dest = { x: npc.x, y: npc.y };
-           isDocking = true;
-         }
-
-         // ドッキングしない場合は、通常の逃走（敵・障害物回避）経路を計算。
-         // 基地は障害物として扱われるため、連邦艦は接する位置で自然に停止する。
-         if (!isDocking) {
-           let threats = [gameObjs.player, base];
-           if (npc instanceof FederationShip) {
-             threats = gameObjs.enemies.filter(e => e.active && e !== npc);
-           }
-           const targetDest = threats.map(t => ({ x: t.x, y: t.y }));
-           dest = npc.calculateDestination(targetDest, context.isFleeing);
-         }
-       } else { // 逃走中でない場合
-         if ( context.target ) {
-           // ターゲットがいれば追跡
-           const targetDest = { x: context.target.x, y: context.target.y};
-           dest = npc.calculateDestination(targetDest, context.isFleeing);
-         } else if (dockableNow) {
-           // ターゲットがおらず、すでに基地に接していればドッキング（回復）する
-           dest = { x: npc.x, y: npc.y };
-           isDocking = true;
-         } else {
-           // ターゲットがいなければ基地へ向かう（接する位置で自然に停止する）
-           const targetDest = { x: base.x, y: base.y };
-           dest = npc.calculateDestination(targetDest, context.isFleeing);
-         }
-       } // if (context.isFleeing)
-
-       npc.moveTo(dest.x, dest.y, TIMING.TURN_DELAY, () => {
-         npc.x = Math.floor(npc.x);
-         npc.y = Math.floor(npc.y);
-
-         const distFromCenter = Phaser.Math.Distance.Between(
-           npc.x, npc.y, AREA_CENTER.X, AREA_CENTER.Y
-         );
-         if (distFromCenter > AREA_R) {
-           npc.die();
-           if (npc instanceof FederationShip) {
-             setMsg("通信士", "味方が戦場から離脱しました", "#88f");
-             gameState.score -= SCORE.DESTROY_PENALTY;
-           }
-           if (npc instanceof EnemyShip) {
-             gameObjs.enemies.forEach(e => {
-               e.spirit = Math.max(EnemyShip.SPIRIT.MIN, e.spirit - EnemyShip.SPIRIT.STEP);
-             });
-             if (!gameState.isGameOver) {
-               if (getActiveEnemyCount() > 0) {
-                 setMsg("副長", "敵艦が戦場から離脱しました", "#0f8");
-               } else {
-                 setMsg("副長", "すべての敵艦が撤退しました！", "#ff0");
-               }
-             }
-           }
-         } // if (distFromCenter > AREA_R)
-
-         // シールド回復処理
-         if (isDocking) {
-           npc.shield = npc.constructor.SHIELD_MAX;
-         } else {
-           npc.shield = Math.min(
-             npc.constructor.SHIELD_MAX,
-             npc.shield + (npc.constructor.SHIELD_MAX * npc.constructor.SHIELD_RECOVERY_RATE)
-           );
-         }
-
-         // spirit 回復
-         if (context.isFleeing) {
-           npc.spirit = Math.min(
-             npc.constructor.SPIRIT.MAX,
-             (npc.spirit + npc.constructor.SPIRIT.RECOVERY)
-           );
-           debugLog(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
-         }
-       }); // npc.moveTo()
-
+       npc.moveTo(dest.x, dest.y, TIMING.TURN_DELAY,
+                  () => onNpcMoveComplete(npc, context, isDocking));
      } // npcMove()
      
      /**
       * ターン終了処理と次ターンへの準備
       */
      function finalizeEnemyTurn(scene) {
-       gameObjs.enemies = gameObjs.enemies.filter(e => e.active);
+       gameObjs.purgeInactive();
        
        if (gameObjs.enemies.length === 0 && !gameState.isGameOver) {
          nextMission(scene);
          return;
        }
 
-       if ( gameState.isGameOver ) {
+       if (gameState.isGameOver) {
          return;
        }
 
        gameState.turn++;
        // 減点
-       gameState.score -= gameObjs.enemies.filter(e => e.active).length;
-       gameState.score -= getActiveFederationShipCount();
+       gameState.addScore(calcTurnPenalty(
+         getActiveEnemyCount(), getActiveFederationShipCount()
+       ));
 
        // 増援の出現
        if (gameState.turn % NEW_ENEMY_INTERVAL === 0) {
@@ -2362,34 +2725,34 @@
            obj.spirit = Math.min(EnemyShip.SPIRIT.MAX, obj.spirit + EnemyShip.SPIRIT.STEP);
            debugLog(`finalizeEnemyTurn> obj.spirit up: ${obj.spirit.toFixed(3)}`);
          });
-         setMsg("戦術士官", "新たな敵を検知！", "#ff0")
+         setMsg(SPEAKER.TACTICAL, "新たな敵を検知！", MSG_COLOR.WARN);
        }
-       if ( gameState.turn % NEW_FEDERATION_INTERVAL === 0 ) {
+       if (gameState.turn % NEW_FEDERATION_INTERVAL === 0) {
          // XXX TBD 連邦の援軍が出現する条件
          // gameState.qtyFederationShip はミッション開始時点のスナップショットのため
          // ここでは使わず、現在生存中の連邦艦数をその場で数える
-         const qty_enemies = gameObjs.enemies.filter(e => e.active).length;
-         const qty_federation = getActiveFederationShipCount();
+         const enemyCount = getActiveEnemyCount();
+         const federationCount = getActiveFederationShipCount();
          debugLog(
-           `qty_federation=${qty_federation}, qty_enemies=${qty_enemies}`
+           `federationCount=${federationCount}, enemyCount=${enemyCount}`
          );
-         if ( qty_federation < qty_enemies / 2 ) {
-           setMsg("通信士", "味方が到着しました！", "#0f0");
+         if (federationCount < enemyCount / 2) {
+           setMsg(SPEAKER.COMMS, "味方が到着しました！", MSG_COLOR.GOOD);
            newFederationShip(scene, 0.8, 0.95);
          }
        }
 
        // 基地の回復
-       if ( gameObjs.starBase.shield < StarBase.SHIELD_MAX ) {
+       if (gameObjs.starBase.shield < StarBase.SHIELD_MAX) {
          gameObjs.starBase.shield = Math.floor(Math.min(
            StarBase.SHIELD_MAX,
            gameObjs.starBase.shield + (StarBase.SHIELD_MAX * StarBase.SHIELD_RECOVERY_RATE)
          ));
        }
 
-       const enp = gameObjs.player.energy_p(); 
-       if ( enp < 30 ) {
-         setMsg("機関部", `エネルギー残り ${enp}%`, "#ff0");
+       const enp = gameObjs.player.energyPercent(); 
+       if (enp < REPORT_THRESHOLD.ENERGY_WARN) {
+         setMsg(SPEAKER.ENGINE, `エネルギー残り ${enp}%`, MSG_COLOR.WARN);
        }
        updateStatus();
 
@@ -2401,7 +2764,8 @@
       */
      function updateGaugeDisplay(valueElId, gaugeElId, value, max) {
        const ratio = value / max;
-       const color = ratio < 0.3 ? "#f00" : "#0f0";
+       const color = ratio < DISPLAY_THRESHOLD.GAUGE_DANGER
+         ? MSG_COLOR.DANGER : MSG_COLOR.GOOD;
        document.getElementById(valueElId).style.color = color;
        document.getElementById(valueElId).textContent = value;
        document.getElementById(gaugeElId).style.width = (ratio * 100) + '%';
@@ -2422,10 +2786,10 @@
        document.getElementById('statusMission').textContent = `${gameState.curMission}`;
        document.getElementById('statusScore').textContent = `${gameState.score}`;
 
-       document.getElementById('statusFederationShipCount').style.color = "#ff0"
+       document.getElementById('statusFederationShipCount').style.color = MSG_COLOR.WARN;
        document.getElementById('statusFederationShipCount').textContent = `${federationCount}`;
 
-       document.getElementById('statusEnemyShipCount').style.color = "#ff0"
+       document.getElementById('statusEnemyShipCount').style.color = MSG_COLOR.WARN;
        document.getElementById('statusEnemyShipCount').textContent = `${enemyCount}`;
 
        updateGaugeDisplay('statusShipShield', 'gaugeShipShield', PlayerShield, PlayerShip.SHIELD_MAX);
@@ -2438,8 +2802,8 @@
       */
      function nextMission(scene) {
        const clearedMission = gameState.curMission;
-       let bonus = gameState.curMission * 100;
-       gameState.score += bonus;
+       const bonus = calcMissionClearBonus(gameState.curMission);
+       gameState.addScore(bonus);
        debugLog(`nextMission> bonus=${bonus}, gameState.score=${gameState.score}`);
 
        gameState.qtyFederationShip = getActiveFederationShipCount();
@@ -2451,12 +2815,12 @@
        );
 
        gameState.curMission++;
-       QTY.ENEMY++;
+       gameState.enemyQty++;
        gameState.isPlayerTurn = false;
 
        gameState.pendingScene = scene;
 
-       setMsg("司令部", `ミッション #${clearedMission} クリア`, '#fff');
+       setMsg(SPEAKER.COMMAND, `ミッション #${clearedMission} クリア`, MSG_COLOR.PLAIN);
        scene.time.delayedCall(
          TIMING.MISSION_OVER, () => showHighScoreOverlay(
            'missionclear', { clearedMission, bonus, list, newIdx }
@@ -2475,7 +2839,12 @@
        gameState.isPlayerTurn = false;
        setMsg(from, msg);
        updateStatus();
-       setTimeout(() => showHighScoreOverlay('gameover', { msgstr }), TIMING.MISSION_OVER);
+       // シーン再起動で確実に止めるため setTimeout ではなく delayedCall を使う。
+       // setTimeout だと前のミッションのハイスコア画面が後から開いてしまう。
+       gameState.curScene.time.delayedCall(
+         TIMING.MISSION_OVER,
+         () => showHighScoreOverlay('gameover', { msgstr })
+       );
      } // gameOver()
 
      function loadHighScores() {
@@ -2495,7 +2864,7 @@
          String(now.getMonth() + 1).padStart(2, '0'),
          String(now.getDate()).padStart(2, '0')
        ].join('/');
-       if ( gameState.flagClear || forceSave ) {
+       if (gameState.flagClear || forceSave) {
          list.push({
            score, turns, mission, result,
            gameid: GAME_ID, date: dateStr, _new: true
@@ -2505,10 +2874,17 @@
        const newIdx = list.findIndex(s => s._new);
        list = list.slice(0, HIGHSCORE.MAX_ENTRIES);
        const madeIt = list.some(s => s._new);
-       localStorage.setItem(
-         HIGHSCORE.STORAGE_KEY,
-         JSON.stringify(list.map(({ _new, ...rest }) => rest))
-       );
+       // プライベートブラウジングや容量超過で setItem は例外を投げる。
+       // 保存に失敗してもミッションクリアの処理は続行させる（記録が
+       // 残らないだけで、ゲームは破綻しない）。
+       try {
+         localStorage.setItem(
+           HIGHSCORE.STORAGE_KEY,
+           JSON.stringify(list.map(({ _new, ...rest }) => rest))
+         );
+       } catch (e) {
+         debugLog('saveHighScore> failed to save:', e);
+       }
        return { list, newIdx: madeIt ? newIdx : -1 };
      }
 
@@ -2524,8 +2900,8 @@
        const rankLabels = ['1ST', '2ND', '3RD', '4TH', '5TH'];
        list.forEach((s, i) => {
          const tr = document.createElement('tr');
-         const thisGame = (s.gameid == GAME_ID);
-         if ( thisGame ) {
+         const thisGame = (s.gameid === GAME_ID);
+         if (thisGame) {
            tr.className = 'hs-new';
          }
          const rank   = rankLabels[i] || `${i + 1}TH`;
@@ -2540,27 +2916,10 @@
            <td>${s.date}</td>
          `;
          
-         // ★追加: 行をクリックした際の処理
+         // 行をクリックすると、その記録の続き（次のミッション）から再開する
          tr.addEventListener('click', () => {
-           // スコアを引き継ぐ
-           gameState.score = s.score;
-           // 記録されたステージの次からスタートする
-           gameState.curMission = (s.mission !== undefined ? s.mission : 1) + 1;
-           gameState.turn = 1;
-           
-           // 敵の初期生成数を、進行するステージに合わせて再計算
-           // (初期値3 + ステージ進行分)
-           QTY.ENEMY = 3 + (gameState.curMission - 1);
-           
-           gameState.isGameOver = false;
-           gameState.flagClear = false;
-           gameState.isPlayerTurn = true;
-           gameState.pendingScene = null;
-           
-           // オーバーレイを非表示にする
+           gameState.resumeFrom(s);
            document.getElementById('highScoreOverlay').style.display = 'none';
-           
-           // シーンを再起動
            if (gameState.curScene) {
              gameState.curScene.scene.restart();
            }
@@ -2579,7 +2938,7 @@
 
        if (mode === 'missionclear') {
          const { clearedMission, bonus, list, newIdx } = data;
-         resultEl.style.color      = '#0f0';
+         resultEl.style.color      = MSG_COLOR.GOOD;
          resultEl.textContent      = `✓ MISSION #${clearedMission} CLEARED!`;
          finalEl.textContent       = `TURNS:${gameState.turn}, MISSION BONUS:+${bonus}, SCORE: ${gameState.score}`;
          renderHSTable(list);
@@ -2588,7 +2947,7 @@
          restartBtn.style.display  = 'inline-block';
        } else if (mode === 'gameover') {
          const { msgstr } = data;
-         resultEl.style.color      = '#ff0';
+         resultEl.style.color      = MSG_COLOR.WARN;
          resultEl.textContent      = msgstr;
          finalEl.textContent       = `MISSION FAILED: SCORE: ${gameState.score}  ` +
                                      `MISSION #${gameState.curMission}  TURNS: ${gameState.turn}`;
@@ -2597,7 +2956,7 @@
          restartBtn.textContent    = '▶ RESTART';
          restartBtn.style.display  = 'inline-block';
        } else {
-         resultEl.style.color      = '#0ff';
+         resultEl.style.color      = MSG_COLOR.INFO;
          resultEl.textContent      = '▶ HIGH SCORES ◀';
          finalEl.textContent       = `NOW — ` +
                                      `MISSION #${gameState.curMission} TURN: ${gameState.turn} - ` +
@@ -2610,6 +2969,24 @@
        overlay.style.display = 'flex';
      } // showHighScoreOverlay()
 
+     // タイトルとバージョンの表示。HTML に直書きせず、ここを唯一の出所とする
+     document.getElementById('gameTitle').textContent = `${GAME_NAME} ${VERSION}`;
+
+     // ズームボタンの登録は create() ではなくここで行う。create() は
+     // scene.restart() のたびに実行されるため、そちらに置くと
+     // addEventListener がミッションごとに積み重なってしまう。
+     document.getElementById('zoomIn').addEventListener('click', () => {
+       if (gameState.curScene) {
+         changeZoom(gameState.curScene, CAMERA.STEP);
+       }
+     });
+
+     document.getElementById('zoomOut').addEventListener('click', () => {
+       if (gameState.curScene) {
+         changeZoom(gameState.curScene, -CAMERA.STEP);
+       }
+     });
+
      document.getElementById('viewScoresBtn').addEventListener('click', () => {
        showHighScoreOverlay('view');
      });
@@ -2617,12 +2994,12 @@
      document.getElementById('hsRestartBtn').addEventListener('click', () => {
        if (gameState.pendingScene) {
          document.getElementById('highScoreOverlay').style.display = 'none';
-         gameState.turn = 1;
-         const s = gameState.pendingScene;
-         gameState.pendingScene = null;
-         gameState.isPlayerTurn = true;
-         s.scene.restart();
+         const scene = gameState.pendingScene;
+         gameState.resetForNewMission();
+         scene.scene.restart();
        } else {
+         // ミッションクリア以外（敗北・ハイスコア閲覧）からの RESTART は
+         // 最初からやり直すため、ページごと読み込み直す
          location.reload();
        }
      });

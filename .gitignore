@@ -96,3 +96,10 @@ tags
 nohup.out
 
 ###
+
+# シナリオテストの依存（開発時のみ。公開物には含めない）
+tests/node_modules/
+tests/test-results/
+tests/playwright-report/
+test-results/
+_baseline.html
