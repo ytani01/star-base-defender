@@ -204,6 +204,31 @@ test.describe('基本操作', () => {
     expect((await readLog(page, 2)).join('\n')).toContain('障害物に遮られました');
   });
 
+  test('ステータス欄の数値は整数で表示される', async ({ page }) => {
+    // 内部の値は割り切れない計算で端数を持ちうる。それをそのまま出すと
+    // 112.00000000000001 のような表示になり、横画面では行が折り返して
+    // 表示まで崩れる。バランス数値を変えたときに初めて出るため、
+    // 端数を作って確かめる。
+    await openGame(page);
+    await page.evaluate(() => {
+      gameObjs.player.shield = 400 * 0.28;      // 112.00000000000001
+      gameObjs.player.energy = 5000 / 3;        // 1666.666...
+      gameObjs.starBase.shield = 4000 * 0.115;  // 460.00000000000006
+      updateStatus();
+    });
+
+    const shown = await page.evaluate(() => ({
+      shield: document.getElementById('statusShipShield').textContent,
+      energy: document.getElementById('statusShipEnergy').textContent,
+      base: document.getElementById('statusBaseShield').textContent,
+    }));
+    for (const [name, text] of Object.entries(shown)) {
+      expect(text, `${name} が整数で表示される`).toMatch(/^-?\d+$/);
+    }
+    expect(shown.shield, 'シールドは四捨五入される').toBe('112');
+    expect(shown.energy, 'エネルギーは四捨五入される').toBe('1667');
+  });
+
   test('自機をクリックしてシールドを回復できる（エネルギーが減る）', async ({ page }) => {
     await openGame(page);
     await clearField(page);

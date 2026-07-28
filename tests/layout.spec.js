@@ -96,13 +96,43 @@ test.describe('表示・操作環境', () => {
     // 幅を詰めた結果、ラベルと数値が泣き別れては読めない。
     // 「宇宙域を広げる」より「読めること」が優先だという線引きを固定する。
     // ヘッダはタイトルと著作権表示が折り返す設計（flex-wrap）なので除く。
+    //
+    // 起動直後の値（シールド 400 など）だけで測ると、桁が増えたときの
+    // 崩れを見逃す。実際に遊べば必ず通る「削られた状態」で測る。
     for (const size of SIZES.filter((s) => s.w >= s.h)) {
+      await page.setViewportSize({ width: size.w, height: size.h });
+      await openGame(page);
+      await fillLog(page);
+      await page.evaluate(() => {
+        gameObjs.player.shield = PlayerShip.SHIELD_MAX * 0.28;
+        gameObjs.player.energy = PlayerShip.ENERGY_MAX * 0.55;
+        gameObjs.starBase.shield = StarBase.SHIELD_MAX * 0.42;
+        updateStatus();
+      });
+      const m = await measure(page);
+
+      expect(m.wrappedRows, `${size.label}: 折り返した行がない`).toEqual([]);
+    }
+  });
+
+  test('ズームボタンが盤面の外に出るのは、宇宙域を狭めずに済むときだけ', async ({ page }) => {
+    // 盤面に重ねれば宇宙域は狭まらないが一部が隠れる。外に出せば全部見える
+    // かわりに、高さに余裕のない画面では宇宙域がそのまま縮む。
+    // どちらを選ぶかは CSS のしきい値（max-aspect-ratio）が決めており、
+    // そのしきい値が実際の寸法と合っているかをここで確かめる。
+    for (const size of SIZES) {
       await page.setViewportSize({ width: size.w, height: size.h });
       await openGame(page);
       await fillLog(page);
       const m = await measure(page);
 
-      expect(m.wrappedRows, `${size.label}: 折り返した行がない`).toEqual([]);
+      if (m.zoomOverlapsCanvas) {
+        continue; // 重ねている場合は宇宙域を狭めていないので問題ない
+      }
+      // 外に出しているなら、宇宙域は画面の幅いっぱいまで使えているはず。
+      // 使えていないなら、隠さないために狭めたことになり割に合わない
+      expect(m.canvas.width, `${size.label}: 盤面の外に出したのに宇宙域が狭い`)
+        .toBeGreaterThanOrEqual(Math.min(size.w, size.h) - 1);
     }
   });
 

@@ -127,6 +127,33 @@ test.describe('CLAUDE.md の最重要ルール（機械的に判定できるも�
     expect(at(missing), '直後に同じプロパティの dvh を併記すること').toEqual([]);
   });
 
+  test('定数オブジェクトの参照先が実在する', () => {
+    // DRAW_COLOR.FOO のような参照が、定義側に無い名前を指していないか。
+    // 未定義のプロパティは undefined になるだけで例外にならず、
+    // 色なら「黒く描かれる」形で静かに壊れる。挙動を見るテストでは
+    // 捕まらない（盤面の座標もログも変わらないため）。
+    const html = fs.readFileSync(INDEX, 'utf8');
+    const missing = [];
+
+    for (const name of ['DRAW_COLOR', 'MSG_COLOR', 'SPEAKER', 'TIMING',
+                        'QTY', 'SCORE', 'HIGHSCORE', 'DISPLAY_THRESHOLD']) {
+      const def = html.match(new RegExp(`const ${name} = \\{([\\s\\S]*?)\\n     \\};`));
+      expect(def, `${name} の定義が見つかる`).not.toBeNull();
+      const keys = new Set(
+        [...def[1].matchAll(/^\s{7}([A-Z][A-Z0-9_]*)\s*:/gm)].map((m) => m[1]));
+      expect(keys.size, `${name} に項目がある`).toBeGreaterThan(0);
+
+      // 前が識別子の文字なら別の名前の一部（HIGHSCORE. の中の SCORE. など）
+      const ref = new RegExp(`(?<![A-Za-z0-9_])${name}\\.([A-Z][A-Z0-9_]*)`, 'g');
+      for (const m of html.matchAll(ref)) {
+        if (!keys.has(m[1])) {
+          missing.push(`${name}.${m[1]} (${html.slice(0, m.index).split('\n').length}行目)`);
+        }
+      }
+    }
+    expect([...new Set(missing)], '定義されていない名前を参照している').toEqual([]);
+  });
+
   test('プレイヤーの移動が getAvoidanceVector() を使っていない', () => {
     // 星を避ける動きは NPC のもの。プレイヤーは指した場所へまっすぐ向かう。
     // 呼び出しが calculateDestination() の中だけに収まっていることを見張る。

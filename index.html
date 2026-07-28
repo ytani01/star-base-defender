@@ -99,6 +99,10 @@
      #statusPanel #logStatus {
        height: 90px;
        line-height: 1.2;
+       /* 禁則処理。既定では長音符や小書き仮名の前でも改行されるため、
+          「シ／ールド」のように語が割れて読み取りに一拍かかる。
+          報告を一目で読ませるための指定であって、見た目の好みではない。 */
+       line-break: strict;
        overflow-y: auto;
        background: #000;
        border: 1px solid rgba(0, 255, 255, 0.2);
@@ -132,8 +136,16 @@
        max-width: 100%;
        max-height: 100%;
        aspect-ratio: 1 / 1;       /* 追加: 常に正方形を保つことで見切れと間延びを防止 */
+       /* ズームUIと縦に並ぶ場合に高さを分け合う。height: 100% だけだと
+          兄弟が使った分を考慮せず、画面の下へはみ出す。flex-basis を 0 に
+          して「残っている分」を主サイズにする（Phaser は FIT なので、
+          この箱の中に正方形のキャンバスを収めてくれる） */
+       flex: 1 1 0;
+       min-height: 0;
+       min-width: 0;
      }
 
+     /* 既定は盤面への重ね置き。場所を取らないので宇宙域を絶対に狭めない */
      #zoomUI {
        position: absolute;
        top: 10px;
@@ -142,6 +154,27 @@
        flex-direction: column;
        gap: 10px;
        z-index: 1000;
+     }
+
+     /* 縦長で高さに余裕がある画面だけ、盤面に重ねず真上へ出す。
+        条件は「ステータス欄とズームUIを引いた残りの高さが、画面の幅以上」。
+        ステータス欄は最大 40dvh、ズームUIは約 60px なので
+        0.6 × 高さ − 60 ≥ 幅、おおむね 幅/高さ ≤ 0.5 に落ちる。
+        これを超える画面で真上に出すと宇宙域がそのまま縮むため、
+        重ねたままにする（実測: 360x640 で 360→324、320x568 で 320→281）。
+        しきい値が正しいかは layout.spec.js が実際の寸法で確かめている。 */
+     @media (orientation: portrait) and (max-aspect-ratio: 1 / 2) {
+       #gameWrapper {
+         flex-direction: column;
+       }
+       #zoomUI {
+         position: static;
+         flex-direction: row;
+         padding: 6px 10px;
+         flex: 0 0 auto;
+         /* DOM 上はキャンバスの後ろにあるので、表示順だけ前に出す */
+         order: -1;
+       }
      }
      #zoomUI button {
        /* タップしやすい最小サイズ(48px)は確保しつつ、画面が小さい端末では
@@ -391,7 +424,7 @@
 
      // リリースのたびに更新する。表示は起動時に .game-title へ流し込む
      const GAME_NAME = 'StarBase Defender';
-     const VERSION = 'v0.4.3';
+     const VERSION = 'v0.4.4';
 
      const TIMING = {
        BEAM_DUR: 400,
@@ -485,6 +518,16 @@
        RANGE_ENEMY: 0xffff00,      // 黄: 敵の射程円
        BOUNDARY: 0x0088ff,         // 青: 宇宙域の境界
        DOCKING_RING: 0x02ffff,     // シアン: ドッキング中を示す輪
+
+       // 艦体・構造物の色。preload() でスプライトを描くときに使う
+       // 自機と味方は同系色にして「自軍」であることを示しつつ、明度で
+       // 差をつける。盤面で最初に目を留めるべきは自機なので自機を明るく
+       // 置き、味方は一段落とす。色相まで分けると自軍がばらけて見える
+       HULL_PLAYER: 0x66ddff,      // 明るいシアン: 自機
+       HULL_FEDERATION: 0x4488ff,  // 青: 連邦艦（味方）
+       HULL_ENEMY: 0x008800,       // 緑: 敵艦
+       HULL_BASE: 0x88ffff,        // 淡いシアン: 基地
+       HULL_STAR: 0xa0a0a0,        // 灰: 恒星（障害物）
      };
 
      // 残量に応じて表示を切り替える比率（0.0〜1.0）
@@ -2032,7 +2075,7 @@
        const g = this.make.graphics({add:false});
 
        // PlayerShip
-       g.fillStyle(0x4488ff);
+       g.fillStyle(DRAW_COLOR.HULL_PLAYER);
        g.fillRect(20,36,20,6);
        g.fillRect(26,25,8,20);
        g.fillRect(13,32,7,19);
@@ -2043,7 +2086,7 @@
        g.clear();
 
        // FederationShip
-       g.fillStyle(0x4488ff);
+       g.fillStyle(DRAW_COLOR.HULL_FEDERATION);
        g.fillRect(20,40,20,9);
        g.fillRect(25,34,10,18);
        g.fillRect(15,36,6,16);
@@ -2054,7 +2097,7 @@
        g.clear();
 
        // Enemy
-       g.fillStyle(0x008800);
+       g.fillStyle(DRAW_COLOR.HULL_ENEMY);
        g.beginPath();
        g.moveTo(32,55);
        g.lineTo(54,40);
@@ -2078,7 +2121,7 @@
        // Base
        const CX_STARBASE = StarBase.W / 2;
        const CY_STARBASE = StarBase.W / 2;
-       const baseColor = 0x88ffff;
+       const baseColor = DRAW_COLOR.HULL_BASE;
        g.fillStyle(baseColor);
        g.lineStyle(8, baseColor, 1);
        g.fillEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * .2, StarBase.W * 0.9);
@@ -2095,7 +2138,7 @@
        const R_STAR = W_STAR / 2;
        const CX_STAR = W_STAR / 2;
        const CY_STAR = W_STAR / 2;
-       g.fillStyle(0xa0a0a0);
+       g.fillStyle(DRAW_COLOR.HULL_STAR);
        g.fillCircle(CX_STAR, CY_STAR, R_STAR);
        g.generateTexture('starImg', W_STAR, W_STAR);
 
@@ -2788,7 +2831,11 @@
        const color = ratio < DISPLAY_THRESHOLD.GAUGE_DANGER
                            ? MSG_COLOR.DANGER : MSG_COLOR.GOOD;
        document.getElementById(valueElId).style.color = color;
-       document.getElementById(valueElId).textContent = value;
+       // 整数に丸めてから出す。いまのバランス数値ではたまたま割り切れて
+       // いるだけで、回復率や最大値を変えると 112.00000000000001 のような
+       // 値がそのまま画面に出る。17桁になると横画面で行が折り返し、
+       // 表示の崩れにまで波及する。
+       document.getElementById(valueElId).textContent = Math.round(value);
        document.getElementById(gaugeElId).style.width = (ratio * 100) + '%';
        document.getElementById(gaugeElId).style.background = color;
      } // updateGaugeDisplay()
