@@ -45,6 +45,7 @@ awk '/<script>/{flag=1; next} /<\/script>/{flag=0} flag' index.html > /tmp/extra
 
 表示を変えたときは Claude Code で `/layout-check` を使う（`.claude/skills/layout-check/`）。
 上の `layout-report.js` を、比べ方の手順つきで呼び出すもの。
+コミット前の規約の点検は `/rule-check`（`.claude/skills/rule-check/`）。
 
 テストを書くときの注意（実際につまずいた点。詳細は `conductor/tech-stack.md`）:
 
@@ -55,18 +56,19 @@ awk '/<script>/{flag=1; next} /<\/script>/{flag=0} flag' index.html > /tmp/extra
 
 ## 最重要ルール
 
-必ず `conductor/` 配下の規約に従うこと。特に違反しやすいもの:
+必ず `conductor/` 配下の規約に従うこと。特に違反しやすいもの
+（★ は `tests/source-rules.spec.js` が機械的に検査する。残りは `/rule-check` で見る）:
 
-- **`console.log()` を直接書かない。** 必ず `debugLog()` を使う
-- **`setTimeout` / `setInterval` を使わない。** 遅延実行は `scene.time.delayedCall()`、アニメーションは `scene.tweens`
+- ★ **`console.log()` を直接書かない。** 必ず `debugLog()` を使う
+- ★ **`setTimeout` / `setInterval` を使わない。** 遅延実行は `scene.time.delayedCall()`、アニメーションは `scene.tweens`
   （シーン再起動時に停止できず、前ミッションの処理が残るため）
-- **トップレベルの `let` を新設しない。** 状態は `gameState`（進行状態）か `gameObjs`（オブジェクト管理）に属させる
+- ★ **トップレベルの `let` を新設しない。** 状態は `gameState`（進行状態）か `gameObjs`（オブジェクト管理）に属させる
 - **`CONSTANT_CASE` は実行中に変化しない値のみ。** `const` オブジェクトのプロパティを実行時に書き換えない
 - **リファクタリングでゲームバランスの数値を変えない。** バランス調整は別コミット（`balance:`）にする
-- **プレイヤーの移動は意図的に `getAvoidanceVector()` を使わない。** NPC 処理と共通化する際に誤って追加しないこと
-- 中身のない `/** */` を残さない。JSDoc には「何をするか」でなく**「なぜそうするのか」**を書く
+- ★ **プレイヤーの移動は意図的に `getAvoidanceVector()` を使わない。** NPC 処理と共通化する際に誤って追加しないこと
+- ★ 中身のない `/** */` を残さない（「なぜ」が書けているかは ★ の対象外）。JSDoc には「何をするか」でなく**「なぜそうするのか」**を書く
 - 色は `:root` のカスタムプロパティ経由で参照する。色は装飾でなく**意味**を持つ（シアン=自軍 / 黄=警告 / 赤=危険 / 緑=良好 / オレンジ・マゼンタ=敵）
-- 高さ指定は `vh` フォールバックの直後に `dvh` を併記する。タップ対象は 48px 以上
+- ★ 高さ指定は `vh` フォールバックの直後に `dvh` を併記する。タップ対象は 48px 以上
 - ログの発信者名（操舵手・戦術士官・機関部・通信士・副長・基地・司令部・コンピュータ）は担当が決まっている（`conductor/product-guidelines.md`）
 
 ## `index.html` の構造
