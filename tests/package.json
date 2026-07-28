@@ -1,0 +1,14 @@
+{
+  "name": "star-base-defender-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "シナリオテスト。開発時のみ使用し、公開される index.html には含まれない",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "install-browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.0"
+  }
+}
