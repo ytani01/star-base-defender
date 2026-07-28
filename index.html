@@ -62,7 +62,7 @@
        align-items: flex-end;
        border-bottom: 1px dashed var(--color-primary);
        padding-bottom: 6px;
-       margin-bottom: 10px !important;
+       margin-bottom: 10px;
        flex-wrap: wrap;
      }
      #statusPanel .status-header span {
@@ -96,14 +96,14 @@
        margin: 0;
      }
 
-     #logStatus {
+     #statusPanel #logStatus {
        height: 90px;
        line-height: 1.2;
        overflow-y: auto;
        background: #000;
        border: 1px solid rgba(0, 255, 255, 0.2);
        padding: 4px;
-       margin-top: 5px !important;
+       margin-top: 5px;
      }
      #logStatus .log-line {
        margin: 2px 0;
@@ -685,7 +685,7 @@
       */     
      function drawGauge(g, cx, cy, width, height, ratio, color) {
        g.clear();
-       if ( !isFinite(cy) ) {
+       if (!isFinite(cy)) {
          return;
        }
 
@@ -771,7 +771,7 @@
 
        // ビームの持続時間（TIMING.BEAM_DURに合わせて500ms）
        let duration = TIMING.BEAM_DUR / 1000;
-       if ( ! isPlayer ) {
+       if (! isPlayer) {
          duration = TIMING.BEAM_DUR / 1000 / 3 * 2;
        }
 
@@ -787,7 +787,7 @@
        // 2. メインオシレーター（鋸歯状波で厚みのある音色を作る）
        const osc = ctx.createOscillator();
        osc.type = 'sawtooth';
-       if ( isPlayer ) {
+       if (isPlayer) {
          osc.frequency.setValueAtTime(800, now);
        } else {
          osc.frequency.setValueAtTime(600, now);
@@ -985,7 +985,7 @@
          scene, x, y, texture,
          shield, shieldGaugeColor,
          scale=SCALE
-       ) {
+      ) {
          super(scene, x, y, texture, scale);
          this.shield = shield;
          this.shieldGaugeColor = shieldGaugeColor;
@@ -999,7 +999,7 @@
        }
 
        update() {
-         if (! this.active ) {
+         if (! this.active) {
            if (this.shieldGauge) {
              this.shieldGauge.destroy();
              this.shieldCircle.destroy();
@@ -1012,10 +1012,10 @@
          //
          const shieldRatio = this.shield / this.constructor.SHIELD_MAX;
          let shieldColor = DRAW_COLOR.SHIELD_OK;
-         if ( shieldRatio < DISPLAY_THRESHOLD.SHIELD_LOW ) {
+         if (shieldRatio < DISPLAY_THRESHOLD.SHIELD_LOW) {
            shieldColor = DRAW_COLOR.SHIELD_LOW;
          }
-         if ( shieldRatio < DISPLAY_THRESHOLD.SHIELD_CRITICAL ) {
+         if (shieldRatio < DISPLAY_THRESHOLD.SHIELD_CRITICAL) {
            shieldColor = DRAW_COLOR.SHIELD_CRITICAL;
          }
          this.shieldCircle.clear();
@@ -1058,10 +1058,10 @@
        die() {
          this.shield = 0;
          this.active = false;
-         if ( this.shieldGauge ) {
+         if (this.shieldGauge) {
            this.shieldGauge.destroy();
          }
-         if ( this.shieldCircle ) {
+         if (this.shieldCircle) {
            this.shieldCircle.destroy();
          }
          this.destroy();
@@ -1085,7 +1085,7 @@
          scene, x, y, texture,
          shield, shieldColor, scale,
          weaponPower, weaponAreaR, weaponCost=0
-       ) {
+      ) {
          super(scene, x, y, texture, shield, shieldColor, scale);
          this.weapon = new Weapon(weaponPower, weaponAreaR, weaponCost);
        }
@@ -1158,19 +1158,19 @@
        resolveMovement(
          desiredX, desiredY, speed, ignoreObjs = [],
          precomputedDirectDest = null, destTarget = null
-       ) {
+      ) {
          const x = this.x;
          const y = this.y;
 
          let dx = desiredX - x;
          let dy = desiredY - y;
-         let reqDistSq = dx * dx + dy * dy;
+         const reqDistSq = dx * dx + dy * dy;
 
          // 直線移動（clampDest）の結果。呼び出し側ですでに計算済みならそれを使い回し、
          // 同じ入力に対する重複計算を避ける（clampDestは副作用のない純粋な計算）。
-         let directDest = precomputedDirectDest
+         const directDest = precomputedDirectDest
            || this.clampDest(desiredX, desiredY, ignoreObjs, destTarget);
-         let directMoveSq = (directDest.x - x)**2 + (directDest.y - y)**2;
+         const directMoveSq = (directDest.x - x)**2 + (directDest.y - y)**2;
 
          // 直線移動だけで目的距離の95%以上進めるなら、迂回探索はせずそのまま確定
          if (directMoveSq >= reqDistSq * SpaceShip.ENOUGH_MOVE_RATIO) {
@@ -1182,22 +1182,22 @@
          // 迂回できる角度を総当たりで探す（見つかった中で目的地に最も近い、または
          // 直進よりマシに動ける角度を採用する）。
          speed /= 2;
-         let baseAngle = Math.atan2(dy, dx);
+         const baseAngle = Math.atan2(dy, dx);
          let bestDest = directDest;
          let minTargetDistSq = (directDest.x - desiredX)**2 + (directDest.y - desiredY)**2;
 
          for (let sign of [1, -1]) { // 左右どちら向きにも振ってみる
            for (let i = 5; i <= 90; i += 5) { // 5°刻みで角度を広げていく
-             let offset = (i * Math.PI) / 180;
-             let testAngle = baseAngle + offset * sign;
+             const offset = (i * Math.PI) / 180;
+             const testAngle = baseAngle + offset * sign;
 
-             let testX = x + Math.cos(testAngle) * speed;
-             let testY = y + Math.sin(testAngle) * speed;
+             const testX = x + Math.cos(testAngle) * speed;
+             const testY = y + Math.sin(testAngle) * speed;
 
-             let clamped = this.clampDest(testX, testY, ignoreObjs, destTarget);
+             const clamped = this.clampDest(testX, testY, ignoreObjs, destTarget);
 
-             let moveDistSq = (clamped.x - x)**2 + (clamped.y - y)**2;
-             let distToTargetSq = (clamped.x - desiredX)**2 + (clamped.y - desiredY)**2;
+             const moveDistSq = (clamped.x - x)**2 + (clamped.y - y)**2;
+             const distToTargetSq = (clamped.x - desiredX)**2 + (clamped.y - desiredY)**2;
 
              // ほとんど動けない角度は候補にしない
              if (moveDistSq < SpaceShip.MIN_MOVE_DIST ** 2) {
@@ -1206,7 +1206,7 @@
 
              // 現在のベスト候補がほぼ動けていない（スタック中）場合は、
              // 目的地への近さより「動けること」を優先して採用する
-             let currentBestMoveSq = (bestDest.x - x)**2 + (bestDest.y - y)**2;
+             const currentBestMoveSq = (bestDest.x - x)**2 + (bestDest.y - y)**2;
              debugLog('currentBestMoveSq', currentBestMoveSq);
              let stuck = currentBestMoveSq < 1.0;
 
@@ -1240,7 +1240,7 @@
            let dist = Math.hypot(dx, dy);
            
            if (dist > 0 && dist < avoidRadius) {
-             let force = 1.0 - (dist / avoidRadius);
+             const force = 1.0 - (dist / avoidRadius);
              accX += (dx / dist) * force * repulsionWeight - (dy / dist) * force * tangentialWeight;
              accY += (dy / dist) * force * repulsionWeight + (dx / dist) * force * tangentialWeight;
            }
@@ -1253,8 +1253,8 @@
         * 障害物や他ユニットからの回避・分離ベクトルを算出する
         */
        getAvoidanceVector(obstacles) {
-         let avoid = this.calcAvoidanceForce(obstacles, 2.2, 0.8, 1.2);
-         let sep = this.calcAvoidanceForce(gameObjs.enemies, 2.5, 2.0, 0.0);
+         const avoid = this.calcAvoidanceForce(obstacles, 2.2, 0.8, 1.2);
+         const sep = this.calcAvoidanceForce(gameObjs.enemies, 2.5, 2.0, 0.0);
          return { x: avoid.x + sep.x, y: avoid.y + sep.y };
        } // getAvoidanceVector()
 
@@ -1279,7 +1279,7 @@
              let dy = this.y - t.y;
              let dist = Math.hypot(dx, dy);
              if (dist > 0.001) {
-               let weight = 1.0 / dist;
+               const weight = 1.0 / dist;
                dirX += (dx / dist) * weight;
                dirY += (dy / dist) * weight;
              }
@@ -1291,13 +1291,13 @@
              let dy = t.y - this.y;
              let dist = Math.hypot(dx, dy);
              if (dist > 0.001) {
-               let weight = (1.0 / dist) * weightMultiplier;
+               const weight = (1.0 / dist) * weightMultiplier;
                dirX += (dx / dist) * weight;
                dirY += (dy / dist) * weight;
              }
            });
 
-           let fDist = Math.hypot(dirX, dirY);
+           const fDist = Math.hypot(dirX, dirY);
            if (fDist > 0.000001) {
              dirX /= fDist;
              dirY /= fDist;
@@ -1323,23 +1323,23 @@
         * destTarget には「到達したい対象」を渡す（clampDest 参照）。
         */
        calculateDestination(targetPos, isFleeing = false, destTarget = null) {
-         let targetVec = this.getTargetVector(targetPos, isFleeing);
-         let avoidVec = this.getAvoidanceVector(gameObjs.stars);
+         const targetVec = this.getTargetVector(targetPos, isFleeing);
+         const avoidVec = this.getAvoidanceVector(gameObjs.stars);
          
          let finalX = targetVec.x * 1.0 + avoidVec.x;
          let finalY = targetVec.y * 1.0 + avoidVec.y;
 
          let finalDist = Math.hypot(finalX, finalY);
          if (finalDist < 0.001) {
-           let randomAngle = Math.random() * Math.PI * 2;
+           const randomAngle = Math.random() * Math.PI * 2;
            finalX = Math.cos(randomAngle);
            finalY = Math.sin(randomAngle);
            finalDist = 1.0;
          }
 
          const speed = this.constructor.SPEED;
-         let desiredX = this.x + (finalX / finalDist) * speed;
-         let desiredY = this.y + (finalY / finalDist) * speed;
+         const desiredX = this.x + (finalX / finalDist) * speed;
+         const desiredY = this.y + (finalY / finalDist) * speed;
 
          return this.resolveMovement(desiredX, desiredY, speed, [], null, destTarget);
        } // calculateDestination()
@@ -1425,7 +1425,7 @@
            if (!t || !t.active) return;
            if (this.shouldIgnoreTarget(t)) return;
 
-           let d = Phaser.Math.Distance.Between(this.x, this.y, t.x, t.y);
+           const d = Phaser.Math.Distance.Between(this.x, this.y, t.x, t.y);
            
            // 最短距離の対象を記録（攻撃不可の場合の追跡目標）
            if (d < closestDist) {
@@ -1435,7 +1435,7 @@
 
            // 攻撃可能な対象を評価
            if (!isFleeing && d <= this.weapon.maxRange() * (1.0 - this.spirit)) {
-             let checkBaseObstacle = (t !== gameObjs.starBase);
+             const checkBaseObstacle = (t !== gameObjs.starBase);
              if (!isLOSBlocked(this, t, checkBaseObstacle)) {
                if (d < bestAttackableDist) {
                  bestAttackableDist = d;
@@ -1512,7 +1512,7 @@
          energy, energyColor,
          scale = SCALE,
          weaponPower = 0, weaponAreaR = 0, weaponCost = 0
-       ) {
+      ) {
          // 親クラス (SpaceShip) へパラメータを渡す
          super(
            scene, x, y, texture, shield, gaugeColor, scale, weaponPower, weaponAreaR, weaponCost
@@ -1581,7 +1581,7 @@
          super.update();
 
          // ドッキング状態
-         if ( gameObjs.player.isDocked ) {
+         if (gameObjs.player.isDocked) {
            gameObjs.rangeGraphics.lineStyle(5, DRAW_COLOR.DOCKING_RING, 1);
            gameObjs.rangeGraphics.strokeCircle(
              gameObjs.starBase.x, gameObjs.starBase.y, StarBase.DOCKING_RANGE - 3
@@ -2048,7 +2048,7 @@
        g.lineTo(6,40);
        g.lineTo(28,55);
        g.fillPath();
-       g.fillRect(26,10,8,35)
+       g.fillRect(26,10,8,35);
        g.fillEllipse(30,15,18,19);
        g.generateTexture('enemyImg',60,60);
 
@@ -2132,7 +2132,7 @@
        }
        
        // Player
-       let pp = getSafeRandPos(0.1, 0.3);
+       const pp = getSafeRandPos(0.1, 0.3);
        gameObjs.player = new PlayerShip(this, pp.x, pp.y);
 
        // Camera
@@ -2147,7 +2147,7 @@
        this.input.on('pointerdown', handlePointerDown, this);
 
        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
-         let zoomAmount = deltaY > 0 ? -CAMERA.STEP : CAMERA.STEP;
+         const zoomAmount = deltaY > 0 ? -CAMERA.STEP : CAMERA.STEP;
          changeZoom(this, zoomAmount);
        });
 
@@ -2174,14 +2174,14 @@
          gameObjs.rangeGraphics.lineStyle(1, color, 0.5);
          gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.effectiveRange());
          
-         if ( obj === gameObjs.player ) {  
+         if (obj === gameObjs.player) {  
            gameObjs.rangeGraphics.lineStyle(1, color, 0.3);
            gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.maxRange());
          }
        });
 
-       if ( gameObjs.player ) gameObjs.player.update();
-       if ( gameObjs.starBase ) gameObjs.starBase.update();
+       if (gameObjs.player ) gameObjs.player.update();
+       if (gameObjs.starBase ) gameObjs.starBase.update();
        
        gameObjs.federationShips.forEach(e => e.update());
        gameObjs.enemies.forEach(e => e.update());
@@ -2206,7 +2206,7 @@
          y = Phaser.Math.Between(AREA_CENTER.Y - AREA_R, AREA_CENTER.Y + AREA_R);
          distToCenter = Phaser.Math.Distance.Between(x, y, AREA_CENTER.X, AREA_CENTER.Y);
          
-         if ( distToCenter < AREA_R * distMin || distToCenter > AREA_R * distMax ) {
+         if (distToCenter < AREA_R * distMin || distToCenter > AREA_R * distMax) {
            continue;
          }
          
@@ -2270,7 +2270,7 @@
          Phaser.Math.Distance.Between(
            pointer.worldX, pointer.worldY, AREA_CENTER.X, AREA_CENTER.Y
          ) >= AREA_R
-       ) {
+      ) {
          return;
        }
 
@@ -2491,7 +2491,7 @@
 
        const speedPercent = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
        const cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
-       if ( gameObjs.player.energy - cost < 0 ) {
+       if (gameObjs.player.energy - cost < 0) {
          setMsg(SPEAKER.ENGINE, "エネルギー不足です", MSG_COLOR.WARN);
          updateStatus();
          return;
@@ -2548,7 +2548,7 @@
          scene.time.delayedCall(startDelay, () => execNPCAction(scene, npc));
        });
 
-       let totalDelay = (
+       const totalDelay = (
          TIMING.TURN_DELAY + TIMING.TURN_MARGIN + TIMING.ENEMY_DELAY_MAX
        );
        scene.time.delayedCall(totalDelay, () => finalizeEnemyTurn(scene));
@@ -2706,7 +2706,7 @@
          return;
        }
 
-       if ( gameState.isGameOver ) {
+       if (gameState.isGameOver) {
          return;
        }
 
@@ -2725,9 +2725,9 @@
            obj.spirit = Math.min(EnemyShip.SPIRIT.MAX, obj.spirit + EnemyShip.SPIRIT.STEP);
            debugLog(`finalizeEnemyTurn> obj.spirit up: ${obj.spirit.toFixed(3)}`);
          });
-         setMsg(SPEAKER.TACTICAL, "新たな敵を検知！", MSG_COLOR.WARN)
+         setMsg(SPEAKER.TACTICAL, "新たな敵を検知！", MSG_COLOR.WARN);
        }
-       if ( gameState.turn % NEW_FEDERATION_INTERVAL === 0 ) {
+       if (gameState.turn % NEW_FEDERATION_INTERVAL === 0) {
          // XXX TBD 連邦の援軍が出現する条件
          // gameState.qtyFederationShip はミッション開始時点のスナップショットのため
          // ここでは使わず、現在生存中の連邦艦数をその場で数える
@@ -2736,14 +2736,14 @@
          debugLog(
            `federationCount=${federationCount}, enemyCount=${enemyCount}`
          );
-         if ( federationCount < enemyCount / 2 ) {
+         if (federationCount < enemyCount / 2) {
            setMsg(SPEAKER.COMMS, "味方が到着しました！", MSG_COLOR.GOOD);
            newFederationShip(scene, 0.8, 0.95);
          }
        }
 
        // 基地の回復
-       if ( gameObjs.starBase.shield < StarBase.SHIELD_MAX ) {
+       if (gameObjs.starBase.shield < StarBase.SHIELD_MAX) {
          gameObjs.starBase.shield = Math.floor(Math.min(
            StarBase.SHIELD_MAX,
            gameObjs.starBase.shield + (StarBase.SHIELD_MAX * StarBase.SHIELD_RECOVERY_RATE)
@@ -2751,7 +2751,7 @@
        }
 
        const enp = gameObjs.player.energyPercent(); 
-       if ( enp < REPORT_THRESHOLD.ENERGY_WARN ) {
+       if (enp < REPORT_THRESHOLD.ENERGY_WARN) {
          setMsg(SPEAKER.ENGINE, `エネルギー残り ${enp}%`, MSG_COLOR.WARN);
        }
        updateStatus();
@@ -2786,10 +2786,10 @@
        document.getElementById('statusMission').textContent = `${gameState.curMission}`;
        document.getElementById('statusScore').textContent = `${gameState.score}`;
 
-       document.getElementById('statusFederationShipCount').style.color = MSG_COLOR.WARN
+       document.getElementById('statusFederationShipCount').style.color = MSG_COLOR.WARN;
        document.getElementById('statusFederationShipCount').textContent = `${federationCount}`;
 
-       document.getElementById('statusEnemyShipCount').style.color = MSG_COLOR.WARN
+       document.getElementById('statusEnemyShipCount').style.color = MSG_COLOR.WARN;
        document.getElementById('statusEnemyShipCount').textContent = `${enemyCount}`;
 
        updateGaugeDisplay('statusShipShield', 'gaugeShipShield', PlayerShield, PlayerShip.SHIELD_MAX);
@@ -2864,7 +2864,7 @@
          String(now.getMonth() + 1).padStart(2, '0'),
          String(now.getDate()).padStart(2, '0')
        ].join('/');
-       if ( gameState.flagClear || forceSave ) {
+       if (gameState.flagClear || forceSave) {
          list.push({
            score, turns, mission, result,
            gameid: GAME_ID, date: dateStr, _new: true
@@ -2901,7 +2901,7 @@
        list.forEach((s, i) => {
          const tr = document.createElement('tr');
          const thisGame = (s.gameid === GAME_ID);
-         if ( thisGame ) {
+         if (thisGame) {
            tr.className = 'hs-new';
          }
          const rank   = rankLabels[i] || `${i + 1}TH`;
