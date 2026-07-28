@@ -50,7 +50,7 @@ async function setupField(page, enemyCount) {
     gameObjs.starBase.shield = StarBase.SHIELD_MAX;
     gameObjs.player.x = AREA_CENTER.X - 120;
     gameObjs.player.y = AREA_CENTER.Y;
-    gameObjs.player.is_docked = false;
+    gameObjs.player.isDocked = false;
     gameObjs.player.shield = PlayerShip.SHIELD_MAX;
     gameObjs.player.energy = PlayerShip.ENERGY_MAX;
   }, enemyCount);
@@ -186,7 +186,7 @@ test.describe('ターン進行と戦況', () => {
           e.y = AREA_CENTER.Y + 260;
         }
       });
-      return { shield: f.shield, docked: f.is_docked };
+      return { shield: f.shield, docked: f.isDocked };
     });
     expect(before.docked, 'まだドッキングしていない').toBe(false);
 
@@ -195,7 +195,7 @@ test.describe('ターン進行と戦況', () => {
     const after = await page.evaluate(() => {
       const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
       return {
-        docked: f.is_docked,
+        docked: f.isDocked,
         shield: f.shield,
         max: FederationShip.SHIELD_MAX,
         dist: Phaser.Math.Distance.Between(

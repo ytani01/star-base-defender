@@ -27,7 +27,7 @@ async function prepare(page, enemyCount = 2) {
         e.y = AREA_CENTER.Y + i * 40;
       }
     });
-    gameObjs.player.is_docked = false;
+    gameObjs.player.isDocked = false;
     gameObjs.player.shield = PlayerShip.SHIELD_MAX;
     gameObjs.player.energy = PlayerShip.ENERGY_MAX;
   }, enemyCount);
@@ -147,7 +147,7 @@ test.describe('決着', () => {
     await prepare(page);
     await page.evaluate(() => {
       gameObjs.player.energy = PlayerShip.ENERGY_MIN - 1;
-      gameObjs.player.is_docked = false;
+      gameObjs.player.isDocked = false;
     });
 
     // 何か操作しようとした時点で航行不能と判定される

@@ -142,6 +142,13 @@ async function clickWorld(page, worldPos) {
 async function snapshot(page) {
   return page.evaluate(() => {
     const round = (v) => Math.round(v * 100) / 100;
+    // ドッキング状態のフィールドは is_docked から isDocked へ改名された。
+    // 改名前の版とも突き合わせられるよう、古い名前も見る。改名前と
+    // 比べる必要がなくなったら、この場合分けは消してよい。
+    const dockedOf = (o) => {
+      const v = o.isDocked === undefined ? o['is_docked'] : o.isDocked;
+      return v === undefined ? null : v;
+    };
     const ship = (o) => o && {
       cls: o.constructor.name,
       active: o.active,
@@ -149,7 +156,7 @@ async function snapshot(page) {
       y: round(o.y),
       shield: round(o.shield),
       spirit: o.spirit === undefined ? null : round(o.spirit),
-      docked: o.is_docked === undefined ? null : o.is_docked,
+      docked: dockedOf(o),
     };
     return {
       turn: gameState.turn,
@@ -263,17 +270,25 @@ async function readLog(page, count = 5) {
  * コンソールのエラーと警告を集める。テストの冒頭で仕掛けておき、
  * 最後に中身が空であることを確かめる使い方をする。
  *
- * Phaser が出す AudioContext の警告は、ユーザー操作なしでページを
- * 開いたときに必ず出るため除外する。
+ * ゲームに由来しないものは除外する。残しておくと、実行した環境の
+ * 違いでテストの結果が変わってしまう。
  *
  * @param {import('@playwright/test').Page} page
  * @return {{errors: string[], warnings: string[]}}
  */
 function collectConsoleIssues(page) {
+  /** ゲームの問題ではない、環境由来のメッセージ */
+  const isEnvironmental = (text) =>
+    // ユーザー操作なしでページを開くと Phaser が必ず出す
+    text.includes('AudioContext was not allowed to start')
+    // GPU ドライバが出す性能に関する通知。搭載 GPU によって出たり出なかったりする
+    || text.includes('GL Driver Message')
+    || text.includes('GPU stall');
+
   const issues = { errors: [], warnings: [] };
   page.on('console', (msg) => {
     const text = msg.text();
-    if (text.includes('AudioContext was not allowed to start')) {
+    if (isEnvironmental(text)) {
       return;
     }
     if (msg.type() === 'error') {

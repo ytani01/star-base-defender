@@ -898,31 +898,31 @@
      class Weapon {
        static MAX_DAMAGE_RATIO = 0.2;  // 最大射程距離のダメージ比率
        
-       constructor(max_power, area_r, cost=0) {
-         debugLog(`Weapon> max_power=${max_power}, area_r=${area_r}, const=${cost}`);
-         this.max_power = max_power;
-         this.area_r = area_r;
+       constructor(maxPower, areaR, cost=0) {
+         debugLog(`Weapon> maxPower=${maxPower}, areaR=${areaR}, const=${cost}`);
+         this.maxPower = maxPower;
+         this.areaR = areaR;
          this.cost = cost;
        }
        
-       EffectiveRange() {
-         return this.area_r;
+       effectiveRange() {
+         return this.areaR;
        }
        
-       MaxRange() {
-         return Math.floor(this.area_r * Math.sqrt(1 / this.constructor.MAX_DAMAGE_RATIO - 1));
+       maxRange() {
+         return Math.floor(this.areaR * Math.sqrt(1 / this.constructor.MAX_DAMAGE_RATIO - 1));
        }
 
        /**
         * 距離に応じた武器の威力減衰率（有効度）を計算する
         */
-       Effectiveness(distance) {
-         const x = distance / this.area_r;
+       effectiveness(distance) {
+         const x = distance / this.areaR;
          return 1 / (1 + x * x);
        }
 
-       CalcDamage(distance) {
-         return Math.floor(this.max_power * this.Effectiveness(distance));
+       calcDamage(distance) {
+         return Math.floor(this.maxPower * this.effectiveness(distance));
        }
      } // class Weapon
 
@@ -945,11 +945,11 @@
        get y() {return this.sprite.y;}
        set y(val) {this.sprite.y = val;}
 
-       get src_w() {return this.sprite.width;}
-       get src_h() {return this.sprite.height;}
+       get srcW() {return this.sprite.width;}
+       get srcH() {return this.sprite.height;}
 
-       get w() {return this.src_w * this.scale;}
-       get h() {return this.src_h * this.scale;}
+       get w() {return this.srcW * this.scale;}
+       get h() {return this.srcH * this.scale;}
        get r() {return (this.w + this.h) / 4;}
 
        destroy() {
@@ -983,26 +983,26 @@
 
        constructor(
          scene, x, y, texture,
-         shield, shield_gauge_color,
+         shield, shieldGaugeColor,
          scale=SCALE
        ) {
          super(scene, x, y, texture, scale);
          this.shield = shield;
-         this.shield_gauge_color = shield_gauge_color;
+         this.shieldGaugeColor = shieldGaugeColor;
 
-         this.gauge_h = this.constructor.GAUGE_H * scale;
-         this.gauge_y = this.h + this.constructor.GAUGE_Y_OFFSET * scale;
-         this.gauge_w = this.w;
+         this.gaugeH = this.constructor.GAUGE_H * scale;
+         this.gaugeY = this.h + this.constructor.GAUGE_Y_OFFSET * scale;
+         this.gaugeW = this.w;
 
-         this.shield_gauge = this.scene.add.graphics();
-         this.shield_circle = this.scene.add.graphics();
+         this.shieldGauge = this.scene.add.graphics();
+         this.shieldCircle = this.scene.add.graphics();
        }
 
        update() {
          if (! this.active ) {
-           if (this.shield_gauge) {
-             this.shield_gauge.destroy();
-             this.shield_circle.destroy();
+           if (this.shieldGauge) {
+             this.shieldGauge.destroy();
+             this.shieldCircle.destroy();
            }
            return;
          }
@@ -1010,24 +1010,24 @@
          //
          // draw Shield circle
          //
-         const shield_ratio = this.shield / this.constructor.SHIELD_MAX;
-         let shield_color = DRAW_COLOR.SHIELD_OK;
-         if ( shield_ratio < DISPLAY_THRESHOLD.SHIELD_LOW ) {
-           shield_color = DRAW_COLOR.SHIELD_LOW;
+         const shieldRatio = this.shield / this.constructor.SHIELD_MAX;
+         let shieldColor = DRAW_COLOR.SHIELD_OK;
+         if ( shieldRatio < DISPLAY_THRESHOLD.SHIELD_LOW ) {
+           shieldColor = DRAW_COLOR.SHIELD_LOW;
          }
-         if ( shield_ratio < DISPLAY_THRESHOLD.SHIELD_CRITICAL ) {
-           shield_color = DRAW_COLOR.SHIELD_CRITICAL;
+         if ( shieldRatio < DISPLAY_THRESHOLD.SHIELD_CRITICAL ) {
+           shieldColor = DRAW_COLOR.SHIELD_CRITICAL;
          }
-         this.shield_circle.clear();
-         this.shield_circle.lineStyle(3 * shield_ratio, shield_color, 1);
-         this.shield_circle.strokeCircle(this.x, this.y, this.r);
+         this.shieldCircle.clear();
+         this.shieldCircle.lineStyle(3 * shieldRatio, shieldColor, 1);
+         this.shieldCircle.strokeCircle(this.x, this.y, this.r);
 
          drawGauge(
-           this.shield_gauge,
-           this.x, this.y + (this.gauge_y * this.scale),
-           this.gauge_w, this.gauge_h,
+           this.shieldGauge,
+           this.x, this.y + (this.gaugeY * this.scale),
+           this.gaugeW, this.gaugeH,
            this.shield / this.constructor.SHIELD_MAX,
-           this.shield_gauge_color
+           this.shieldGaugeColor
          );
        } // update()
 
@@ -1058,11 +1058,11 @@
        die() {
          this.shield = 0;
          this.active = false;
-         if ( this.shield_gauge ) {
-           this.shield_gauge.destroy();
+         if ( this.shieldGauge ) {
+           this.shieldGauge.destroy();
          }
-         if ( this.shield_circle ) {
-           this.shield_circle.destroy();
+         if ( this.shieldCircle ) {
+           this.shieldCircle.destroy();
          }
          this.destroy();
        } // die()
@@ -1083,11 +1083,11 @@
 
        constructor(
          scene, x, y, texture,
-         shield, shield_color, scale,
-         weapon_power, weapon_area_r, weapon_cost=0
+         shield, shieldColor, scale,
+         weaponPower, weaponAreaR, weaponCost=0
        ) {
-         super(scene, x, y, texture, shield, shield_color, scale);
-         this.weapon = new Weapon(weapon_power, weapon_area_r, weapon_cost);
+         super(scene, x, y, texture, shield, shieldColor, scale);
+         this.weapon = new Weapon(weaponPower, weaponAreaR, weaponCost);
        }
 
        /**
@@ -1362,8 +1362,8 @@
       * NPC用基底クラス (SpaceShip を継承)
       */
      class NPCShip extends SpaceShip {
-       constructor(scene, x, y, texture, shield, shield_color, scale, weapon_power, weapon_area_r) {
-         super(scene, x, y, texture, shield, shield_color, scale, weapon_power, weapon_area_r);
+       constructor(scene, x, y, texture, shield, shieldColor, scale, weaponPower, weaponAreaR) {
+         super(scene, x, y, texture, shield, shieldColor, scale, weaponPower, weaponAreaR);
 
          // 子クラス(EnemyShip / FederationShip) が持つスタティックプロパティを参照して士気を初期化
          this.spirit = this.constructor.SPIRIT.INIT;
@@ -1384,7 +1384,7 @@
          // 自身の scene と getBeamColor() を使用してビームを描画
          fireBeam(this.scene, this, target, this.getBeamColor());
          
-         const damage = this.weapon.CalcDamage(distance);
+         const damage = this.weapon.calcDamage(distance);
          target.takeDamage(damage);
 
          // 艦種ごとの攻撃後処理（メッセージ通知や撃破判定）を呼び出し
@@ -1434,7 +1434,7 @@
            }
 
            // 攻撃可能な対象を評価
-           if (!isFleeing && d <= this.weapon.MaxRange() * (1.0 - this.spirit)) {
+           if (!isFleeing && d <= this.weapon.maxRange() * (1.0 - this.spirit)) {
              let checkBaseObstacle = (t !== gameObjs.starBase);
              if (!isLOSBlocked(this, t, checkBaseObstacle)) {
                if (d < bestAttackableDist) {
@@ -1508,33 +1508,33 @@
 
        constructor(
          scene, x, y, texture,
-         shield, gauge_color,
-         energy, energy_color,
+         shield, gaugeColor,
+         energy, energyColor,
          scale = SCALE,
-         weapon_power = 0, weapon_area_r = 0, weapon_cost = 0
+         weaponPower = 0, weaponAreaR = 0, weaponCost = 0
        ) {
          // 親クラス (SpaceShip) へパラメータを渡す
          super(
-           scene, x, y, texture, shield, gauge_color, scale, weapon_power, weapon_area_r, weapon_cost
+           scene, x, y, texture, shield, gaugeColor, scale, weaponPower, weaponAreaR, weaponCost
          );
          this.energy = energy;
-         this.energy_gauge_color = energy_color;
+         this.energyGaugeColor = energyColor;
 
-         this.energy_gauge = this.scene.add.graphics();
+         this.energyGauge = this.scene.add.graphics();
        }
 
-       energy_p() {
+       energyPercent() {
          return Math.floor(this.energy / this.constructor.ENERGY_MAX * 100);
        }
 
        update() {
          super.update();
          drawGauge(
-           this.energy_gauge,
-           this.x, this.y + (this.gauge_y * this.scale) + this.gauge_h + 1,
-           this.gauge_w, this.gauge_h,
+           this.energyGauge,
+           this.x, this.y + (this.gaugeY * this.scale) + this.gaugeH + 1,
+           this.gaugeW, this.gaugeH,
            this.energy / this.constructor.ENERGY_MAX,
-           this.energy_gauge_color
+           this.energyGaugeColor
          );          
        }
      } // class ObjWithEnergy
@@ -1572,16 +1572,16 @@
        constructor(scene, x, y) {
          super(scene, x, y, 'baseImg', StarBase.SHIELD_MAX, StarBase.SHIELD_COLOR);
 
-         this.gauge_y = this.gauge_y + this.gauge_h / 2 * 3;
+         this.gaugeY = this.gaugeY + this.gaugeH / 2 * 3;
          this.sprite.setDepth(1);
-         this.shield_gauge.setDepth(1);
+         this.shieldGauge.setDepth(1);
        }
 
        update() {
          super.update();
 
          // ドッキング状態
-         if ( gameObjs.player.is_docked ) {
+         if ( gameObjs.player.isDocked ) {
            gameObjs.rangeGraphics.lineStyle(5, DRAW_COLOR.DOCKING_RING, 1);
            gameObjs.rangeGraphics.strokeCircle(
              gameObjs.starBase.x, gameObjs.starBase.y, StarBase.DOCKING_RANGE - 3
@@ -1591,7 +1591,7 @@
 
        // 基地に対するクリック操作
        onInteract(player, scene, endTurn) {
-         if (player.is_docked) {
+         if (player.isDocked) {
            setMsg(SPEAKER.BASE, "ドッキング中");
            endTurn();
            return true;
@@ -1647,22 +1647,22 @@
 
        // --- 敵艦が攻撃した後の処理 ---
        onAfterAttack(target) {
-         const t_shield_p = Math.floor(target.shieldPercent() * 100);
+         const targetShieldPercent = Math.floor(target.shieldPercent() * 100);
 
          if (target === gameObjs.player
-             && t_shield_p < REPORT_THRESHOLD.SHIELD_WARN) {
-           if (t_shield_p > REPORT_THRESHOLD.SHIELD_DANGER) {
-             setMsg(SPEAKER.ENGINE, `シールド ${t_shield_p}% に低下`, MSG_COLOR.WARN);
+             && targetShieldPercent < REPORT_THRESHOLD.SHIELD_WARN) {
+           if (targetShieldPercent > REPORT_THRESHOLD.SHIELD_DANGER) {
+             setMsg(SPEAKER.ENGINE, `シールド ${targetShieldPercent}% に低下`, MSG_COLOR.WARN);
            } else {
-             setMsg(SPEAKER.ENGINE, `艦長！シールド ${t_shield_p}% 危険です！`, MSG_COLOR.DANGER);
+             setMsg(SPEAKER.ENGINE, `艦長！シールド ${targetShieldPercent}% 危険です！`, MSG_COLOR.DANGER);
            }
            updateStatus();
          }
          if (target === gameObjs.starBase
-             && t_shield_p < REPORT_THRESHOLD.SHIELD_WARN) {
-           setMsg(SPEAKER.BASE, `シールド ${t_shield_p}%、至急救援を求む！`, MSG_COLOR.WARN);
-           if (t_shield_p <= REPORT_THRESHOLD.SHIELD_DANGER) {
-             setMsg(SPEAKER.BASE, `シールド ${t_shield_p}%、至急救援を求む！`, MSG_COLOR.DANGER);
+             && targetShieldPercent < REPORT_THRESHOLD.SHIELD_WARN) {
+           setMsg(SPEAKER.BASE, `シールド ${targetShieldPercent}%、至急救援を求む！`, MSG_COLOR.WARN);
+           if (targetShieldPercent <= REPORT_THRESHOLD.SHIELD_DANGER) {
+             setMsg(SPEAKER.BASE, `シールド ${targetShieldPercent}%、至急救援を求む！`, MSG_COLOR.DANGER);
            }
            updateStatus();
          }
@@ -1703,9 +1703,9 @@
        getPotentialTargets() {
          const targets = [
            gameObjs.starBase,
-           ...gameObjs.federationShips.filter(f => !f.is_docked),
+           ...gameObjs.federationShips.filter(f => !f.isDocked),
          ];
-         if (!gameObjs.player.is_docked) {
+         if (!gameObjs.player.isDocked) {
            targets.push(gameObjs.player);
          }
          return targets;
@@ -1713,7 +1713,7 @@
 
        // 敵艦に対するクリック操作（攻撃）
        onInteract(player, scene, endTurn) {
-         if (player.is_docked) {
+         if (player.isDocked) {
            setMsg(SPEAKER.TACTICAL, "ドッキング中のため兵器は使用できません。", MSG_COLOR.WARN);
            return true;
          }
@@ -1726,7 +1726,7 @@
          player.energy -= player.weapon.cost;
          const dist = Phaser.Math.Distance.Between(player.x, player.y, this.x, this.y);
 
-         if (dist > player.weapon.MaxRange()) {
+         if (dist > player.weapon.maxRange()) {
            setMsg(SPEAKER.TACTICAL, "射程範囲外のため敵艦にダメージなし", MSG_COLOR.WARN);
            fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
            endTurn();
@@ -1741,7 +1741,7 @@
 
          // 命中
          //setMsg(SPEAKER.TACTICAL, "攻撃命中！ 敵艦シールド低下！", "#f80");
-         const damage = player.weapon.CalcDamage(dist);
+         const damage = player.weapon.calcDamage(dist);
          this.takeDamage(damage);
          fireBeam(scene, player, this, DRAW_COLOR.BEAM_PLAYER);
 
@@ -1789,7 +1789,7 @@
          );
 
          // 自機と同じく、基地にドッキングしている間は攻撃せず、敵にも狙われない
-         this.is_docked = false;
+         this.isDocked = false;
        }
 
        /**
@@ -1905,30 +1905,30 @@
 
          // ※ this.weapon = new Weapon(...) は SpaceShip で行われるため削除！
 
-         this.is_docked = false;
+         this.isDocked = false;
          
          this.sprite.setDepth(10);
-         this.shield_gauge.setDepth(10);
+         this.shieldGauge.setDepth(10);
        }
 
        // 自機に対するクリック操作（シールド強化）
        onInteract(player, scene, endTurn) {
-         const d_shield = PlayerShip.SHIELD_MAX - this.shield;
-         if (d_shield <= 0) {
+         const shieldDeficit = PlayerShip.SHIELD_MAX - this.shield;
+         if (shieldDeficit <= 0) {
            setMsg(SPEAKER.ENGINE, "シールドはすでに最大です。", MSG_COLOR.PLAIN);
            return true;
          }
 
-         const energy_supply = Math.min(this.energy, d_shield);
-         if (energy_supply <= 0) {
+         const energySupply = Math.min(this.energy, shieldDeficit);
+         if (energySupply <= 0) {
            setMsg(SPEAKER.ENGINE, "エネルギー不足により、シールドを補強できません！");
            return true;
          }
 
-         this.energy -= energy_supply;
-         this.shield += energy_supply;
+         this.energy -= energySupply;
+         this.shield += energySupply;
 
-         setMsg(SPEAKER.ENGINE, `シールドアップ。エネルギー残り ${this.energy_p()}%`, MSG_COLOR.SELF);
+         setMsg(SPEAKER.ENGINE, `シールドアップ。エネルギー残り ${this.energyPercent()}%`, MSG_COLOR.SELF);
          endTurn();
          return true;
        } // onInteract()
@@ -1987,8 +1987,8 @@
      /**
       * 連邦艦（味方NPC）を1隻、他の物体と重ならない位置に出現させる。
       */
-     function newFederationShip(scene, dist_min=0.3, dist_max=0.6) {
-       let p = getSafeRandPos(dist_min, dist_max);
+     function newFederationShip(scene, distMin=0.3, distMax=0.6) {
+       let p = getSafeRandPos(distMin, distMax);
        const newFed = new FederationShip(scene, p.x, p.y);
        gameObjs.addFederation(newFed);
        updateStatus();
@@ -1997,8 +1997,8 @@
      /**
       * 敵艦を1隻、安全な位置に生成して gameObjs に登録する
       */
-     function spawnEnemy(scene, dist_min, dist_max) {
-       const p = getSafeRandPos(dist_min, dist_max);
+     function spawnEnemy(scene, distMin, distMax) {
+       const p = getSafeRandPos(distMin, distMax);
        const enemy = new EnemyShip(scene, p.x, p.y);
        gameObjs.addEnemy(enemy);
        return enemy;
@@ -2057,9 +2057,9 @@
        // Base
        const CX_STARBASE = StarBase.W / 2;
        const CY_STARBASE = StarBase.W / 2;
-       const base_color = 0x88ffff;
-       g.fillStyle(base_color);
-       g.lineStyle(8, base_color, 1);
+       const baseColor = 0x88ffff;
+       g.fillStyle(baseColor);
+       g.lineStyle(8, baseColor, 1);
        g.fillEllipse(CX_STARBASE, CY_STARBASE, StarBase.W * .2, StarBase.W * 0.9);
        g.fillEllipse(CX_STARBASE, CY_STARBASE - 30, StarBase.W * 0.25, StarBase.W * 0.25);
        g.fillEllipse(CX_STARBASE, CY_STARBASE + 30, StarBase.W * 0.25, StarBase.W * 0.25);
@@ -2172,11 +2172,11 @@
            ? DRAW_COLOR.RANGE_FRIENDLY : DRAW_COLOR.RANGE_ENEMY;
 
          gameObjs.rangeGraphics.lineStyle(1, color, 0.5);
-         gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.EffectiveRange());
+         gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.effectiveRange());
          
          if ( obj === gameObjs.player ) {  
            gameObjs.rangeGraphics.lineStyle(1, color, 0.3);
-           gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.MaxRange());
+           gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.maxRange());
          }
        });
 
@@ -2193,7 +2193,7 @@
       * 「中心付近に自機を配置する」を同じ関数で出し分けている。
       * 条件を満たす座標が見つからない場合も、試行回数の上限で必ず打ち切る。
       */
-     function getSafeRandPos(dist_min, dist_max){
+     function getSafeRandPos(distMin, distMax){
        let x, y, distToCenter;
        let safe = false;
        let attempts = 0;
@@ -2206,7 +2206,7 @@
          y = Phaser.Math.Between(AREA_CENTER.Y - AREA_R, AREA_CENTER.Y + AREA_R);
          distToCenter = Phaser.Math.Distance.Between(x, y, AREA_CENTER.X, AREA_CENTER.Y);
          
-         if ( distToCenter < AREA_R * dist_min || distToCenter > AREA_R * dist_max ) {
+         if ( distToCenter < AREA_R * distMin || distToCenter > AREA_R * distMax ) {
            continue;
          }
          
@@ -2249,7 +2249,7 @@
       */
      function checkEnergyDepleted(msg) {
        const player = gameObjs.player;
-       if (player.energy >= PlayerShip.ENERGY_MIN || player.is_docked) {
+       if (player.energy >= PlayerShip.ENERGY_MIN || player.isDocked) {
          return false;
        }
        updateStatus();
@@ -2326,7 +2326,7 @@
       * 補給と引き換えに攻撃手段を失うため、明示的な操作でのみ実行される。
       */
      function dockShip(scene) {
-       gameObjs.player.is_docked = true;
+       gameObjs.player.isDocked = true;
 
        // 補給
        gameObjs.player.shield = PlayerShip.SHIELD_MAX;
@@ -2395,8 +2395,8 @@
       *           precomputedDirectDest:?{x:number,y:number}}}
       */
      function resolvePlayerDestination(desiredX, desiredY, moveDist, destTarget = null) {
-       if (gameObjs.player.is_docked) {
-         gameObjs.player.is_docked = false;
+       if (gameObjs.player.isDocked) {
+         gameObjs.player.isDocked = false;
          gameObjs.player.shield = PlayerShip.SHIELD_MAX;
 
          const ignoreObjs = [gameObjs.starBase];
@@ -2469,14 +2469,14 @@
        const { desiredX, desiredY, moveDist } = desired;
 
        // 目的座標が「基地」かどうかの判定
-       const dist_target_to_base = Phaser.Math.Distance.Between(
+       const distTargetToBase = Phaser.Math.Distance.Between(
          targetX, targetY, gameObjs.starBase.x, gameObjs.starBase.y
        );
-       const target_is_base = dist_target_to_base <= StarBase.R;
+       const targetIsBase = distTargetToBase <= StarBase.R;
 
        // 基地を目指す移動では、基地を障害物ではなく目的地として扱い、
        // 接触位置ちょうどで停止させる（canDock() が確実に成立する）
-       const destTarget = target_is_base ? gameObjs.starBase : null;
+       const destTarget = targetIsBase ? gameObjs.starBase : null;
 
        const resolved = resolvePlayerDestination(
          desiredX, desiredY, moveDist, destTarget
@@ -2489,7 +2489,7 @@
        }
        const { destX, destY, actualDist, isRerouted } = stuck;
 
-       const speed_p = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
+       const speedPercent = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
        const cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
        if ( gameObjs.player.energy - cost < 0 ) {
          setMsg(SPEAKER.ENGINE, "エネルギー不足です", MSG_COLOR.WARN);
@@ -2500,9 +2500,9 @@
        // コース変更時のメッセージ
        const shiftDist = Phaser.Math.Distance.Between(desiredX, desiredY, destX, destY);
        if (isRerouted) {
-         setMsg(SPEAKER.HELM, `障害物回避のためコース調整。推力 ${speed_p}%`, MSG_COLOR.WARN);
-       } else if (shiftDist > 5.0 && !target_is_base) {
-         setMsg(SPEAKER.HELM, `進路上に障害物。安全距離にて停止。推力 ${speed_p}%`, MSG_COLOR.WARN);
+         setMsg(SPEAKER.HELM, `障害物回避のためコース調整。推力 ${speedPercent}%`, MSG_COLOR.WARN);
+       } else if (shiftDist > 5.0 && !targetIsBase) {
+         setMsg(SPEAKER.HELM, `進路上に障害物。安全距離にて停止。推力 ${speedPercent}%`, MSG_COLOR.WARN);
        }
        updateStatus();
 
@@ -2569,7 +2569,7 @@
 
        if (context.isFleeing) {
          npcMove(scene, npc, context);
-       } else if (context.canAttack && !npc.is_docked) {
+       } else if (context.canAttack && !npc.isDocked) {
          npc.attack(context.target, context.distToTarget);
        } else {
          // ドッキング中は自機と同じく兵器を使用できないため、攻撃したい
@@ -2681,12 +2681,12 @@
 
        // ドッキング・発進の状態遷移。敵の標的選定はターン中に参照されるため、
        // 移動の完了を待たずにこの時点でフラグを切り替える（自機の
-       // dockShip() が即座に is_docked を立てるのと同じ扱い）。
-       if (isDocking && !npc.is_docked) {
-         npc.is_docked = true;
+       // dockShip() が即座に isDocked を立てるのと同じ扱い）。
+       if (isDocking && !npc.isDocked) {
+         npc.isDocked = true;
          setMsg(SPEAKER.COMMS, "味方が基地にドッキングしました", MSG_COLOR.FRIENDLY);
-       } else if (npc.is_docked && !isDocking) {
-         npc.is_docked = false;
+       } else if (npc.isDocked && !isDocking) {
+         npc.isDocked = false;
          dest = pushOutFromBase(npc, dest);
          setMsg(SPEAKER.COMMS, "味方が基地から発進しました", MSG_COLOR.FRIENDLY);
        }
@@ -2731,12 +2731,12 @@
          // XXX TBD 連邦の援軍が出現する条件
          // gameState.qtyFederationShip はミッション開始時点のスナップショットのため
          // ここでは使わず、現在生存中の連邦艦数をその場で数える
-         const qty_enemies = getActiveEnemyCount();
-         const qty_federation = getActiveFederationShipCount();
+         const enemyCount = getActiveEnemyCount();
+         const federationCount = getActiveFederationShipCount();
          debugLog(
-           `qty_federation=${qty_federation}, qty_enemies=${qty_enemies}`
+           `federationCount=${federationCount}, enemyCount=${enemyCount}`
          );
-         if ( qty_federation < qty_enemies / 2 ) {
+         if ( federationCount < enemyCount / 2 ) {
            setMsg(SPEAKER.COMMS, "味方が到着しました！", MSG_COLOR.GOOD);
            newFederationShip(scene, 0.8, 0.95);
          }
@@ -2750,7 +2750,7 @@
          ));
        }
 
-       const enp = gameObjs.player.energy_p(); 
+       const enp = gameObjs.player.energyPercent(); 
        if ( enp < REPORT_THRESHOLD.ENERGY_WARN ) {
          setMsg(SPEAKER.ENGINE, `エネルギー残り ${enp}%`, MSG_COLOR.WARN);
        }

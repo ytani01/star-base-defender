@@ -394,36 +394,36 @@
          const w = (expr) => g(`(() => { const w = new Weapon(1000, 100); return ${expr}; })()`);
 
          it('至近距離では最大威力に近い', () => {
-           assertClose(w('w.Effectiveness(0)'), 1.0, 1e-9, '距離0の有効度');
+           assertClose(w('w.effectiveness(0)'), 1.0, 1e-9, '距離0の有効度');
          });
          it('有効射程で威力が半減する', () => {
-           assertClose(w('w.Effectiveness(w.EffectiveRange())'), 0.5, 1e-9,
+           assertClose(w('w.effectiveness(w.effectiveRange())'), 0.5, 1e-9,
                        '有効射程での有効度');
          });
          it('最大射程で MAX_DAMAGE_RATIO まで落ちる', () => {
            const ratio = g('Weapon.MAX_DAMAGE_RATIO');
-           // MaxRange() は floor しているため、厳密には ratio をわずかに上回る
-           assertClose(w('w.Effectiveness(w.MaxRange())'), ratio, 0.01,
+           // maxRange() は floor しているため、厳密には ratio をわずかに上回る
+           assertClose(w('w.effectiveness(w.maxRange())'), ratio, 0.01,
                        '最大射程での有効度');
          });
          it('最大射程は有効射程より遠い', () => {
-           assertTrue(w('w.MaxRange() > w.EffectiveRange()'), '射程の大小');
+           assertTrue(w('w.maxRange() > w.effectiveRange()'), '射程の大小');
          });
          it('距離が延びるほどダメージが減る（単調減少）', () => {
-           const dmg = [0, 25, 50, 100, 200, 300].map(d => w(`w.CalcDamage(${d})`));
+           const dmg = [0, 25, 50, 100, 200, 300].map(d => w(`w.calcDamage(${d})`));
            for (let i = 1; i < dmg.length; i++) {
              assertTrue(dmg[i] <= dmg[i - 1],
                         `距離 ${[0, 25, 50, 100, 200, 300][i]} のダメージが前より小さい`);
            }
          });
          it('ダメージは整数で返る', () => {
-           const d = w('w.CalcDamage(37)');
+           const d = w('w.calcDamage(37)');
            assertEqual(d, Math.floor(d), '整数');
          });
          it('有効射程が同じなら威力に比例する', () => {
-           const a = g('new Weapon(1000, 100).CalcDamage(50)');
-           const b = g('new Weapon(2000, 100).CalcDamage(50)');
-           // CalcDamage は floor するため、2倍したときに 1 だけずれうる
+           const a = g('new Weapon(1000, 100).calcDamage(50)');
+           const b = g('new Weapon(2000, 100).calcDamage(50)');
+           // calcDamage は floor するため、2倍したときに 1 だけずれうる
            assertTrue(Math.abs(b - a * 2) <= 1, `威力2倍: ${a} と ${b}`);
          });
        });

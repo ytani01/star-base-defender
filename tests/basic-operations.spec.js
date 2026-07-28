@@ -45,7 +45,7 @@ async function placePlayer(page, x, y) {
   await page.evaluate(({ x, y }) => {
     gameObjs.player.x = x;
     gameObjs.player.y = y;
-    gameObjs.player.is_docked = false;
+    gameObjs.player.isDocked = false;
   }, { x, y });
 }
 
@@ -78,7 +78,7 @@ test.describe('基本操作', () => {
       star.y = AREA_CENTER.Y;
       gameObjs.player.x = AREA_CENTER.X - 120;
       gameObjs.player.y = AREA_CENTER.Y;
-      gameObjs.player.is_docked = false;
+      gameObjs.player.isDocked = false;
       gameObjs.starBase.x = AREA_CENTER.X;
       gameObjs.starBase.y = AREA_CENTER.Y - 250;  // 進路から外す
       return { star: { x: star.x, y: star.y, r: star.r }, playerR: gameObjs.player.r };
@@ -104,7 +104,7 @@ test.describe('基本操作', () => {
       gameObjs.starBase.x = AREA_CENTER.X;
       gameObjs.starBase.y = AREA_CENTER.Y - 250;
       const p = gameObjs.player;
-      p.is_docked = false;
+      p.isDocked = false;
       p.y = AREA_CENTER.Y;
       // 接触距離（自機と星の半径の和）のすぐ外側に立たせる
       p.x = AREA_CENTER.X - ((p.w + gameObjs.stars[0].w) / 2 + 5);
@@ -136,7 +136,7 @@ test.describe('基本操作', () => {
       e.shield = EnemyShip.SHIELD_MAX;
       gameObjs.player.x = AREA_CENTER.X;
       gameObjs.player.y = AREA_CENTER.Y;
-      gameObjs.player.is_docked = false;
+      gameObjs.player.isDocked = false;
       gameObjs.starBase.x = AREA_CENTER.X;
       gameObjs.starBase.y = AREA_CENTER.Y - 250;
       return { x: e.x, y: e.y, shield: e.shield };
@@ -157,11 +157,11 @@ test.describe('基本操作', () => {
       e.sprite.setVisible(true);
       gameObjs.player.x = AREA_CENTER.X - 250;
       gameObjs.player.y = AREA_CENTER.Y;
-      gameObjs.player.is_docked = false;
+      gameObjs.player.isDocked = false;
       gameObjs.starBase.x = AREA_CENTER.X;
       gameObjs.starBase.y = AREA_CENTER.Y - 250;
       // 最大射程より遠くへ置く
-      e.x = gameObjs.player.x + gameObjs.player.weapon.MaxRange() + 60;
+      e.x = gameObjs.player.x + gameObjs.player.weapon.maxRange() + 60;
       e.y = AREA_CENTER.Y;
       e.shield = EnemyShip.SHIELD_MAX;
       return { x: e.x, y: e.y, shield: e.shield };
@@ -180,7 +180,7 @@ test.describe('基本操作', () => {
     const enemy = await page.evaluate(() => {
       gameObjs.player.x = AREA_CENTER.X - 80;
       gameObjs.player.y = AREA_CENTER.Y;
-      gameObjs.player.is_docked = false;
+      gameObjs.player.isDocked = false;
       gameObjs.starBase.x = AREA_CENTER.X;
       gameObjs.starBase.y = AREA_CENTER.Y - 250;
       const star = gameObjs.stars[0];
@@ -210,7 +210,7 @@ test.describe('基本操作', () => {
     const before = await page.evaluate(() => {
       gameObjs.player.x = AREA_CENTER.X;
       gameObjs.player.y = AREA_CENTER.Y;
-      gameObjs.player.is_docked = false;
+      gameObjs.player.isDocked = false;
       gameObjs.starBase.x = AREA_CENTER.X;
       gameObjs.starBase.y = AREA_CENTER.Y - 250;
       gameObjs.player.shield = PlayerShip.SHIELD_MAX * 0.5;
@@ -237,7 +237,7 @@ test.describe('基本操作', () => {
       b.x = AREA_CENTER.X;
       b.y = AREA_CENTER.Y;
       const p = gameObjs.player;
-      p.is_docked = false;
+      p.isDocked = false;
       p.shield = PlayerShip.SHIELD_MAX * 0.3;
       p.energy = PlayerShip.ENERGY_MAX * 0.3;
       // 接触する距離に置く
@@ -250,7 +250,7 @@ test.describe('基本操作', () => {
     await clickWorld(page, base);
 
     const after = await page.evaluate(() => ({
-      docked: gameObjs.player.is_docked,
+      docked: gameObjs.player.isDocked,
       shield: gameObjs.player.shield,
       energy: gameObjs.player.energy,
       max: [PlayerShip.SHIELD_MAX, PlayerShip.ENERGY_MAX],
@@ -275,7 +275,7 @@ test.describe('基本操作', () => {
       const p = gameObjs.player;
       p.x = b.x;
       p.y = b.y;
-      p.is_docked = true;
+      p.isDocked = true;
       const e = gameObjs.enemies[0];
       e.active = true;
       e.sprite.setVisible(true);
@@ -293,14 +293,14 @@ test.describe('基本操作', () => {
     expect(await page.evaluate(() => gameObjs.enemies[0].shield),
            'ダメージは入らない').toBe(setup.shield);
     expect((await readLog(page, 2)).join('\n')).toContain('ドッキング中のため兵器は使用できません');
-    expect(await page.evaluate(() => gameObjs.player.is_docked),
+    expect(await page.evaluate(() => gameObjs.player.isDocked),
            'ドッキングは続いている').toBe(true);
 
     // 2) 空間をクリックして離れると、基地の外へ押し出される
     await clickWorld(page, await page.evaluate(
       () => ({ x: AREA_CENTER.X + 150, y: AREA_CENTER.Y })));
     const after = await page.evaluate(() => ({
-      docked: gameObjs.player.is_docked,
+      docked: gameObjs.player.isDocked,
       dist: Phaser.Math.Distance.Between(
         gameObjs.player.x, gameObjs.player.y,
         gameObjs.starBase.x, gameObjs.starBase.y),
