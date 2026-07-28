@@ -33,6 +33,10 @@ cd tests && npx playwright test layout          # ファイル名で絞り込む
 # 挙動を変えないはずの変更をしたとき、変更前と突き合わせる
 cd tests && node make-baseline.js HEAD~5 && npx playwright test regression
 
+# 表示の実測（各画面のパネル幅・宇宙域・折り返しを一覧にする。/layout-check）
+cd tests && node layout-report.js --out before   # 変更前を控える
+cd tests && node layout-report.js --compare before/report.json
+
 # 構文チェック（インラインスクリプトを抽出して node で検査）
 awk '/<script>/{flag=1; next} /<\/script>/{flag=0} flag' index.html > /tmp/extracted.js && node --check /tmp/extracted.js
 ```
@@ -143,7 +147,7 @@ GameObj (座標・サイズを Phaser スプライトへ委譲。get x/y/r)
   （`v0.<機能追加>.<修正>`。挙動不変のリファクタリングのみなら上げなくてよい）
 
 変更したら自動テストを走らせ、確認シナリオのうち〈人〉の項目を実行する（`conductor/workflow.md`）。
-**モバイルの縦画面・横画面の確認を省略しない。**
+**モバイルの縦画面・横画面の確認を省略しない**（表示を変えたときは `/layout-check`）。
 不具合を直したときは、**その不具合を検出できるテストを追加し、修正前のコードで実際に失敗することを確かめる。**
 
 ## 参照すべき文書
