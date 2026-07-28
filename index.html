@@ -749,6 +749,14 @@
          });
        }
 
+       /**
+        * 撃破・撤退した敵を配列から取り除く。配列の入れ替えを
+        * このクラスの中に閉じ込め、外から代入させないための入口。
+        */
+       purgeInactive() {
+         this.enemies = this.enemies.filter(e => e.active);
+       }
+
        // 敵の追加・削除を管理
        addEnemy(enemy) {
          this.enemies.push(enemy);
@@ -886,8 +894,6 @@
 
          this.shield_gauge = this.scene.add.graphics();
          this.shield_circle = this.scene.add.graphics();
-
-         this.spirit = 0.5;
        }
 
        update() {
@@ -928,21 +934,6 @@
         */
        shieldPercent() {
          return (this.shield / this.constructor.SHIELD_MAX);
-       }
-
-       /**
-        * 恐怖度（0.0〜1.0）。士気の裏返しであり、逃走に転じる閾値になる。
-        */
-       fear() {
-         return (1.0 - this.spirit);
-       }
-
-       /**
-        * 逃走中かどうか。シールド残量が恐怖度を下回ると逃走に転じる。
-        * 士気が高いほど、より深く削られるまで戦い続けることになる。
-        */
-       isFleeing() {
-         return this.shieldPercent() < this.fear();
        }
 
        /**
@@ -1364,6 +1355,21 @@
 
          return { target, distToTarget, canAttack, isFleeing };
        } // evaluateTactics()
+
+       /**
+        * 恐怖度（0.0〜1.0）。士気の裏返しであり、逃走に転じる閾値になる。
+        */
+       fear() {
+         return (1.0 - this.spirit);
+       }
+
+       /**
+        * 逃走中かどうか。シールド残量が恐怖度を下回ると逃走に転じる。
+        * 士気が高いほど、より深く削られるまで戦い続けることになる。
+        */
+       isFleeing() {
+         return this.shieldPercent() < this.fear();
+       }
 
        /**
         * 基地のドックを使えるか。使えるのは連邦艦だけなので既定は false。
@@ -2175,6 +2181,23 @@
      } // isLOSBlocked()
 
      /**
+      * エネルギーが最小活動限界を下回っていれば敗北させる。
+      * 行動の前後どちらでも起こりうるため関数にまとめてある。
+      * ドッキング中は基地から供給を受けられるので対象外。
+      * @param {string} msg 「コンピュータ」が告げる文言（前後で使い分ける）
+      * @return {boolean} 敗北させたかどうか
+      */
+     function checkEnergyDepleted(msg) {
+       const player = gameObjs.player;
+       if (player.energy >= PlayerShip.ENERGY_MIN || player.is_docked) {
+         return false;
+       }
+       updateStatus();
+       gameOver(SPEAKER.COMPUTER, msg);
+       return true;
+     } // checkEnergyDepleted()
+
+     /**
       * クリック（タップ）操作の受け口。
       * 「何をクリックしたか」だけで行動が決まる設計のため、まず対象オブジェクトへ
       * 処理を委ね、どこからも処理されなかった場合にのみ移動へフォールバックする。
@@ -2191,12 +2214,9 @@
          return;
        }
 
-       if (gameObjs.player.energy < PlayerShip.ENERGY_MIN && !gameObjs.player.is_docked) {
-         updateStatus();
-         gameOver(
-           SPEAKER.COMPUTER,
-           "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信し機体を放棄します..."
-         );
+       if (checkEnergyDepleted(
+         "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信し機体を放棄します..."
+       )) {
          return;
        }
 
@@ -2219,12 +2239,9 @@
        const targetY = clickedObj ? clickedObj.y : pointer.worldY;
        attemptPlayerMove(this, targetX, targetY, TIMING.TURN_DELAY);
 
-       if (gameObjs.player.energy < PlayerShip.ENERGY_MIN && !gameObjs.player.is_docked) {
-         updateStatus();
-         gameOver(
-           SPEAKER.COMPUTER, "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信します..."
-         );
-       }
+       checkEnergyDepleted(
+         "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信します..."
+       );
      } // handlePointerDown()
 
      /**
@@ -2622,7 +2639,7 @@
       * ターン終了処理と次ターンへの準備
       */
      function finalizeEnemyTurn(scene) {
-       gameObjs.enemies = gameObjs.enemies.filter(e => e.active);
+       gameObjs.purgeInactive();
        
        if (gameObjs.enemies.length === 0 && !gameState.isGameOver) {
          nextMission(scene);
@@ -2635,7 +2652,7 @@
 
        gameState.turn++;
        // 減点
-       gameState.score -= gameObjs.enemies.filter(e => e.active).length;
+       gameState.score -= getActiveEnemyCount();
        gameState.score -= getActiveFederationShipCount();
 
        // 増援の出現
@@ -2653,7 +2670,7 @@
          // XXX TBD 連邦の援軍が出現する条件
          // gameState.qtyFederationShip はミッション開始時点のスナップショットのため
          // ここでは使わず、現在生存中の連邦艦数をその場で数える
-         const qty_enemies = gameObjs.enemies.filter(e => e.active).length;
+         const qty_enemies = getActiveEnemyCount();
          const qty_federation = getActiveFederationShipCount();
          debugLog(
            `qty_federation=${qty_federation}, qty_enemies=${qty_enemies}`
