@@ -2505,12 +2505,14 @@
      } // execNPCAction()
 
      /**
-      * NPC 移動処理とシールド回復
+      * NPC の移動先を決める。
+      * 「どこへ向かうか」と「ドックに入るのか」を同時に返すのは、
+      * 両者が同じ条件（基地に接しているか）から導かれるため。
+      * @param {NPCShip} npc 移動させる艦
+      * @param {Object} context evaluateTactics() の結果
+      * @return {{dest:{x:number, y:number}, isDocking:boolean}} 移動先とドッキングするか
       */
-     function npcMove(scene, npc, context) {
-       let dest;
-       let isDocking = false;
-
+     function resolveNpcDestination(npc, context) {
        const base = gameObjs.starBase;
        const isBaseActive = base && base.active && base.shield > 0;
        // 連邦艦にとって基地は「障害物」ではなく「目的地」である。
@@ -2520,36 +2522,88 @@
        const dockTarget = canUseDock ? base : null;
        // すでに基地に接している（＝前のターンまでに到着済み）かどうか
        const dockableNow = canUseDock && isAdjacentToBase(npc, base);
+       const enterDock = { dest: { x: base.x, y: base.y }, isDocking: true };
 
        if (context.isFleeing) {
          // 連邦艦はすでに基地に接していれば、自機と同じくドックへ入る
          if (dockableNow) {
-           dest = { x: base.x, y: base.y };
-           isDocking = true;
+           return enterDock;
          }
-
-         // ドッキングしない場合は、通常の逃走（敵・障害物回避）経路を計算。
+         // それ以外は通常の逃走（敵・障害物回避）経路を計算する。
          // 連邦艦は基地に引き寄せられるため、接触位置で停止して次のターンに
          // ドッキングする。
-         if (!isDocking) {
-           const targetDest = npc.getFleeThreats().map(t => ({ x: t.x, y: t.y }));
-           dest = npc.calculateDestination(targetDest, context.isFleeing, dockTarget);
-         }
-       } else { // 逃走中でない場合
-         if ( context.target ) {
-           // ターゲットがいれば追跡
-           const targetDest = { x: context.target.x, y: context.target.y};
-           dest = npc.calculateDestination(targetDest, context.isFleeing);
-         } else if (dockableNow) {
-           // ターゲットがおらず、すでに基地に接していればドックへ入る
-           dest = { x: base.x, y: base.y };
-           isDocking = true;
-         } else {
-           // ターゲットがいなければ基地へ向かう（接触位置ちょうどで停止する）
-           const targetDest = { x: base.x, y: base.y };
-           dest = npc.calculateDestination(targetDest, context.isFleeing, dockTarget);
-         }
-       } // if (context.isFleeing)
+         const targetDest = npc.getFleeThreats().map(t => ({ x: t.x, y: t.y }));
+         return {
+           dest: npc.calculateDestination(targetDest, context.isFleeing, dockTarget),
+           isDocking: false,
+         };
+       }
+
+       // 逃走中でない場合
+       if (context.target) {
+         // ターゲットがいれば追跡
+         const targetDest = { x: context.target.x, y: context.target.y };
+         return {
+           dest: npc.calculateDestination(targetDest, context.isFleeing),
+           isDocking: false,
+         };
+       }
+       if (dockableNow) {
+         // ターゲットがおらず、すでに基地に接していればドックへ入る
+         return enterDock;
+       }
+       // ターゲットがいなければ基地へ向かう（接触位置ちょうどで停止する）
+       const targetDest = { x: base.x, y: base.y };
+       return {
+         dest: npc.calculateDestination(targetDest, context.isFleeing, dockTarget),
+         isDocking: false,
+       };
+     } // resolveNpcDestination()
+
+     /**
+      * 移動が完了したあとの後始末。宇宙域からの離脱判定と、
+      * シールド・士気の回復をまとめて行う。
+      * @param {NPCShip} npc 移動を終えた艦
+      * @param {Object} context evaluateTactics() の結果
+      * @param {boolean} isDocking ドックに入る移動だったか
+      */
+     function onNpcMoveComplete(npc, context, isDocking) {
+       npc.x = Math.floor(npc.x);
+       npc.y = Math.floor(npc.y);
+
+       const distFromCenter = Phaser.Math.Distance.Between(
+         npc.x, npc.y, AREA_CENTER.X, AREA_CENTER.Y
+       );
+       if (distFromCenter > AREA_R) {
+         npc.die();
+         npc.onLeaveArea();
+       }
+
+       // シールド回復処理
+       if (isDocking) {
+         npc.shield = npc.constructor.SHIELD_MAX;
+       } else {
+         npc.shield = Math.min(
+           npc.constructor.SHIELD_MAX,
+           npc.shield + (npc.constructor.SHIELD_MAX * npc.constructor.SHIELD_RECOVERY_RATE)
+         );
+       }
+
+       // spirit 回復
+       if (context.isFleeing) {
+         npc.spirit = Math.min(
+           npc.constructor.SPIRIT.MAX,
+           (npc.spirit + npc.constructor.SPIRIT.RECOVERY)
+         );
+         debugLog(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
+       }
+     } // onNpcMoveComplete()
+
+     /**
+      * NPC 移動処理とシールド回復
+      */
+     function npcMove(scene, npc, context) {
+       let { dest, isDocking } = resolveNpcDestination(npc, context);
 
        // ドッキング・発進の状態遷移。敵の標的選定はターン中に参照されるため、
        // 移動の完了を待たずにこの時点でフラグを切り替える（自機の
@@ -2563,38 +2617,8 @@
          setMsg(SPEAKER.COMMS, "味方が基地から発進しました", MSG_COLOR.FRIENDLY);
        }
 
-       npc.moveTo(dest.x, dest.y, TIMING.TURN_DELAY, () => {
-         npc.x = Math.floor(npc.x);
-         npc.y = Math.floor(npc.y);
-
-         const distFromCenter = Phaser.Math.Distance.Between(
-           npc.x, npc.y, AREA_CENTER.X, AREA_CENTER.Y
-         );
-         if (distFromCenter > AREA_R) {
-           npc.die();
-           npc.onLeaveArea();
-         }
-
-         // シールド回復処理
-         if (isDocking) {
-           npc.shield = npc.constructor.SHIELD_MAX;
-         } else {
-           npc.shield = Math.min(
-             npc.constructor.SHIELD_MAX,
-             npc.shield + (npc.constructor.SHIELD_MAX * npc.constructor.SHIELD_RECOVERY_RATE)
-           );
-         }
-
-         // spirit 回復
-         if (context.isFleeing) {
-           npc.spirit = Math.min(
-             npc.constructor.SPIRIT.MAX,
-             (npc.spirit + npc.constructor.SPIRIT.RECOVERY)
-           );
-           debugLog(`npcMove> spirit recover: ${npc.spirit.toFixed(3)}`);
-         }
-       }); // npc.moveTo()
-
+       npc.moveTo(dest.x, dest.y, TIMING.TURN_DELAY,
+                  () => onNpcMoveComplete(npc, context, isDocking));
      } // npcMove()
      
      /**
