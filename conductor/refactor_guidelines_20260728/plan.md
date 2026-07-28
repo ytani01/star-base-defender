@@ -116,16 +116,16 @@
 
 ---
 
-## Phase 8: 整形
+## Phase 8: 整形 [checkpoint: 4dd54c7]
 
 コミット種別: `style:` / 最後に実施する。
 
-- [ ] Task: セミコロンの欠落を補う（572 / 2365 / 2425 / 2428行 ほか）〔JS §3: Every statement must be terminated with a semicolon〕
-- [ ] Task: 再代入されない `let` を `const` にする。ただし `resolveMovement()` (932〜996行) 内は移動ロジックに差分が集中するため、Phase 5 の作業とは別に単独で行う 〔JS §4: Use const by default〕
-- [ ] Task: 80桁を超える行（75行が該当。2431〜2433 / 2105 / 2155行 ほか）を折り返す 〔JS §3: Column Limit 80〕
-- [ ] Task: `if ( cond )` と `if (cond)` の表記揺れを `if (cond)` に統一する 〔JS §3: Whitespace〕
-- [ ] Task: CSS の `!important` (61 / 103行) を、詳細度で解決できるか検討し、可能なものを解消する。Phase 1 の `id` 削除により `#statusPanel div` の一括指定を見直せる可能性がある 〔HTML/CSS: !important を新規に追加しない／既存は順次解消〕
-- [ ] Task: Conductor - User Manual Verification 'Phase 8' (Protocol in workflow.md)
+- [x] Task: セミコロンの欠落を補う（572 / 2365 / 2425 / 2428行 ほか）〔JS §3: Every statement must be terminated with a semicolon〕 [30f3390]
+- [x] Task: 再代入されない `let` を `const` にする。ただし `resolveMovement()` (932〜996行) 内は移動ロジックに差分が集中するため、Phase 5 の作業とは別に単独で行う 〔JS §4: Use const by default〕 [30f3390]
+- [-] Task: ~~80桁を超える行を折り返す~~ **実施しない。** JS スタイルガイドのプロジェクト固有ルールが「80桁制限は目標として守るが、これのみを理由とした既存コードの一括修正は行わず、その行を触るときに合わせて直す」と定めており、この一括修正はそれに反するため。規約が計画より上位と判断した 〔JS §3: Column Limit 80〕
+- [x] Task: `if ( cond )` と `if (cond)` の表記揺れを `if (cond)` に統一する 〔JS §3: Whitespace〕 [30f3390]
+- [x] Task: CSS の `!important` (61 / 103行) を、詳細度で解決できるか検討し、可能なものを解消する。※ 2箇所とも解消し、ファイルから !important が消えた 〔HTML/CSS: !important を新規に追加しない／既存は順次解消〕 [30f3390]
+- [x] Task: Conductor - User Manual Verification 'Phase 8' (Protocol in workflow.md) [4dd54c7]
 
 ---
 
