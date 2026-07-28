@@ -430,6 +430,32 @@
        STORAGE_KEY: 'starbaseDefenderScores'
      };
 
+     // ログの色。色は装飾ではなく意味を持つ（Product Guidelines 参照）。
+     // 新しい色を足す前に、既存の意味で表現できないか検討すること。
+     const MSG_COLOR = {
+       INFO: '#0ff',      // シアン: 通常の情報（既定）
+       SELF: '#8ff',      // 淡いシアン: 自機の状態変化
+       FRIENDLY: '#88f',  // 青紫: 味方（連邦艦）に関する報告
+       WARN: '#ff0',      // 黄: 警告・注意
+       DANGER: '#f00',    // 赤: 危険・致命
+       GOOD: '#0f0',      // 緑: 良好・安全
+       RETREAT: '#0f8',   // 青緑: 敵の撤退（こちらに有利な戦況変化）
+       ENEMY: '#f40',     // オレンジ: 敵に起きた出来事
+       PLAIN: '#fff',     // 白: 意味の色を持たせない告知
+     };
+
+     // ログの発信者。担当は Product Guidelines の一覧と1対1で対応する。
+     const SPEAKER = {
+       HELM: '操舵手',          // 移動・進路・コース変更
+       TACTICAL: '戦術士官',    // 攻撃・射程・敵の検知
+       ENGINE: '機関部',        // エネルギー・自機シールド
+       COMMS: '通信士',         // 味方（連邦艦）に関する報告
+       XO: '副長',              // 戦況全体の要約
+       BASE: '基地',            // 基地からの通信・ドッキング
+       COMMAND: '司令部',       // ミッションの成否
+       COMPUTER: 'コンピュータ', // 自動的な状況判定・緊急時の宣告
+     };
+
      // デバッグログの有効/無効切り替え。開発時に true にすると各種ログが出力される。
      const DEBUG = false;
 
@@ -555,7 +581,7 @@
       * @param {string} msg 表示するテキスト（空文字の場合はログを全消去）
       * @param {string} fg 文字色。緊急度を色で示すために使う
       */
-     function setMsg(from="", msg="", fg="#0ff") {
+     function setMsg(from="", msg="", fg=MSG_COLOR.INFO) {
        const el = document.getElementById('logStatus');
        
        // msgが空文字（ゲームオーバー時などの画面クリア命令）の場合は全消去
@@ -1391,7 +1417,7 @@
        // 基地に対するクリック操作
        onInteract(player, scene, endTurn) {
          if (player.is_docked) {
-           setMsg("基地", "ドッキング中");
+           setMsg(SPEAKER.BASE, "ドッキング中");
            endTurn();
            return true;
          }
@@ -1450,26 +1476,26 @@
 
          if (target === gameObjs.player && t_shield_p < 60) {
            if (t_shield_p > 30) {
-             setMsg("機関部", `シールド ${t_shield_p}% に低下`, "#ff0");
+             setMsg(SPEAKER.ENGINE, `シールド ${t_shield_p}% に低下`, MSG_COLOR.WARN);
            } else {
-             setMsg("機関部", `艦長！シールド ${t_shield_p}% 危険です！`, "#f00");
+             setMsg(SPEAKER.ENGINE, `艦長！シールド ${t_shield_p}% 危険です！`, MSG_COLOR.DANGER);
            }
            updateStatus();
          }
          if (target === gameObjs.starBase && t_shield_p < 60) {
-           setMsg("基地", `シールド ${t_shield_p}%、至急救援を求む！`, "#ff0");
+           setMsg(SPEAKER.BASE, `シールド ${t_shield_p}%、至急救援を求む！`, MSG_COLOR.WARN);
            if (t_shield_p <= 30) {
-             setMsg("基地", `シールド ${t_shield_p}%、至急救援を求む！`, "#f00");
+             setMsg(SPEAKER.BASE, `シールド ${t_shield_p}%、至急救援を求む！`, MSG_COLOR.DANGER);
            }
            updateStatus();
          }
          if (target.shield <= 0 && !gameState.isGameOver) {
            if (target === gameObjs.starBase) {
-             gameOver("基地", "シールド消失！基地が崩壊...");
+             gameOver(SPEAKER.BASE, "シールド消失！基地が崩壊...");
            } else if (target === gameObjs.player) {
-             gameOver("機関部", "シールド消失！ 船体が崩壊...");
+             gameOver(SPEAKER.ENGINE, "シールド消失！ 船体が崩壊...");
            } else if (target instanceof FederationShip) { // 【修正】配列比較のバグを解消
-             setMsg("通信士", "味方との通信が途絶えました", "#f00");
+             setMsg(SPEAKER.COMMS, "味方との通信が途絶えました", MSG_COLOR.DANGER);
              updateStatus();
            }
          }
@@ -1491,11 +1517,11 @@
        // 敵艦に対するクリック操作（攻撃）
        onInteract(player, scene, endTurn) {
          if (player.is_docked) {
-           setMsg("戦術士官", "ドッキング中のため兵器は使用できません。", "#ff0");
+           setMsg(SPEAKER.TACTICAL, "ドッキング中のため兵器は使用できません。", MSG_COLOR.WARN);
            return true;
          }
          if (player.energy < player.weapon.cost) {
-           setMsg("戦術士官", "エネルギー不足で攻撃できません！", "#f00");
+           setMsg(SPEAKER.TACTICAL, "エネルギー不足で攻撃できません！", MSG_COLOR.DANGER);
            return true;
          }
 
@@ -1504,20 +1530,20 @@
          const dist = Phaser.Math.Distance.Between(player.x, player.y, this.x, this.y);
 
          if (dist > player.weapon.MaxRange()) {
-           setMsg("戦術士官", "射程範囲外のため敵艦にダメージなし", "#ff0");
+           setMsg(SPEAKER.TACTICAL, "射程範囲外のため敵艦にダメージなし", MSG_COLOR.WARN);
            fireBeam(scene, player, this, 0x444444);
            endTurn();
            return true;
          }
          if (isLOSBlocked(player, this, false)) {
-           setMsg("戦術士官", "障害物に遮られました", "#ff0");
+           setMsg(SPEAKER.TACTICAL, "障害物に遮られました", MSG_COLOR.WARN);
            fireBeam(scene, player, this, 0x444444);
            endTurn();
            return true;
          }
 
          // 命中
-         //setMsg("戦術士官", "攻撃命中！ 敵艦シールド低下！", "#f80");
+         //setMsg(SPEAKER.TACTICAL, "攻撃命中！ 敵艦シールド低下！", "#f80");
          const damage = player.weapon.CalcDamage(dist);
          this.takeDamage(damage);
          fireBeam(scene, player, this, 0x00ffff);
@@ -1526,7 +1552,7 @@
            // 撃墜
            gameObjs.removeEnemy(this);
            spawnEnemy(scene, 0.8, 0.95);
-           setMsg("戦術士官", "敵艦を撃破！ 別の新たな敵艦を検知しました！", "#ff0");
+           setMsg(SPEAKER.TACTICAL, "敵艦を撃破！ 別の新たな敵艦を検知しました！", MSG_COLOR.WARN);
          }
          endTurn();
          return true;
@@ -1582,7 +1608,7 @@
        onAfterAttack(target) {
          if (!target.active) {
            gameObjs.removeEnemy(target);
-           setMsg("通信士", "連邦艦が敵艦を撃破しました！", "#f40");
+           setMsg(SPEAKER.COMMS, "連邦艦が敵艦を撃破しました！", MSG_COLOR.ENEMY);
            updateStatus();
          }
        } // onAfterAttack()
@@ -1662,20 +1688,20 @@
        onInteract(player, scene, endTurn) {
          const d_shield = PlayerShip.SHIELD_MAX - this.shield;
          if (d_shield <= 0) {
-           setMsg("機関部", "シールドはすでに最大です。", "#fff");
+           setMsg(SPEAKER.ENGINE, "シールドはすでに最大です。", MSG_COLOR.PLAIN);
            return true;
          }
 
          const energy_supply = Math.min(this.energy, d_shield);
          if (energy_supply <= 0) {
-           setMsg("機関部", "エネルギー不足により、シールドを補強できません！");
+           setMsg(SPEAKER.ENGINE, "エネルギー不足により、シールドを補強できません！");
            return true;
          }
 
          this.energy -= energy_supply;
          this.shield += energy_supply;
 
-         setMsg("機関部", `シールドアップ。エネルギー残り ${this.energy_p()}%`, "#8ff");
+         setMsg(SPEAKER.ENGINE, `シールドアップ。エネルギー残り ${this.energy_p()}%`, MSG_COLOR.SELF);
          endTurn();
          return true;
        } // onInteract()
@@ -2043,7 +2069,7 @@
        if (gameObjs.player.energy < PlayerShip.ENERGY_MIN && !gameObjs.player.is_docked) {
          updateStatus();
          gameOver(
-           "コンピュータ",
+           SPEAKER.COMPUTER,
            "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信し機体を放棄します..."
          );
          return;
@@ -2071,7 +2097,7 @@
        if (gameObjs.player.energy < PlayerShip.ENERGY_MIN && !gameObjs.player.is_docked) {
          updateStatus();
          gameOver(
-           "コンピュータ", "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信します..."
+           SPEAKER.COMPUTER, "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信します..."
          );
        }
      } // handlePointerDown()
@@ -2112,7 +2138,7 @@
          duration: 200,
          ease: 'Sine.easeInOut'
        });
-       setMsg("基地", "ドッキング完了。エネルギー補給開始。", "#0ff");
+       setMsg(SPEAKER.BASE, "ドッキング完了。エネルギー補給開始。", MSG_COLOR.INFO);
        updateStatus();
      } // dockShip()
 
@@ -2255,7 +2281,7 @@
        );
        const stuck = resolveStuckAvoidance(desiredX, desiredY, moveDist, resolved);
        if (stuck.cancelled) {
-         setMsg("操舵手", "障害物に接近しすぎてコース設定できません", "#0f0");
+         setMsg(SPEAKER.HELM, "障害物に接近しすぎてコース設定できません", MSG_COLOR.GOOD);
          updateStatus();
          return;
        }
@@ -2264,7 +2290,7 @@
        const speed_p = (actualDist / PlayerShip.SPEED * 100).toFixed(0);
        const cost = Math.max(1, Math.ceil(actualDist * PlayerShip.MOVE_COST_RATE));
        if ( gameObjs.player.energy - cost < 0 ) {
-         setMsg("機関部", "エネルギー不足です", '#ff0');
+         setMsg(SPEAKER.ENGINE, "エネルギー不足です", MSG_COLOR.WARN);
          updateStatus();
          return;
        }
@@ -2272,9 +2298,9 @@
        // コース変更時のメッセージ
        const shiftDist = Phaser.Math.Distance.Between(desiredX, desiredY, destX, destY);
        if (isRerouted) {
-         setMsg("操舵手", `障害物回避のためコース調整。推力 ${speed_p}%`, "#ff0");
+         setMsg(SPEAKER.HELM, `障害物回避のためコース調整。推力 ${speed_p}%`, MSG_COLOR.WARN);
        } else if (shiftDist > 5.0 && !target_is_base) {
-         setMsg("操舵手", `進路上に障害物。安全距離にて停止。推力 ${speed_p}%`, "#ff0");
+         setMsg(SPEAKER.HELM, `進路上に障害物。安全距離にて停止。推力 ${speed_p}%`, MSG_COLOR.WARN);
        }
        updateStatus();
 
@@ -2405,11 +2431,11 @@
        // dockShip() が即座に is_docked を立てるのと同じ扱い）。
        if (isDocking && !npc.is_docked) {
          npc.is_docked = true;
-         setMsg("通信士", "味方が基地にドッキングしました", "#88f");
+         setMsg(SPEAKER.COMMS, "味方が基地にドッキングしました", MSG_COLOR.FRIENDLY);
        } else if (npc.is_docked && !isDocking) {
          npc.is_docked = false;
          dest = pushOutFromBase(npc, dest);
-         setMsg("通信士", "味方が基地から発進しました", "#88f");
+         setMsg(SPEAKER.COMMS, "味方が基地から発進しました", MSG_COLOR.FRIENDLY);
        }
 
        npc.moveTo(dest.x, dest.y, TIMING.TURN_DELAY, () => {
@@ -2422,7 +2448,7 @@
          if (distFromCenter > AREA_R) {
            npc.die();
            if (npc instanceof FederationShip) {
-             setMsg("通信士", "味方が戦場から離脱しました", "#88f");
+             setMsg(SPEAKER.COMMS, "味方が戦場から離脱しました", MSG_COLOR.FRIENDLY);
              gameState.score -= SCORE.DESTROY_PENALTY;
            }
            if (npc instanceof EnemyShip) {
@@ -2431,9 +2457,9 @@
              });
              if (!gameState.isGameOver) {
                if (getActiveEnemyCount() > 0) {
-                 setMsg("副長", "敵艦が戦場から離脱しました", "#0f8");
+                 setMsg(SPEAKER.XO, "敵艦が戦場から離脱しました", MSG_COLOR.RETREAT);
                } else {
-                 setMsg("副長", "すべての敵艦が撤退しました！", "#ff0");
+                 setMsg(SPEAKER.XO, "すべての敵艦が撤退しました！", MSG_COLOR.WARN);
                }
              }
            }
@@ -2490,7 +2516,7 @@
            obj.spirit = Math.min(EnemyShip.SPIRIT.MAX, obj.spirit + EnemyShip.SPIRIT.STEP);
            debugLog(`finalizeEnemyTurn> obj.spirit up: ${obj.spirit.toFixed(3)}`);
          });
-         setMsg("戦術士官", "新たな敵を検知！", "#ff0")
+         setMsg(SPEAKER.TACTICAL, "新たな敵を検知！", MSG_COLOR.WARN)
        }
        if ( gameState.turn % NEW_FEDERATION_INTERVAL === 0 ) {
          // XXX TBD 連邦の援軍が出現する条件
@@ -2502,7 +2528,7 @@
            `qty_federation=${qty_federation}, qty_enemies=${qty_enemies}`
          );
          if ( qty_federation < qty_enemies / 2 ) {
-           setMsg("通信士", "味方が到着しました！", "#0f0");
+           setMsg(SPEAKER.COMMS, "味方が到着しました！", MSG_COLOR.GOOD);
            newFederationShip(scene, 0.8, 0.95);
          }
        }
@@ -2517,7 +2543,7 @@
 
        const enp = gameObjs.player.energy_p(); 
        if ( enp < 30 ) {
-         setMsg("機関部", `エネルギー残り ${enp}%`, "#ff0");
+         setMsg(SPEAKER.ENGINE, `エネルギー残り ${enp}%`, MSG_COLOR.WARN);
        }
        updateStatus();
 
@@ -2529,7 +2555,7 @@
       */
      function updateGaugeDisplay(valueElId, gaugeElId, value, max) {
        const ratio = value / max;
-       const color = ratio < 0.3 ? "#f00" : "#0f0";
+       const color = ratio < 0.3 ? MSG_COLOR.DANGER : MSG_COLOR.GOOD;
        document.getElementById(valueElId).style.color = color;
        document.getElementById(valueElId).textContent = value;
        document.getElementById(gaugeElId).style.width = (ratio * 100) + '%';
@@ -2550,10 +2576,10 @@
        document.getElementById('statusMission').textContent = `${gameState.curMission}`;
        document.getElementById('statusScore').textContent = `${gameState.score}`;
 
-       document.getElementById('statusFederationShipCount').style.color = "#ff0"
+       document.getElementById('statusFederationShipCount').style.color = MSG_COLOR.WARN
        document.getElementById('statusFederationShipCount').textContent = `${federationCount}`;
 
-       document.getElementById('statusEnemyShipCount').style.color = "#ff0"
+       document.getElementById('statusEnemyShipCount').style.color = MSG_COLOR.WARN
        document.getElementById('statusEnemyShipCount').textContent = `${enemyCount}`;
 
        updateGaugeDisplay('statusShipShield', 'gaugeShipShield', PlayerShield, PlayerShip.SHIELD_MAX);
@@ -2584,7 +2610,7 @@
 
        gameState.pendingScene = scene;
 
-       setMsg("司令部", `ミッション #${clearedMission} クリア`, '#fff');
+       setMsg(SPEAKER.COMMAND, `ミッション #${clearedMission} クリア`, MSG_COLOR.PLAIN);
        scene.time.delayedCall(
          TIMING.MISSION_OVER, () => showHighScoreOverlay(
            'missionclear', { clearedMission, bonus, list, newIdx }
@@ -2702,7 +2728,7 @@
 
        if (mode === 'missionclear') {
          const { clearedMission, bonus, list, newIdx } = data;
-         resultEl.style.color      = '#0f0';
+         resultEl.style.color      = MSG_COLOR.GOOD;
          resultEl.textContent      = `✓ MISSION #${clearedMission} CLEARED!`;
          finalEl.textContent       = `TURNS:${gameState.turn}, MISSION BONUS:+${bonus}, SCORE: ${gameState.score}`;
          renderHSTable(list);
@@ -2711,7 +2737,7 @@
          restartBtn.style.display  = 'inline-block';
        } else if (mode === 'gameover') {
          const { msgstr } = data;
-         resultEl.style.color      = '#ff0';
+         resultEl.style.color      = MSG_COLOR.WARN;
          resultEl.textContent      = msgstr;
          finalEl.textContent       = `MISSION FAILED: SCORE: ${gameState.score}  ` +
                                      `MISSION #${gameState.curMission}  TURNS: ${gameState.turn}`;
@@ -2720,7 +2746,7 @@
          restartBtn.textContent    = '▶ RESTART';
          restartBtn.style.display  = 'inline-block';
        } else {
-         resultEl.style.color      = '#0ff';
+         resultEl.style.color      = MSG_COLOR.INFO;
          resultEl.textContent      = '▶ HIGH SCORES ◀';
          finalEl.textContent       = `NOW — ` +
                                      `MISSION #${gameState.curMission} TURN: ${gameState.turn} - ` +
