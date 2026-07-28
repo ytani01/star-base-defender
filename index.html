@@ -126,8 +126,11 @@
        min-height: 0;
        min-width: 0;
        display: flex;             /* 追加: フレックスボックス化 */
-       justify-content: flex-start; /* 追加: 左詰め */
-       align-items: flex-start;     /* 追加: 上詰め */
+       /* 縦画面ではズームUIと宇宙域を縦に積む（横画面では下の @media で
+          横並びに戻し、ズームUIは重ねる） */
+       flex-direction: column;
+       justify-content: flex-start; /* 追加: 上詰め */
+       align-items: flex-start;     /* 追加: 左詰め */
        background: #000;          /* 余白部分を黒に */
      }
      #gameCanvas {
@@ -136,15 +139,28 @@
        max-width: 100%;
        max-height: 100%;
        aspect-ratio: 1 / 1;       /* 追加: 常に正方形を保つことで見切れと間延びを防止 */
+       /* 縦画面ではズームUIと高さを分け合う。height: 100% だけだと兄弟が
+          使った分を考慮せず、画面の下へはみ出す。flex-basis を 0 にして
+          「残っている分」を主サイズにする（Phaser は FIT なので、この
+          箱の中に正方形のキャンバスを収めてくれる） */
+       flex: 1 1 0;
+       min-height: 0;
+       min-width: 0;
      }
 
      #zoomUI {
-       position: absolute;
-       top: 10px;
-       left: 10px;
+       /* 縦画面では宇宙域の真上に横一列で置き、盤面に重ねない。
+          縦画面の宇宙域は画面の幅で大きさが決まるため、上に場所を取っても
+          高さに余裕がある限り宇宙域は痩せない（余裕のない小さな画面では
+          痩せる。横画面では逆に高さが宇宙域を決めるので重ねたままにする） */
        display: flex;
-       flex-direction: column;
+       flex-direction: row;
        gap: 10px;
+       padding: 6px 10px;
+       flex: 0 0 auto;
+       /* DOM 上はキャンバスの後ろにあるので、表示順だけ前に出す。
+          並べ替えのために DOM をいじると、横画面の重ね置きに影響する */
+       order: -1;
        z-index: 1000;
      }
      #zoomUI button {
@@ -284,6 +300,18 @@
      @media (orientation: landscape) {
        #gameContainer {
          flex-direction: row;
+       }
+       /* 横画面は画面の高さが宇宙域の大きさを決める。ズームUIを上に置くと
+          その分だけ宇宙域が直接痩せるため、盤面に重ねる形に戻す */
+       #gameWrapper {
+         flex-direction: row;
+       }
+       #zoomUI {
+         position: absolute;
+         top: 10px;
+         left: 10px;
+         flex-direction: column;
+         padding: 0;
        }
        #statusPanel {
          /* 横画面ではパネルの幅がそのまま宇宙域の幅を削るため、中身が必要と
