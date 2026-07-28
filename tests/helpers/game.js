@@ -38,6 +38,12 @@ async function openGame(page, options = {}) {
     };
   }, seed);
 
+  // ブラウザが勝手に要求する favicon を黙らせる。ゲームは画像を持たない
+  // ため必ず 404 になり、画面つきで実行したときだけコンソールにエラーが
+  // 出て結果が変わってしまう（ヘッドレスでは要求されない）。
+  await page.route('**/favicon.ico', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/x-icon', body: '' }));
+
   // 描画が間引かれるとゲームの時計が進まなくなるため、前面に出しておく
   await page.bringToFront();
   // クエリを付けてキャッシュを避ける
