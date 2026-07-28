@@ -380,7 +380,9 @@
 
      const QTY = {
        STAR: 30,
-       ENEMY: 3,
+       // ミッション1の敵の数。以降のミッションでは1隻ずつ増えるが、
+       // 現在の数は実行時の状態なので gameState.enemyQty が持つ。
+       ENEMY_INIT: 3,
      };
 
      const NEW_ENEMY_INTERVAL = 25;
@@ -404,7 +406,6 @@
        ZOOM_MAX: 4.0,
        STEP: 2.0,
      };
-     let CurZoom = 1.0;
 
      const SCORE = {
        INIT: 100,
@@ -442,13 +443,15 @@
          this.pendingScene = null;
          this.curScene = null;
          this.qtyFederationShip = 0;
+         // 現在のミッションで出現させる敵の数（ミッションごとに増える）
+         this.enemyQty = QTY.ENEMY_INIT;
+         // 現在のカメラ倍率
+         this.zoom = CAMERA.ZOOM_MIN;
        }
      } // class GameState
 
      // グローバルなゲーム進行状態インスタンス
      const gameState = new GameState();
-
-     let rangeGraphics, boundaryGraphics;
 
      // ---------------------------------------------------------
      // グローバルメソッド
@@ -496,9 +499,9 @@
       * 宇宙域境界の描画
       */
      function drawBoundary(){
-       boundaryGraphics.clear();
-       boundaryGraphics.lineStyle(2, 0x0088ff, 1);
-       boundaryGraphics.strokeCircle(AREA_CENTER.X, AREA_CENTER.Y, AREA_R);
+       gameObjs.boundaryGraphics.clear();
+       gameObjs.boundaryGraphics.lineStyle(2, 0x0088ff, 1);
+       gameObjs.boundaryGraphics.strokeCircle(AREA_CENTER.X, AREA_CENTER.Y, AREA_R);
      } // drawBoundary()
 
      /**
@@ -628,6 +631,9 @@
          this.federationShips = [];
          this.enemies = [];
          this.stars = [];
+         // 射程円・宇宙域の境界を描くための描画用オブジェクト
+         this.rangeGraphics = null;
+         this.boundaryGraphics = null;
        }
 
        findObjectAt(x, y) {
@@ -1331,8 +1337,8 @@
 
          // ドッキング状態
          if ( gameObjs.player.is_docked ) {
-           rangeGraphics.lineStyle(5, 0x02ffff, 1);
-           rangeGraphics.strokeCircle(
+           gameObjs.rangeGraphics.lineStyle(5, 0x02ffff, 1);
+           gameObjs.rangeGraphics.strokeCircle(
              gameObjs.starBase.x, gameObjs.starBase.y, StarBase.DOCKING_RANGE - 3
            );
          }
@@ -1636,22 +1642,22 @@
       * ズーム倍率変更
       */
      function changeZoom(scene, amount) {
-       let nextZoom = CurZoom;
+       let nextZoom = gameState.zoom;
        if (amount > 0) {
-         nextZoom = CurZoom * amount;
+         nextZoom = gameState.zoom * amount;
        } else if (amount < 0) {
-         nextZoom = CurZoom / -amount;
+         nextZoom = gameState.zoom / -amount;
        }
        
        // 最小倍率を 1.0 に強制固定（1倍以下はない）
-       CurZoom = Phaser.Math.Clamp(nextZoom, 1.0, CAMERA.ZOOM_MAX);
+       gameState.zoom = Phaser.Math.Clamp(nextZoom, CAMERA.ZOOM_MIN, CAMERA.ZOOM_MAX);
        
        // ターゲットの切り替えを実行
        updateCameraTarget(scene);
        
        scene.tweens.add({
          targets: scene.cameras.main,
-         zoom: CurZoom,
+         zoom: gameState.zoom,
          duration: 250,
          ease: 'Sine.easeInOut'
        });
@@ -1776,8 +1782,8 @@
       */
      function updateCameraTarget(scene) {
        // 1倍以下のズーム倍率は存在しないように制限
-       if (CurZoom <= 1.0) {
-         CurZoom = 1.0;
+       if (gameState.zoom <= CAMERA.ZOOM_MIN) {
+         gameState.zoom = CAMERA.ZOOM_MIN;
          // 1倍のときはスターベース（AREA_CENTER）を中心とし、追従を解除
          scene.cameras.main.stopFollow();
          scene.cameras.main.centerOn(AREA_CENTER.X, AREA_CENTER.Y);
@@ -1792,8 +1798,8 @@
       */
      function create() {
        gameState.curScene = this;
-       rangeGraphics = this.add.graphics();
-       boundaryGraphics = this.add.graphics();
+       gameObjs.rangeGraphics = this.add.graphics();
+       gameObjs.boundaryGraphics = this.add.graphics();
        drawBoundary();
 
        setMsg("", "");
@@ -1811,7 +1817,7 @@
 
        // Enemies
        gameObjs.enemies = [];
-       for (let i=0; i < QTY.ENEMY; i++) {
+       for (let i=0; i < gameState.enemyQty; i++) {
          spawnEnemy(this, 0.6, 0.9);
        }
 
@@ -1828,8 +1834,8 @@
        // Camera
        this.cameras.main.removeBounds();
        // 初期倍率を1.0倍とし、ターゲット切り替え関数を適用する
-       CurZoom = 1.0;
-       this.cameras.main.setZoom(CurZoom);
+       gameState.zoom = CAMERA.ZOOM_MIN;
+       this.cameras.main.setZoom(gameState.zoom);
        updateCameraTarget(this);
 
        updateStatus();
@@ -1851,7 +1857,7 @@
       * フレーム更新
       */
      function update() {
-       rangeGraphics.clear();
+       gameObjs.rangeGraphics.clear();
 
        // 障害物リストをコンテキストから取得するように変更
        const allObjects = [
@@ -1865,12 +1871,12 @@
            obj === gameObjs.player || obj instanceof FederationShip
          ) ? 0x00ffff : 0xffff00;
 
-         rangeGraphics.lineStyle(1, color, 0.5);
-         rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.EffectiveRange());
+         gameObjs.rangeGraphics.lineStyle(1, color, 0.5);
+         gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.EffectiveRange());
          
          if ( obj === gameObjs.player ) {  
-           rangeGraphics.lineStyle(1, color, 0.3);
-           rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.MaxRange());
+           gameObjs.rangeGraphics.lineStyle(1, color, 0.3);
+           gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.MaxRange());
          }
        });
 
@@ -2532,7 +2538,7 @@
        );
 
        gameState.curMission++;
-       QTY.ENEMY++;
+       gameState.enemyQty++;
        gameState.isPlayerTurn = false;
 
        gameState.pendingScene = scene;
@@ -2642,8 +2648,7 @@
            gameState.turn = 1;
            
            // 敵の初期生成数を、進行するステージに合わせて再計算
-           // (初期値3 + ステージ進行分)
-           QTY.ENEMY = 3 + (gameState.curMission - 1);
+           gameState.enemyQty = QTY.ENEMY_INIT + (gameState.curMission - 1);
            
            gameState.isGameOver = false;
            gameState.flagClear = false;
