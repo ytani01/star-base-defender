@@ -103,3 +103,6 @@ tests/test-results/
 tests/playwright-report/
 test-results/
 _baseline.html
+
+# 表示レイアウトの実測結果（layout-report.js の出力。そのつど作り直す）
+tests/layout-report/

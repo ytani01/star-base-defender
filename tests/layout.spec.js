@@ -1,6 +1,7 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
-const { openGame } = require('./helpers/game');
+const { openGame, fillLog, measureLayout: measure } = require('./helpers/game');
+const { SIZES } = require('./helpers/viewports');
 
 /**
  * 確認シナリオ「表示・操作環境」に対応するテスト。
@@ -8,57 +9,10 @@ const { openGame } = require('./helpers/game');
  * 宇宙域の見切れは、画面の縦横比によって出たり出なかったりする。
  * スマートフォンの横持ちだけを見ていると取りこぼすため、
  * 「画面の高さがステータス欄を除いた幅より大きい」比率を必ず含める。
+ *
+ * 画面サイズの一覧・ログの詰め方・計測は helpers 側に置いてある。
+ * 同じものを layout-report.js（実測レポート）も使う。
  */
-
-/** 確かめる画面サイズ。実機に多い比率と、不具合が出た比率を並べる */
-const SIZES = [
-  { w: 390, h: 844, label: 'スマートフォン縦' },
-  { w: 414, h: 896, label: 'スマートフォン縦（大）' },
-  { w: 360, h: 640, label: 'スマートフォン縦（小）' },
-  { w: 320, h: 568, label: 'スマートフォン縦（最小）' },
-  { w: 844, h: 390, label: 'スマートフォン横' },
-  { w: 896, h: 414, label: 'スマートフォン横（大）' },
-  { w: 640, h: 360, label: 'スマートフォン横（小）' },
-  { w: 768, h: 1024, label: 'タブレット縦' },
-  { w: 1024, h: 768, label: 'タブレット横' },
-  { w: 1280, h: 900, label: 'PC' },
-  { w: 1920, h: 1080, label: 'PC（広い）' },
-  { w: 500, h: 390, label: 'ウィンドウを狭めた状態' },
-];
-
-/** ステータス欄をログで満たす。実際に遊んだあとの状態に近づける */
-async function fillLog(page) {
-  await page.evaluate(() => {
-    for (let i = 0; i < LOG_MAX_LINES + 10; i++) {
-      setMsg(SPEAKER.TACTICAL, `表示確認のためのログ ${i}`, MSG_COLOR.INFO);
-    }
-  });
-}
-
-/** 画面上の配置を測る */
-async function measure(page) {
-  return page.evaluate(() => {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const rect = (sel) => {
-      const el = document.querySelector(sel);
-      const b = el.getBoundingClientRect();
-      return { left: b.left, top: b.top, right: b.right, bottom: b.bottom,
-               width: b.width, height: b.height };
-    };
-    return {
-      vw, vh,
-      canvas: rect('#gameCanvas canvas'),
-      panel: rect('#statusPanel'),
-      isLandscape: vw >= vh,
-      scrollWidth: document.documentElement.scrollWidth,
-      tapTargets: ['zoomIn', 'zoomOut'].map((id) => {
-        const b = document.getElementById(id).getBoundingClientRect();
-        return { id, w: b.width, h: b.height };
-      }),
-    };
-  });
-}
 
 test.describe('表示・操作環境', () => {
   for (const size of SIZES) {
@@ -146,24 +100,9 @@ test.describe('表示・操作環境', () => {
       await page.setViewportSize({ width: size.w, height: size.h });
       await openGame(page);
       await fillLog(page);
+      const m = await measure(page);
 
-      const wrapped = await page.evaluate(() => {
-        const panel = document.getElementById('statusPanel');
-        const rows = [...panel.children].filter(
-          (c) => c.id !== 'logStatus' && !c.classList.contains('status-header'));
-        // 折り返しようのない幅を与えたときの高さを1行分の基準にする
-        const keep = panel.style.width;
-        panel.style.width = '900px';
-        const oneLine = rows.map((c) => c.getBoundingClientRect().height);
-        panel.style.width = keep;
-        return rows
-          .map((c, i) => [c.textContent.trim().replace(/\s+/g, ' '),
-                          c.getBoundingClientRect().height > oneLine[i] + 2])
-          .filter(([, isWrapped]) => isWrapped)
-          .map(([text]) => text);
-      });
-
-      expect(wrapped, `${size.label}: 折り返した行がない`).toEqual([]);
+      expect(m.wrappedRows, `${size.label}: 折り返した行がない`).toEqual([]);
     }
   });
 

@@ -33,11 +33,19 @@ cd tests && npx playwright test layout          # ファイル名で絞り込む
 # 挙動を変えないはずの変更をしたとき、変更前と突き合わせる
 cd tests && node make-baseline.js HEAD~5 && npx playwright test regression
 
+# 表示の実測（各画面のパネル幅・宇宙域・折り返しを一覧にする）
+cd tests && node layout-report.js --out before   # 変更前を控える
+cd tests && node layout-report.js --compare before/report.json
+
 # 構文チェック（インラインスクリプトを抽出して node で検査）
 awk '/<script>/{flag=1; next} /<\/script>/{flag=0} flag' index.html > /tmp/extracted.js && node --check /tmp/extracted.js
 ```
 
 デバッグ時は `index.html` の `DEBUG` フラグ（既定 `false`）を `true` にすると `debugLog()` の出力が有効になる。
+
+表示を変えたときは Claude Code で `/layout-check` を使う（`.claude/skills/layout-check/`）。
+上の `layout-report.js` を、比べ方の手順つきで呼び出すもの。
+コミット前の規約の点検は `/rule-check`（`.claude/skills/rule-check/`）。
 
 テストを書くときの注意（実際につまずいた点。詳細は `conductor/tech-stack.md`）:
 
@@ -48,18 +56,19 @@ awk '/<script>/{flag=1; next} /<\/script>/{flag=0} flag' index.html > /tmp/extra
 
 ## 最重要ルール
 
-必ず `conductor/` 配下の規約に従うこと。特に違反しやすいもの:
+必ず `conductor/` 配下の規約に従うこと。特に違反しやすいもの
+（★ は `tests/source-rules.spec.js` が機械的に検査する。残りは `/rule-check` で見る）:
 
-- **`console.log()` を直接書かない。** 必ず `debugLog()` を使う
-- **`setTimeout` / `setInterval` を使わない。** 遅延実行は `scene.time.delayedCall()`、アニメーションは `scene.tweens`
+- ★ **`console.log()` を直接書かない。** 必ず `debugLog()` を使う
+- ★ **`setTimeout` / `setInterval` を使わない。** 遅延実行は `scene.time.delayedCall()`、アニメーションは `scene.tweens`
   （シーン再起動時に停止できず、前ミッションの処理が残るため）
-- **トップレベルの `let` を新設しない。** 状態は `gameState`（進行状態）か `gameObjs`（オブジェクト管理）に属させる
+- ★ **トップレベルの `let` を新設しない。** 状態は `gameState`（進行状態）か `gameObjs`（オブジェクト管理）に属させる
 - **`CONSTANT_CASE` は実行中に変化しない値のみ。** `const` オブジェクトのプロパティを実行時に書き換えない
 - **リファクタリングでゲームバランスの数値を変えない。** バランス調整は別コミット（`balance:`）にする
-- **プレイヤーの移動は意図的に `getAvoidanceVector()` を使わない。** NPC 処理と共通化する際に誤って追加しないこと
-- 中身のない `/** */` を残さない。JSDoc には「何をするか」でなく**「なぜそうするのか」**を書く
+- ★ **プレイヤーの移動は意図的に `getAvoidanceVector()` を使わない。** NPC 処理と共通化する際に誤って追加しないこと
+- ★ 中身のない `/** */` を残さない（「なぜ」が書けているかは ★ の対象外）。JSDoc には「何をするか」でなく**「なぜそうするのか」**を書く
 - 色は `:root` のカスタムプロパティ経由で参照する。色は装飾でなく**意味**を持つ（シアン=自軍 / 黄=警告 / 赤=危険 / 緑=良好 / オレンジ・マゼンタ=敵）
-- 高さ指定は `vh` フォールバックの直後に `dvh` を併記する。タップ対象は 48px 以上
+- ★ 高さ指定は `vh` フォールバックの直後に `dvh` を併記する。タップ対象は 48px 以上
 - ログの発信者名（操舵手・戦術士官・機関部・通信士・副長・基地・司令部・コンピュータ）は担当が決まっている（`conductor/product-guidelines.md`）
 
 ## `index.html` の構造
@@ -143,7 +152,7 @@ GameObj (座標・サイズを Phaser スプライトへ委譲。get x/y/r)
   （`v0.<機能追加>.<修正>`。挙動不変のリファクタリングのみなら上げなくてよい）
 
 変更したら自動テストを走らせ、確認シナリオのうち〈人〉の項目を実行する（`conductor/workflow.md`）。
-**モバイルの縦画面・横画面の確認を省略しない。**
+**モバイルの縦画面・横画面の確認を省略しない**（表示を変えたときは `/layout-check`）。
 不具合を直したときは、**その不具合を検出できるテストを追加し、修正前のコードで実際に失敗することを確かめる。**
 
 ## 参照すべき文書

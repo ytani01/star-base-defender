@@ -255,6 +255,67 @@ async function readStatusPanel(page) {
 }
 
 /**
+ * ステータス欄をログで満たす。実際に遊んだあとの状態に近づける。
+ *
+ * 起動直後のログが空の状態では、ステータス欄が本来より小さく出る。
+ * 表示を測るときは必ずこれを通してから測る。
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+async function fillLog(page) {
+  await page.evaluate(() => {
+    for (let i = 0; i < LOG_MAX_LINES + 10; i++) {
+      setMsg(SPEAKER.TACTICAL, `表示確認のためのログ ${i}`, MSG_COLOR.INFO);
+    }
+  });
+}
+
+/**
+ * 画面上の配置を測る。
+ *
+ * 折り返しの判定は、行の高さを「折り返しようのない幅を与えたときの高さ」と
+ * 比べて行う。行の高さにはゲージ（1em の inline-block）が効くため、
+ * 文字サイズから計算した見込みの行高と比べると誤判定する。
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+async function measureLayout(page) {
+  return page.evaluate(() => {
+    const rect = (sel) => {
+      const b = document.querySelector(sel).getBoundingClientRect();
+      return { left: b.left, top: b.top, right: b.right, bottom: b.bottom,
+               width: b.width, height: b.height };
+    };
+    const panel = document.getElementById('statusPanel');
+    const rows = [...panel.children].filter(
+      (c) => c.id !== 'logStatus' && !c.classList.contains('status-header'));
+    const keep = panel.style.width;
+    panel.style.width = '900px';
+    const oneLine = rows.map((c) => c.getBoundingClientRect().height);
+    panel.style.width = keep;
+
+    return {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      canvas: rect('#gameCanvas canvas'),
+      panel: rect('#statusPanel'),
+      isLandscape: window.innerWidth >= window.innerHeight,
+      scrollWidth: document.documentElement.scrollWidth,
+      // ヘッダはタイトルと著作権表示が折り返す設計（flex-wrap）なので除く
+      wrappedRows: rows
+        .map((c, i) => [c.textContent.trim().replace(/\s+/g, ' '),
+                        c.getBoundingClientRect().height > oneLine[i] + 2])
+        .filter(([, isWrapped]) => isWrapped)
+        .map(([text]) => text),
+      tapTargets: ['zoomIn', 'zoomOut'].map((id) => {
+        const b = document.getElementById(id).getBoundingClientRect();
+        return { id, w: b.width, h: b.height };
+      }),
+    };
+  });
+}
+
+/**
  * ログの最新行から順に取り出す。発信者と本文だけを見たい場合に使う。
  * @param {import('@playwright/test').Page} page
  * @param {number} [count]
@@ -315,6 +376,8 @@ module.exports = {
   snapshot,
   playScriptedTurns,
   readStatusPanel,
+  fillLog,
+  measureLayout,
   readLog,
   collectConsoleIssues,
 };
