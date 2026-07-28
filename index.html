@@ -110,7 +110,13 @@
      #gameWrapper {
        position: relative;
        flex: 1;
+       /* flex アイテムの既定は min-width / min-height: auto のため、中身の
+          最小サイズより小さくならない。宇宙域は正方形なので、横画面では
+          「画面の高さ」がそのまま最小幅として効いてしまい、ステータス欄を
+          除いた残り幅を超えて右へはみ出す。縦横どちらの並びでも縮められる
+          よう、両方を 0 にする。 */
        min-height: 0;
+       min-width: 0;
        display: flex;             /* 追加: フレックスボックス化 */
        justify-content: flex-start; /* 追加: 左詰め */
        align-items: flex-start;     /* 追加: 上詰め */
