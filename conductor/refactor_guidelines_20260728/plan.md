@@ -40,7 +40,7 @@
 
 ---
 
-## Phase 3: 定数と実行時状態の分離
+## Phase 3: 定数と実行時状態の分離 [checkpoint: c1fa9b0]
 
 コミット種別: `refactor:`
 
@@ -51,7 +51,7 @@
 - [x] Task: バージョン番号を `VERSION` 定数として JS 側に定義し、起動時に `.game-title` (305行) へ流し込む。現状は HTML にハードコードされており、リリースのたびに手で書き換えている 〔Workflow: バージョン更新〕 [f6e9471]
 - [x] Task: ゲーム状態のリセット処理を `GameState` のメソッドに集約する。現在はハイスコア行クリック (2544〜2567行) と RESTART ボタン (2617〜2628行) がそれぞれ個別に `gameState` を書き換えており、リセットする項目が食い違っている。`resetForNewMission()` / `resumeFrom(record)` を新設して呼び出し側から状態代入を無くす。**現状の挙動（`pendingScene` が無いときは `location.reload()` する等）は変えない** 〔JS: グローバル変数を増やさない（状態の所有者を明確にする）〕 [c25df00]
 - [x] Task: `create()` 内のイベント登録 (1810〜1811行) を `.onclick =` から `addEventListener` に統一する。※ `create()` は `scene.restart()` で再実行されるため、その場で置き換えるとハンドラが多重登録される。他のボタンと同じくトップレベルへ移した 〔HTML/CSS: 構造・見た目・振る舞いを混ぜない（一貫性）〕 [f6e9471]
-- [~] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md) [c1fa9b0]
 
 ---
 
