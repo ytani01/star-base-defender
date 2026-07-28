@@ -23,7 +23,7 @@ Playwright が使えない環境でも Phase 1 だけで価値が出る。
 
 ---
 
-## Phase 2: シナリオテストの基盤
+## Phase 2: シナリオテストの基盤 [checkpoint: 615c92c]
 
 コミット種別: `test:` / **ここで決定性を確保する。** ここが甘いと以降が信用できない。
 
@@ -31,7 +31,7 @@ Playwright が使えない環境でも Phase 1 だけで価値が出る。
 - [x] Task: テスト用のヘルパーを作る。`index.html` をキャッシュを避けて読み込み、起動前に `Math.random` を固定し、盤面が再現することを確かめる自己テストを含める 〔Tech Stack: シナリオテストを書くときの注意〕 [191a503]
 - [x] Task: ターンの進行を待つ仕組みを、実時間の待ちに頼らない形にする。ヘッドレスで描画が間引かれてもタイマーが進むこと。※ 演出と予約された処理が片付くまで待つ形にした 〔Tech Stack: 同上〕 [191a503]
 - [x] Task: 盤面と全オブジェクトの状態を取り出す関数を作る（座標・シールド・士気・ドッキング状態・スコア・ターン・ログ）〔spec: 変更前後の突き合わせ〕 [191a503]
-- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md) [615c92c]
 
 ---
 
