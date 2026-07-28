@@ -55,7 +55,7 @@
 
 ---
 
-## Phase 4: 意味のある名前を与える
+## Phase 4: 意味のある名前を与える [checkpoint: 76dc70c]
 
 コミット種別: `refactor:` / **表示される色・文言・閾値の数値は一切変えない。**
 
@@ -66,7 +66,7 @@
 - [x] Task: 報告の閾値に名前を与える。`EnemyShip.onAfterAttack()` (1376〜1390行) の `60` / `30`、`finalizeEnemyTurn()` (2391行) のエネルギー警告 `30` を定数化する 〔JS: 同上〕 [2caf342]
 - [x] Task: 移動判定の閾値に名前を与える。`resolveMovement()` (973行) と `resolveStuckAvoidance()` (2108行) の「ほぼ動けていない」判定 `10`、直進で足りるとみなす比率 `0.95` (946 / 990行) を定数化する。**値そのものは変えない**。※ `clampDest()` の停止マージン `1.5` は `SpaceShip.STOP_MARGIN` として実施済み [1d57cea] 〔JS: 同上〕 [2caf342]
 - [x] Task: `setMsg()` のログ保持行数 `50` (550行) を定数化する 〔JS: 同上〕 [2caf342]
-- [~] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md) [76dc70c]
 
 ---
 
