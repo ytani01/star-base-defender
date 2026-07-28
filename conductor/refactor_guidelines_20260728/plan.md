@@ -29,14 +29,14 @@
 
 ---
 
-## Phase 2: 潜在的な不具合の修正
+## Phase 2: 潜在的な不具合の修正 [checkpoint: 6dcaf47]
 
 コミット種別: `fix:` / **Phase 1 とは別コミットにする**（種別が異なるため）。
 
 - [x] Task: `gameOver()` (2478行) の `setTimeout()` を `scene.time.delayedCall()` に置き換える。現状はシーン再起動時に停止できず、前のミッションのハイスコア画面が後から開く可能性がある。`nextMission()` (2460行) は既に `delayedCall` を使っており、そちらに合わせる。※ `gameOver()` は scene を受け取っていないため、`gameState.curScene` を経由するか引数を追加する 〔JS: Phaser の作法 — setTimeout / setInterval を使わない〕 [233d094]
 - [x] Task: `saveHighScore()` (2508行) の `localStorage.setItem()` を `try` / `catch` で保護する。プライベートブラウジングや容量超過で例外が飛ぶと、ミッションクリア処理が中断する。読み込み側 `loadHighScores()` (2482行) は既に保護されている 〔Tech Stack: 読み込みは必ず失敗を想定します〕 [39703da]
 - [x] Task: `renderHSTable()` (2527行) の `s.gameid == GAME_ID` を `===` にする。両辺とも文字列のため結果は変わらない 〔JS §4: Always use identity operators〕 [4f39a4f]
-- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md) [6dcaf47]
 
 ---
 
@@ -64,7 +64,7 @@
 - [ ] Task: ビームの色 (1370 / 1496 / 1431 / 1446行) を各クラスの `static` プロパティまたは色定数へ移す。外した弾の `0x444444` も含める 〔JS: マジックナンバーを置かない / Product Guidelines: 色は意味を持たせる〕
 - [ ] Task: シールド表示の閾値に名前を与える。`ObjWithShield.update()` (795 / 798行) の `0.5` / `0.25`、`updateGaugeDisplay()` (2404行) の `0.3` を定数化する 〔JS: マジックナンバーを置かない〕
 - [ ] Task: 報告の閾値に名前を与える。`EnemyShip.onAfterAttack()` (1376〜1390行) の `60` / `30`、`finalizeEnemyTurn()` (2391行) のエネルギー警告 `30` を定数化する 〔JS: 同上〕
-- [ ] Task: 移動判定の閾値に名前を与える。`resolveMovement()` (973行) と `resolveStuckAvoidance()` (2108行) の「ほぼ動けていない」判定 `10`、`clampDest()` (923行) の停止マージン `1.5`、直進で足りるとみなす比率 `0.95` (946 / 990行) を定数化する。**値そのものは変えない** 〔JS: 同上〕
+- [ ] Task: 移動判定の閾値に名前を与える。`resolveMovement()` (973行) と `resolveStuckAvoidance()` (2108行) の「ほぼ動けていない」判定 `10`、直進で足りるとみなす比率 `0.95` (946 / 990行) を定数化する。**値そのものは変えない**。※ `clampDest()` の停止マージン `1.5` は `SpaceShip.STOP_MARGIN` として実施済み [1d57cea] 〔JS: 同上〕
 - [ ] Task: `setMsg()` のログ保持行数 `50` (550行) を定数化する 〔JS: 同上〕
 - [ ] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
 
@@ -75,7 +75,7 @@
 コミット種別: `refactor:` / **本 Track で最もデリケートなフェーズ。1タスクごとに動作確認する。**
 
 - [ ] Task: `NPCShip.getFleeThreats()` を新設し、`npcMove()` (2264〜2267行) の逃走時の脅威判定から `instanceof` 分岐を除く。敵艦は「自機と基地」から、連邦艦は「敵艦」から逃げる 〔JS: 艦種による分岐〕
-- [ ] Task: `NPCShip.canDockAtBase()` を新設し（既定 `false`、`FederationShip` で `true`）、`npcMove()` (2251行) の分岐を置き換える 〔JS: 同上〕
+- [ ] Task: `NPCShip.canDockAtBase()` を新設し（既定 `false`、`FederationShip` で `true`）、`npcMove()` の分岐を置き換える。※ ドッキング修正 [b142ad0 / b5e0272] で `instanceof` は `canUseDock` 変数に集約済み。この変数をメソッド化する作業になる 〔JS: 同上〕
 - [ ] Task: `NPCShip.onLeaveArea()` を新設し、`npcMove()` (2296〜2311行) の宇宙域離脱時処理（連邦艦＝メッセージと減点、敵艦＝残存艦の士気低下とメッセージ）を各クラスへ移す。**減点値・士気の増減値は変えない** 〔JS: 同上〕
 - [ ] Task: `npcMove()` (2244〜2334行、約90行) を「移動先の決定」と「移動完了後の後処理」に分割する（例: `resolveNpcDestination()` / `onNpcMoveComplete()`）〔JS: 呼び出し側を単純に保つ〕
 - [ ] Task: 「連邦側かどうか」の判定を `isFriendly()` メソッドに切り出す（`GameObj` 既定 `false`、`PlayerShip` / `FederationShip` で `true`）。`fireBeam()` (2191行) と `update()` (1835〜1837行) の重複した判定式を置き換える 〔JS: 艦種による分岐〕
