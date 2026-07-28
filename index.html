@@ -1397,8 +1397,12 @@
        } // onAfterAttack()
 
        // --- 敵艦のターゲット候補 ---
+       // ドッキング中の艦は基地の中にいるため狙わない（攻撃は基地が受ける）
        getPotentialTargets() {
-         const targets = [gameObjs.starBase, ...gameObjs.federationShips];
+         const targets = [
+           gameObjs.starBase,
+           ...gameObjs.federationShips.filter(f => !f.is_docked),
+         ];
          if (!gameObjs.player.is_docked) {
            targets.push(gameObjs.player);
          }
@@ -1481,6 +1485,9 @@
            FederationShip.SHIELD_MAX, FederationShip.SHIELD_COLOR, SCALE,
            FederationShip.WEAPON.POWER, FederationShip.WEAPON.AREA_R
          );
+
+         // 自機と同じく、基地に入渠している間は攻撃せず、敵にも狙われない
+         this.is_docked = false;
        }
 
        /**
@@ -2250,9 +2257,11 @@
 
        if (context.isFleeing) {
          npcMove(scene, npc, context);
-       } else if (context.canAttack) {
+       } else if (context.canAttack && !npc.is_docked) {
          npc.attack(context.target, context.distToTarget);
        } else {
+         // ドッキング中は自機と同じく兵器を使用できないため、攻撃したい
+         // 状況ならまずドックを出る（npcMove() が押し出しを行う）
          npcMove(scene, npc, context);
        }
      } // execNPCAction()
@@ -2271,9 +2280,9 @@
          && isAdjacentToBase(npc, base);
 
        if (context.isFleeing) {
-         // 連邦艦はすでに基地に接していれば、移動せずドッキング（回復）する
+         // 連邦艦はすでに基地に接していれば、自機と同じくドックへ入る
          if (dockableNow) {
-           dest = { x: npc.x, y: npc.y };
+           dest = { x: base.x, y: base.y };
            isDocking = true;
          }
 
@@ -2293,8 +2302,8 @@
            const targetDest = { x: context.target.x, y: context.target.y};
            dest = npc.calculateDestination(targetDest, context.isFleeing);
          } else if (dockableNow) {
-           // ターゲットがおらず、すでに基地に接していればドッキング（回復）する
-           dest = { x: npc.x, y: npc.y };
+           // ターゲットがおらず、すでに基地に接していればドックへ入る
+           dest = { x: base.x, y: base.y };
            isDocking = true;
          } else {
            // ターゲットがいなければ基地へ向かう（接する位置で自然に停止する）
@@ -2302,6 +2311,18 @@
            dest = npc.calculateDestination(targetDest, context.isFleeing);
          }
        } // if (context.isFleeing)
+
+       // 入渠・発進の状態遷移。敵の標的選定はターン中に参照されるため、
+       // 移動の完了を待たずにこの時点でフラグを切り替える（自機の
+       // dockShip() が即座に is_docked を立てるのと同じ扱い）。
+       if (isDocking && !npc.is_docked) {
+         npc.is_docked = true;
+         setMsg("通信士", "味方が基地にドッキングしました", "#88f");
+       } else if (npc.is_docked && !isDocking) {
+         npc.is_docked = false;
+         dest = pushOutFromBase(npc, dest);
+         setMsg("通信士", "味方が基地から発進しました", "#88f");
+       }
 
        npc.moveTo(dest.x, dest.y, TIMING.TURN_DELAY, () => {
          npc.x = Math.floor(npc.x);
