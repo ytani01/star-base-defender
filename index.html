@@ -762,14 +762,20 @@
          this.federationShips.push(ship);
        }
 
-       // 衝突判定や描画ループで使用する障害物リストを生成
-       getObstacles(ignoreObj = null) {
+       /**
+        * 移動の妨げになるものの一覧。動く側から見れば「自分以外のすべて」
+        * なので艦種で場合分けはせず、除外したいものを ignore で渡す。
+        * @param {Array<GameObj>=} ignore 障害物とみなさないもの（通常は自分自身）
+        * @return {Array<GameObj>} 生存している障害物
+        */
+       getObstacles(ignore = []) {
          return [
            this.starBase,
            ...this.stars,
            ...this.enemies,
-           ...this.federationShips
-         ].filter(o => o && o.active && o !== ignoreObj);
+           ...this.federationShips,
+           this.player,
+         ].filter(o => o && o.active && !ignore.includes(o));
        }
      } // GameObjs
 
@@ -1007,18 +1013,9 @@
          const startX = this.x;
          const startY = this.y;
 
-         const targets = [
-           gameObjs.starBase,
-           ...gameObjs.federationShips,
-           ...gameObjs.enemies,
-           ...gameObjs.stars
-         ].filter(
-           e => e && e.active && e !== this && !ignoreObjs.includes(e)
-         );
-
-         if (this instanceof FederationShip || this instanceof EnemyShip) {
-           targets.push(gameObjs.player);
-         }
+         // 自分自身は障害物にならない。自機が呼んだ場合も、ここで自機が
+         // 除かれるため艦種による場合分けは要らない。
+         const targets = gameObjs.getObstacles([this, ...ignoreObjs]);
 
          const dx = destX - startX;
          const dy = destY - startY;
