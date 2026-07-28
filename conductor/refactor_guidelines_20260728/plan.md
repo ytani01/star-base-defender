@@ -93,11 +93,11 @@
 
 コミット種別: `refactor:` / **テストの導入は行わない。** 将来導入できる状態を作る。
 
-- [ ] Task: 武器の威力減衰 (`Weapon.Effectiveness()` / `CalcDamage()` / `MaxRange()`) が、グローバル状態を参照しない純粋な計算になっていることを確認し、そうでない箇所があれば引数経由に改める 〔Tech Stack: テスト導入の条件〕
-- [ ] Task: 幾何計算（`intersectSegmentCircle()` 1897行 / `hasObstacleOnPath()` 1914行）が `gameObjs` に依存しないことを確認する。`isLOSBlocked()` (1931行) はグローバル参照を含むため、純粋部分と分ける 〔Tech Stack: 同上〕
-- [ ] Task: スコア増減のロジックを、`gameState` を直接書き換える形から「増減値を返す関数 + 適用箇所」に整理する。`takeDamage()` (838行) / `npcMove()` (2298行) / `finalizeEnemyTurn()` (2353〜2354行) / `nextMission()` (2441行) に散在している 〔Tech Stack: 同上 / Product Guide: スコアの考え方〕
-- [ ] Task: 切り出した純粋関数群を `<script>` 内の1箇所にまとめ、「ここはグローバル状態に依存しない」とコメントで明示する 〔Tech Stack: 同上〕
-- [ ] Task: Conductor - User Manual Verification 'Phase 6' (Protocol in workflow.md)
+- [x] Task: 武器の威力減衰 (`Weapon.Effectiveness()` / `CalcDamage()` / `MaxRange()`) が、グローバル状態を参照しない純粋な計算になっていることを確認し、そうでない箇所があれば引数経由に改める。※ 確認の結果、元から純粋だったため変更なし 〔Tech Stack: テスト導入の条件〕 [f16e5b9]
+- [x] Task: 幾何計算（`intersectSegmentCircle()` 1897行 / `hasObstacleOnPath()` 1914行）が `gameObjs` に依存しないことを確認する。`isLOSBlocked()` (1931行) はグローバル参照を含むため、純粋部分と分ける（`isPathBlockedBy()` として切り出し）〔Tech Stack: 同上〕 [f16e5b9]
+- [x] Task: スコア増減のロジックを、`gameState` を直接書き換える形から「増減値を返す関数 + 適用箇所」に整理する。`takeDamage()` (838行) / `npcMove()` (2298行) / `finalizeEnemyTurn()` (2353〜2354行) / `nextMission()` (2441行) に散在している。※ 適用側は `GameState.addScore()` に集約 〔Tech Stack: 同上 / Product Guide: スコアの考え方〕 [f16e5b9]
+- [x] Task: 切り出した純粋関数群を `<script>` 内の1箇所にまとめ、「ここはグローバル状態に依存しない」とコメントで明示する 〔Tech Stack: 同上〕 [f16e5b9]
+- [~] Task: Conductor - User Manual Verification 'Phase 6' (Protocol in workflow.md)
 
 ---
 
