@@ -2509,10 +2509,17 @@
        const newIdx = list.findIndex(s => s._new);
        list = list.slice(0, HIGHSCORE.MAX_ENTRIES);
        const madeIt = list.some(s => s._new);
-       localStorage.setItem(
-         HIGHSCORE.STORAGE_KEY,
-         JSON.stringify(list.map(({ _new, ...rest }) => rest))
-       );
+       // プライベートブラウジングや容量超過で setItem は例外を投げる。
+       // 保存に失敗してもミッションクリアの処理は続行させる（記録が
+       // 残らないだけで、ゲームは破綻しない）。
+       try {
+         localStorage.setItem(
+           HIGHSCORE.STORAGE_KEY,
+           JSON.stringify(list.map(({ _new, ...rest }) => rest))
+         );
+       } catch (e) {
+         debugLog('saveHighScore> failed to save:', e);
+       }
        return { list, newIdx: madeIt ? newIdx : -1 };
      }
 
