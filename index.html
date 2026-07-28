@@ -215,36 +215,48 @@
        inset: 0;
        background: rgba(0, 0, 20, 0.5);
        z-index: 9999;
-       align-items: center;
-       justify-content: center;
+       /* 画面より縦に長くなったときに読み進められるようにする。
+          これがないと、はみ出した先にある RESTART ボタンへ到達できない */
+       overflow-y: auto;
+       padding: clamp(4px, 1.5vh, 12px);
+       box-sizing: border-box;
        font-family: var(--font-mono);
      }
      #hsPanel {
        border: 2px solid var(--color-primary);
-       padding: 28px 32px;
-       min-width: 500px;
+       padding: clamp(10px, min(4vw, 3vh), 28px) clamp(12px, 4vw, 32px);
+       /* 画面が狭いときは中身の都合より画面幅を優先する。
+          min-width を素通しにすると、狭い端末で左右が切れて読めなくなる */
+       min-width: min(500px, 100%);
        max-width: 800px;
-       width: 92%;
+       width: 100%;
+       /* padding と border を幅に含める。含めないと min-width の 500px に
+          左右の padding と border が上乗せされ、指定より太くなる */
+       box-sizing: border-box;
+       /* 中央寄せに align-items / justify-content ではなく auto マージンを使う。
+          flex の中央寄せは、中身が容器より大きいとき上端側がはみ出して
+          スクロールしても戻れなくなる。auto マージンならはみ出さない */
+       margin: auto;
        background: rgba(8, 8, 32, 0.5);
        box-shadow: 0 0 40px rgba(0,255,255,0.9);
      }
      #hsResultMsg {
        text-align: center;
-       font-size: clamp(28px, 5vw, 40px);
+       font-size: clamp(20px, min(5vw, 7vh), 40px);
        letter-spacing: 3px;
        margin: 0 0 6px 0;
      }
      #hsFinalMsg {
        color: #8df;
        text-align: center;
-       font-size: clamp(24px, 2.5vw, 40px);
-       margin: 0 0 16px 0;
-       padding-bottom: 14px;
+       font-size: clamp(14px, min(2.5vw, 3.4vh), 32px);
+       margin: 0 0 clamp(6px, 1.8vh, 16px) 0;
+       padding-bottom: clamp(6px, 1.6vh, 14px);
        border-bottom: 1px solid rgba(0,255,255,0.25);
      }
      .hs-heading {
        color: var(--color-primary);
-       font-size: clamp(28px, 3.5vw, 40px);
+       font-size: clamp(18px, min(3.5vw, 5vh), 40px);
        letter-spacing: 2px;
        margin-bottom: 8px;
      }
@@ -254,13 +266,13 @@
      #hsTable {
        width: 100%;
        border-collapse: collapse;
-       font-size: clamp(24px, 3.2vw, 30px);
+       font-size: clamp(15px, min(3.2vw, 4.2vh), 30px);
        color: #9cf;
        min-width: 260px;
      }
      #hsTable th,
      #hsTable td {
-       padding: 6px;
+       padding: clamp(2px, 0.8vh, 6px) 6px;
        white-space: nowrap;
      }
      #hsTable th {
@@ -285,18 +297,18 @@
        color: #444;
        text-align: center;
        padding: 14px;
-       font-size: clamp(24px, 2.2vw, 40px);
+       font-size: clamp(16px, min(2.2vw, 3vh), 40px);
      }
      #hsBtns {
        display: flex;
        gap: 12px;
        justify-content: center;
-       margin-top: 20px;
+       margin-top: clamp(8px, 2.2vh, 20px);
        flex-wrap: wrap;
      }
      .hs-btn {
        padding: 11px 20px;
-       font-size: clamp(24px, 2.8vw, 40px);
+       font-size: clamp(16px, min(2.8vw, 3.6vh), 40px);
        background: rgba(0, 100, 200, 0.3);
        color: var(--color-primary);
        border: 2px solid var(--color-primary);

@@ -180,3 +180,86 @@ test.describe('表示・操作環境', () => {
     expect(log.scrollable, 'スクロールしてさかのぼれる').toBe(true);
   });
 });
+
+/**
+ * 記録を仕込んでハイスコア画面を開く。
+ * 5件は上限（HIGHSCORE.MAX_ENTRIES）いっぱいで、最も縦に長くなる状態。
+ */
+async function openHighScores(page) {
+  await page.evaluate(() => {
+    localStorage.setItem('starbaseDefenderScores', JSON.stringify([
+      { score: 1250, turn: 32, mission: 5, date: '2026-07-29' },
+      { score: 980, turn: 28, mission: 4, date: '2026-07-29' },
+      { score: 760, turn: 21, mission: 3, date: '2026-07-28' },
+      { score: 540, turn: 18, mission: 2, date: '2026-07-28' },
+      { score: 320, turn: 12, mission: 1, date: '2026-07-27' },
+    ]));
+    gameState.score = 1250;
+    gameState.turn = 32;
+    gameState.curMission = 5;
+    showHighScoreOverlay('gameover', { msgstr: '✗ BASE DESTROYED' });
+  });
+}
+
+test.describe('ハイスコア画面', () => {
+  test('どの画面でも左右が切れない', async ({ page }) => {
+    // 幅の指定に画面幅より大きい下限を置くと、狭い端末で両端が切れて
+    // 順位も日付も読めなくなる。表そのものは横スクロールできるが、
+    // パネルの外枠がはみ出してしまうと、そこへ手が届かない
+    for (const size of SIZES) {
+      await page.setViewportSize({ width: size.w, height: size.h });
+      await openGame(page);
+      await openHighScores(page);
+
+      const m = await page.evaluate(() => {
+        const b = document.getElementById('hsPanel').getBoundingClientRect();
+        return { left: b.left, right: b.right, vw: window.innerWidth,
+                 scrollWidth: document.documentElement.scrollWidth };
+      });
+      expect(m.left, `${size.label}: 左が切れていない`).toBeGreaterThanOrEqual(-1);
+      expect(m.right, `${size.label}: 右が切れていない`).toBeLessThanOrEqual(m.vw + 1);
+      expect(m.scrollWidth, `${size.label}: 横スクロールが出ていない`)
+        .toBeLessThanOrEqual(m.vw + 1);
+    }
+  });
+
+  test('画面に収まらないときは縦にスクロールして最後まで読める', async ({ page }) => {
+    // 収まらないこと自体は許すが、はみ出した先にある RESTART ボタンへ
+    // 到達できないと、そこで詰んでしまう
+    for (const size of SIZES) {
+      await page.setViewportSize({ width: size.w, height: size.h });
+      await openGame(page);
+      await openHighScores(page);
+
+      const m = await page.evaluate(() => {
+        const ov = document.getElementById('highScoreOverlay');
+        const panel = document.getElementById('hsPanel').getBoundingClientRect();
+        return {
+          overflows: ov.scrollHeight > ov.clientHeight + 1,
+          overflowY: getComputedStyle(ov).overflowY,
+          // 上端が画面の外へ出ていると、スクロールしても戻れない
+          panelTop: panel.top,
+          scrollTop: ov.scrollTop,
+        };
+      });
+      if (m.overflows) {
+        expect(['auto', 'scroll'], `${size.label}: 縦にスクロールできる`)
+          .toContain(m.overflowY);
+      }
+      expect(m.panelTop - m.scrollTop, `${size.label}: 上端が画面の外へ出ていない`)
+        .toBeGreaterThanOrEqual(-1);
+    }
+  });
+
+  test('ボタンがタップできる大きさを保っている', async ({ page }) => {
+    for (const size of SIZES) {
+      await page.setViewportSize({ width: size.w, height: size.h });
+      await openGame(page);
+      await openHighScores(page);
+
+      const h = await page.evaluate(
+        () => document.getElementById('hsRestartBtn').getBoundingClientRect().height);
+      expect(h, `${size.label}: RESTART ボタンの高さ`).toBeGreaterThanOrEqual(48);
+    }
+  });
+});
