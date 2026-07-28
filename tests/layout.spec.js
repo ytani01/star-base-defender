@@ -121,6 +121,52 @@ test.describe('表示・操作環境', () => {
     }
   });
 
+  test('横画面でステータス欄の幅が画面幅に追従する', async ({ page }) => {
+    // 横画面のパネルは宇宙域の幅をそのまま削る。固定幅にすると
+    // 狭い画面ほど宇宙域が痩せるため、画面に応じて詰まること自体を確かめる。
+    const widthAt = async (w, h) => {
+      await page.setViewportSize({ width: w, height: h });
+      await openGame(page);
+      await fillLog(page);
+      return (await measure(page)).panel.width;
+    };
+
+    const narrow = await widthAt(640, 360);
+    const wide = await widthAt(1920, 1080);
+
+    expect(narrow, `狭い横画面(640x360)のほうがパネルが細い（広い方は ${wide}）`)
+      .toBeLessThan(wide);
+  });
+
+  test('横画面でステータス欄の行が折り返さない', async ({ page }) => {
+    // 幅を詰めた結果、ラベルと数値が泣き別れては読めない。
+    // 「宇宙域を広げる」より「読めること」が優先だという線引きを固定する。
+    // ヘッダはタイトルと著作権表示が折り返す設計（flex-wrap）なので除く。
+    for (const size of SIZES.filter((s) => s.w >= s.h)) {
+      await page.setViewportSize({ width: size.w, height: size.h });
+      await openGame(page);
+      await fillLog(page);
+
+      const wrapped = await page.evaluate(() => {
+        const panel = document.getElementById('statusPanel');
+        const rows = [...panel.children].filter(
+          (c) => c.id !== 'logStatus' && !c.classList.contains('status-header'));
+        // 折り返しようのない幅を与えたときの高さを1行分の基準にする
+        const keep = panel.style.width;
+        panel.style.width = '900px';
+        const oneLine = rows.map((c) => c.getBoundingClientRect().height);
+        panel.style.width = keep;
+        return rows
+          .map((c, i) => [c.textContent.trim().replace(/\s+/g, ' '),
+                          c.getBoundingClientRect().height > oneLine[i] + 2])
+          .filter(([, isWrapped]) => isWrapped)
+          .map(([text]) => text);
+      });
+
+      expect(wrapped, `${size.label}: 折り返した行がない`).toEqual([]);
+    }
+  });
+
   test('ズームボタンがタップできる大きさを保っている', async ({ page }) => {
     for (const size of SIZES) {
       await page.setViewportSize({ width: size.w, height: size.h });
