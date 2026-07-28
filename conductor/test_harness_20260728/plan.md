@@ -35,14 +35,14 @@ Playwright が使えない環境でも Phase 1 だけで価値が出る。
 
 ---
 
-## Phase 3: 基本操作とターン進行のテスト
+## Phase 3: 基本操作とターン進行のテスト [checkpoint: d7a62b2]
 
 コミット種別: `test:` / 確認シナリオの項目と1対1で対応させる。
 
 - [x] Task: 基本操作（6項目）。移動と障害物の手前での停止、迂回、攻撃の命中／射程外／障害物あり、シールド回復、ドッキング、ドッキング中の攻撃不可と解除時の押し出し（9件） [84ef62d]
 - [x] Task: ターン進行と戦況（7項目）。行動の順番、撃破時の減点と新たな敵の出現、撤退と士気の低下、敵の増援、連邦艦の増援、連邦艦のドッキング、逃走した敵の復帰（8件） [84ef62d]
 - [x] Task: コンソールにエラー・警告が出ないことを、上記のテスト全体で確かめる [84ef62d]
-- [~] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md) [d7a62b2]
 
 ---
 
