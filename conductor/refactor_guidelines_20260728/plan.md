@@ -44,14 +44,14 @@
 
 コミット種別: `refactor:`
 
-- [ ] Task: `QTY.ENEMY` を「初期値の定数」と「現在値の状態」に分ける。`gameState.enemyQty` を新設し、`nextMission()` の `QTY.ENEMY++` (2454行) とハイスコア再開時の `QTY.ENEMY = 3 + (...)` (2553行) を状態側の更新に変更する。`create()` (1785行) の参照も合わせる 〔JS: 定数と実行時状態を混ぜない / const オブジェクトを実行時に書き換えない〕
-- [ ] Task: 上記に伴い、2553行のマジックナンバー `3` を初期値の定数参照に置き換える 〔JS: マジックナンバーを置かない〕
-- [ ] Task: トップレベルの `let CurZoom` (420行) を `gameState` へ移す。命名も `CONSTANT_CASE` から `lowerCamelCase` にする 〔JS: グローバル変数を増やさない / §6 Naming〕
-- [ ] Task: トップレベルの `let rangeGraphics, boundaryGraphics` (464行) を `gameObjs` の管理下に移す 〔JS: グローバル変数を増やさない〕
-- [ ] Task: バージョン番号を `VERSION` 定数として JS 側に定義し、起動時に `.game-title` (305行) へ流し込む。現状は HTML にハードコードされており、リリースのたびに手で書き換えている 〔Workflow: バージョン更新〕
-- [ ] Task: ゲーム状態のリセット処理を `GameState` のメソッドに集約する。現在はハイスコア行クリック (2544〜2567行) と RESTART ボタン (2617〜2628行) がそれぞれ個別に `gameState` を書き換えており、リセットする項目が食い違っている。`resetForNewMission()` / `resumeFrom(record)` を新設して呼び出し側から状態代入を無くす。**現状の挙動（`pendingScene` が無いときは `location.reload()` する等）は変えない** 〔JS: グローバル変数を増やさない（状態の所有者を明確にする）〕
-- [ ] Task: `create()` 内のイベント登録 (1810〜1811行) を `.onclick =` から `addEventListener` に統一する。ファイル内の他の登録箇所 (2613 / 2617 / 2630行) は `addEventListener` を使っている 〔HTML/CSS: 構造・見た目・振る舞いを混ぜない（一貫性）〕
-- [ ] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
+- [x] Task: `QTY.ENEMY` を「初期値の定数」と「現在値の状態」に分ける。`gameState.enemyQty` を新設し、`nextMission()` の `QTY.ENEMY++` (2454行) とハイスコア再開時の `QTY.ENEMY = 3 + (...)` (2553行) を状態側の更新に変更する。`create()` (1785行) の参照も合わせる 〔JS: 定数と実行時状態を混ぜない / const オブジェクトを実行時に書き換えない〕 [a471350]
+- [x] Task: 上記に伴い、2553行のマジックナンバー `3` を初期値の定数参照に置き換える 〔JS: マジックナンバーを置かない〕 [a471350]
+- [x] Task: トップレベルの `let CurZoom` (420行) を `gameState` へ移す。命名も `CONSTANT_CASE` から `lowerCamelCase` にする 〔JS: グローバル変数を増やさない / §6 Naming〕 [a471350]
+- [x] Task: トップレベルの `let rangeGraphics, boundaryGraphics` (464行) を `gameObjs` の管理下に移す 〔JS: グローバル変数を増やさない〕 [a471350]
+- [x] Task: バージョン番号を `VERSION` 定数として JS 側に定義し、起動時に `.game-title` (305行) へ流し込む。現状は HTML にハードコードされており、リリースのたびに手で書き換えている 〔Workflow: バージョン更新〕 [f6e9471]
+- [x] Task: ゲーム状態のリセット処理を `GameState` のメソッドに集約する。現在はハイスコア行クリック (2544〜2567行) と RESTART ボタン (2617〜2628行) がそれぞれ個別に `gameState` を書き換えており、リセットする項目が食い違っている。`resetForNewMission()` / `resumeFrom(record)` を新設して呼び出し側から状態代入を無くす。**現状の挙動（`pendingScene` が無いときは `location.reload()` する等）は変えない** 〔JS: グローバル変数を増やさない（状態の所有者を明確にする）〕 [c25df00]
+- [x] Task: `create()` 内のイベント登録 (1810〜1811行) を `.onclick =` から `addEventListener` に統一する。※ `create()` は `scene.restart()` で再実行されるため、その場で置き換えるとハンドラが多重登録される。他のボタンと同じくトップレベルへ移した 〔HTML/CSS: 構造・見た目・振る舞いを混ぜない（一貫性）〕 [f6e9471]
+- [~] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
 
 ---
 
