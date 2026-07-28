@@ -26,6 +26,8 @@
 star-base-defender/
 ├── index.html          # ゲーム本体。HTML・CSS・JS の全てがこの1ファイルに入る
 ├── README.md           # プレイヤー向けの遊び方説明
+├── tests.html          # 計算のテスト。ブラウザで開くだけ（依存なし）
+├── tests/              # シナリオテスト（Playwright、開発時のみ）
 ├── conductor/          # 開発のための文書群（このディレクトリ）
 ├── docs/               # スクリーンショット・デモ動画・未実装アイデア (TBD.md)
 └── archives/           # 完了・棄却した計画文書の保管場所
@@ -44,11 +46,11 @@ star-base-defender/
 
 ### 進行中
 
-- [test_harness_20260728](./test_harness_20260728/index.md) — 確認シナリオを2層で自動化する（全7フェーズ）
-- [refactor_guidelines_20260728](./refactor_guidelines_20260728/index.md) — `conductor/` の規約に対する `index.html` の乖離を解消する（全8フェーズ）。Phase 6 まで完了。**Phase 7 は自動テストの整備後に再開する**
+- [refactor_guidelines_20260728](./refactor_guidelines_20260728/index.md) — `conductor/` の規約に対する `index.html` の乖離を解消する（全8フェーズ）。Phase 6 まで完了
 
 ### 完了・保管済み
 
+- [test_harness_20260728](./archive/test_harness_20260728/index.md) — 確認シナリオを2層（`tests.html` と Playwright）で自動化
 - [refactor_config_20260706](./archive/refactor_config_20260706/index.md) — 設定値を `OBJ_CONF.*` から各クラスの static プロパティへ移行
 
 ### Track 化していない計画文書

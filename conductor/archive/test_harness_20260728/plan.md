@@ -78,18 +78,18 @@ Playwright が使えない環境でも Phase 1 だけで価値が出る。
 
 ---
 
-## Phase 7: 文書の更新
+## Phase 7: 文書の更新 [checkpoint: 9ee2aeb]
 
 コミット種別: `docs:`
 
 - [x] Task: `conductor/workflow.md` の確認シナリオの各項目に、自動化済みかどうかの印を付ける。人が確かめるべき項目（実機スマホ・効果音・ブラウザ差異）を明示する。※ ズームの追従と `DEBUG` の出力も自動化していないため〈人〉とした [75ea25a]
 - [x] Task: テストの動かし方を書く（`tests.html` は開くだけ、シナリオテストはコマンド）。置き場所は `conductor/workflow.md` と `CLAUDE.md` [75ea25a]
 - [x] Task: `完了の定義` に、変更内容に対応する自動テストが通っていることを加える [75ea25a]
-- [~] Task: Conductor - User Manual Verification 'Phase 7' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 7' (Protocol in workflow.md) [9ee2aeb]
 
 ---
 
 ## 完了後
 
-- [ ] Task: `metadata.json` の `status` を `done` に更新する
-- [ ] Task: この Track を `conductor/archive/` へ移動し、`conductor/index.md` の Tracks 一覧を更新する
+- [x] Task: `metadata.json` の `status` を `done` に更新する
+- [x] Task: この Track を `conductor/archive/` へ移動し、`conductor/index.md` の Tracks 一覧を更新する
