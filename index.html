@@ -461,6 +461,9 @@
        ZOOM_MIN: 1.0,
        ZOOM_MAX: 4.0,
        STEP: 2.0,
+       // これ以上動かしたらクリックではなくスクロール操作とみなす（画面上の距離）。
+       // 指で押すと数 px はぶれるため、0 にするとタップが取れなくなる
+       DRAG_THRESHOLD: 10,
      };
 
      const SCORE = {
@@ -576,6 +579,9 @@
          this.enemyQty = QTY.ENEMY_INIT;
          // 現在のカメラ倍率
          this.zoom = CAMERA.ZOOM_MIN;
+         // ズーム中のドラッグスクロール。lastX / lastY は画面座標で、
+         // 1回のポインタ操作の間だけ意味を持つ
+         this.pan = { isDragging: false, lastX: 0, lastY: 0 };
        }
 
        /**
@@ -650,6 +656,28 @@
          t2: (-b + sqrtDisc) / (2 * a),
        };
      } // intersectSegmentCircle()
+
+     /**
+      * カメラの中心を宇宙域の内側へ丸める。
+      *
+      * ドラッグでいくらでもスクロールできると盤面を画面の外まで送ってしまい、
+      * どちらへ戻せばよいか分からなくなる。中心が宇宙域から出ないようにすれば、
+      * 端まで送っても盤面の半分は残る。
+      *
+      * @return {{x:number, y:number}} 丸めたあとの中心
+      */
+     function clampCameraCenter(x, y) {
+       const dx = x - AREA_CENTER.X;
+       const dy = y - AREA_CENTER.Y;
+       const dist = Math.hypot(dx, dy);
+       if (dist <= AREA_R) {
+         return { x, y };
+       }
+       return {
+         x: AREA_CENTER.X + (dx / dist) * AREA_R,
+         y: AREA_CENTER.Y + (dy / dist) * AREA_R,
+       };
+     } // clampCameraCenter()
 
      /**
       * src から dst への線分が obj に遮られるか。
@@ -2205,10 +2233,16 @@
        gameState.zoom = CAMERA.ZOOM_MIN;
        this.cameras.main.setZoom(gameState.zoom);
        updateCameraTarget(this);
+       // ドラッグの途中でシーンが作り直された場合に、その状態を持ち越さない
+       gameState.pan.isDragging = false;
 
        updateStatus();
 
+       // 行動の確定は pointerup。押した瞬間に確定させると、スクロールする
+       // つもりで触れただけで自機が動いてしまう
        this.input.on('pointerdown', handlePointerDown, this);
+       this.input.on('pointermove', handlePointerMove, this);
+       this.input.on('pointerup', handlePointerUp, this);
 
        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
          const zoomAmount = deltaY > 0 ? -CAMERA.STEP : CAMERA.STEP;
@@ -2322,11 +2356,72 @@
      } // checkEnergyDepleted()
 
      /**
+      * ポインタを押した時点の記録。
+      * 行動を起こすかスクロールにするかは、離すまで動いた量で決まるため、
+      * ここでは判断しない。
+      */
+     function handlePointerDown(pointer) {
+       gameState.pan.isDragging = false;
+       gameState.pan.lastX = pointer.x;
+       gameState.pan.lastY = pointer.y;
+     } // handlePointerDown()
+
+     /**
+      * ドラッグによる宇宙域のスクロール。
+      *
+      * 1倍のときは全体が見えているので動かさない。追従したままでは毎フレーム
+      * 自機へ引き戻されてスクロールが打ち消されるため、スクロールに変わった
+      * 時点で追従を切る。追従へ戻すのはズーム操作のとき（updateCameraTarget）。
+      */
+     function handlePointerMove(pointer) {
+       if (!pointer.isDown || gameState.zoom <= CAMERA.ZOOM_MIN) {
+         return;
+       }
+       if (pointer.getDistance() < CAMERA.DRAG_THRESHOLD) {
+         return;
+       }
+
+       const cam = this.cameras.main;
+       if (!gameState.pan.isDragging) {
+         gameState.pan.isDragging = true;
+         cam.stopFollow();
+         // しきい値を超えた地点を起点にする。押した位置から測ると、
+         // スクロールの始まりにしきい値のぶんだけ画面が飛ぶ
+         gameState.pan.lastX = pointer.x;
+         gameState.pan.lastY = pointer.y;
+         return;
+       }
+
+       // 差分は画面上の距離なので、倍率で割ってワールドの距離に直す
+       const next = clampCameraCenter(
+         cam.midPoint.x - (pointer.x - gameState.pan.lastX) / cam.zoom,
+         cam.midPoint.y - (pointer.y - gameState.pan.lastY) / cam.zoom
+       );
+       cam.centerOn(next.x, next.y);
+       gameState.pan.lastX = pointer.x;
+       gameState.pan.lastY = pointer.y;
+     } // handlePointerMove()
+
+     /**
+      * ポインタを離した時点で、行動を起こすかどうかを決める。
+      * 動いた量がしきい値を超えていればスクロール操作だったとみなし、
+      * 行動は起こさない（スクロールのつもりで自機が動くのを防ぐ）。
+      */
+     function handlePointerUp(pointer) {
+       const wasDragging = gameState.pan.isDragging;
+       gameState.pan.isDragging = false;
+       if (wasDragging || pointer.getDistance() >= CAMERA.DRAG_THRESHOLD) {
+         return;
+       }
+       handlePointerTap.call(this, pointer);
+     } // handlePointerUp()
+
+     /**
       * クリック（タップ）操作の受け口。
       * 「何をクリックしたか」だけで行動が決まる設計のため、まず対象オブジェクトへ
       * 処理を委ね、どこからも処理されなかった場合にのみ移動へフォールバックする。
       */
-     function handlePointerDown(pointer) {
+     function handlePointerTap(pointer) {
        if (gameState.isGameOver || !gameState.isPlayerTurn) return;
 
        // 宇宙域外は無視
@@ -2366,7 +2461,7 @@
        checkEnergyDepleted(
          "エネルギー枯渇により航行不能。緊急遭難ビーコンを発信します..."
        );
-     } // handlePointerDown()
+     } // handlePointerTap()
 
      /**
       * 指定した艦が基地に接触している（ドッキング可能な距離にいる）かどうかを判定する。

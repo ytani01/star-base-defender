@@ -1,7 +1,8 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 const {
-  openGame, waitForPlayerTurn, snapshot, clickWorld, readLog, readStatusPanel,
+  openGame, waitForPlayerTurn, snapshot, clickWorld, dragScreen, readLog,
+  readStatusPanel, waitForIdle,
 } = require('./helpers/game');
 
 /**
@@ -368,5 +369,130 @@ test.describe('基本操作', () => {
            'ドッキングが解除された').toBe(false);
     expect((await readStatusPanel(page)).docked,
            '0隻に戻る').toBe('0');
+  });
+});
+
+/**
+ * ズームを指定の倍率まで上げ、カメラが落ち着くまで待つ。
+ * changeZoom() は tween で寄せるため、直後に測ると途中の値が取れる。
+ */
+async function zoomTo(page, zoom) {
+  await page.evaluate((z) => {
+    while (gameState.zoom < z) {
+      changeZoom(gameState.curScene, CAMERA.STEP);
+    }
+  }, zoom);
+  await waitForIdle(page);
+}
+
+/** カメラが今どこを見ているか */
+async function cameraCenter(page) {
+  return page.evaluate(() => {
+    const cam = gameState.curScene.cameras.main;
+    return { x: cam.midPoint.x, y: cam.midPoint.y, following: !!cam._follow };
+  });
+}
+
+test.describe('ズーム中のスクロール', () => {
+  test('ズーム中にドラッグすると宇宙域がスクロールする', async ({ page }) => {
+    await openGame(page);
+    await clearField(page);
+    await zoomTo(page, 2);
+
+    const before = await cameraCenter(page);
+    expect(before.following, 'ドラッグ前は自機を追っている').toBe(true);
+
+    // 画面中央から左へ引く。カメラは引いた向きと逆（右）へ動く
+    const box = await page.evaluate(() => {
+      const r = document.querySelector('#gameCanvas canvas').getBoundingClientRect();
+      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    });
+    await dragScreen(page, { x: box.cx, y: box.cy }, { x: box.cx - 120, y: box.cy });
+
+    const after = await cameraCenter(page);
+    expect(after.x, '引いた向きと逆へ動く').toBeGreaterThan(before.x + 1);
+    expect(after.following, 'スクロール中は追従が外れる').toBe(false);
+  });
+
+  test('ドラッグしても自機は動かない', async ({ page }) => {
+    // この機能で最も壊してはいけない点。スクロールのつもりの操作で
+    // 自機が動くと、ターンを1つ無駄にすることになる
+    await openGame(page);
+    await clearField(page);
+    await zoomTo(page, 2);
+
+    const before = await snapshot(page);
+    const box = await page.evaluate(() => {
+      const r = document.querySelector('#gameCanvas canvas').getBoundingClientRect();
+      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    });
+    await dragScreen(page, { x: box.cx, y: box.cy }, { x: box.cx - 120, y: box.cy });
+
+    const after = await snapshot(page);
+    expect(after.player.x, '自機の位置が変わらない').toBe(before.player.x);
+    expect(after.player.y, '自機の位置が変わらない').toBe(before.player.y);
+    expect(after.turn, 'ターンが進まない').toBe(before.turn);
+    expect(await page.evaluate(() => gameState.isPlayerTurn),
+           'プレイヤーのターンのまま').toBe(true);
+  });
+
+  test('ズーム1倍ではドラッグしてもスクロールしない', async ({ page }) => {
+    // 全体が見えているので動かす必要がない
+    await openGame(page);
+    await clearField(page);
+
+    const before = await cameraCenter(page);
+    const box = await page.evaluate(() => {
+      const r = document.querySelector('#gameCanvas canvas').getBoundingClientRect();
+      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    });
+    await dragScreen(page, { x: box.cx, y: box.cy }, { x: box.cx - 120, y: box.cy });
+
+    const after = await cameraCenter(page);
+    expect(after.x, 'カメラは動かない').toBeCloseTo(before.x, 1);
+    expect(after.y, 'カメラは動かない').toBeCloseTo(before.y, 1);
+  });
+
+  test('スクロールしたあと、ズーム操作で自機の追従に戻る', async ({ page }) => {
+    await openGame(page);
+    await clearField(page);
+    await zoomTo(page, 2);
+
+    const box = await page.evaluate(() => {
+      const r = document.querySelector('#gameCanvas canvas').getBoundingClientRect();
+      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    });
+    await dragScreen(page, { x: box.cx, y: box.cy }, { x: box.cx - 120, y: box.cy });
+    expect((await cameraCenter(page)).following, '追従が外れている').toBe(false);
+
+    await zoomTo(page, 4);
+    expect((await cameraCenter(page)).following, 'ズーム操作で追従に戻る').toBe(true);
+  });
+
+  test('宇宙域の外までスクロールできない', async ({ page }) => {
+    // 際限なくスクロールできると盤面を見失う。中心が宇宙域から出ないよう
+    // 制限しておけば、端まで送っても盤面の半分は残る
+    await openGame(page);
+    await clearField(page);
+    await zoomTo(page, 2);
+
+    const box = await page.evaluate(() => {
+      const r = document.querySelector('#gameCanvas canvas').getBoundingClientRect();
+      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, left: r.left };
+    });
+    // 何度も大きく引いて、行けるところまで送る
+    for (let i = 0; i < 6; i++) {
+      await dragScreen(page, { x: box.cx + 150, y: box.cy },
+                       { x: box.left + 5, y: box.cy });
+    }
+
+    const dist = await page.evaluate(() => {
+      const cam = gameState.curScene.cameras.main;
+      return Phaser.Math.Distance.Between(
+        cam.midPoint.x, cam.midPoint.y, AREA_CENTER.X, AREA_CENTER.Y);
+    });
+    const areaR = await page.evaluate(() => AREA_R);
+    expect(dist, '宇宙域の外へは出ない').toBeLessThanOrEqual(areaR + 1);
+    expect(dist, '端まで送れてはいる').toBeGreaterThan(areaR * 0.5);
   });
 });

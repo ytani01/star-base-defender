@@ -135,6 +135,29 @@ async function clickWorld(page, worldPos) {
 }
 
 /**
+ * 画面上をドラッグする。宇宙域のスクロールを起こすために使う。
+ *
+ * 座標がゲーム内ではなく画面上なのは、スクロールするとゲーム内の座標と
+ * 画面上の位置の対応が動くため。「画面のここからここへ指を引く」という
+ * 操作をそのまま書けるようにしてある。
+ *
+ * steps を入れないと途中の pointermove が飛ばず、押して離しただけの
+ * 扱いになってスクロールが起きない。
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {{x: number, y: number}} from 画面座標
+ * @param {{x: number, y: number}} to 画面座標
+ * @param {number} [steps]
+ */
+async function dragScreen(page, from, to, steps = 12) {
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps });
+  await page.mouse.up();
+  await waitForIdle(page);
+}
+
+/**
  * 盤面の全状態を取り出す。変更前後の突き合わせにも使うため、
  * 見た目に出るものは一通り含める。
  * @param {import('@playwright/test').Page} page
@@ -382,6 +405,7 @@ module.exports = {
   waitForPlayerTurn,
   toScreen,
   clickWorld,
+  dragScreen,
   snapshot,
   playScriptedTurns,
   readStatusPanel,
