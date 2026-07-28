@@ -74,18 +74,18 @@
 
 コミット種別: `refactor:` / **本 Track で最もデリケートなフェーズ。1タスクごとに動作確認する。**
 
-- [ ] Task: `NPCShip.getFleeThreats()` を新設し、`npcMove()` (2264〜2267行) の逃走時の脅威判定から `instanceof` 分岐を除く。敵艦は「自機と基地」から、連邦艦は「敵艦」から逃げる 〔JS: 艦種による分岐〕
-- [ ] Task: `NPCShip.canDockAtBase()` を新設し（既定 `false`、`FederationShip` で `true`）、`npcMove()` の分岐を置き換える。※ ドッキング修正 [b142ad0 / b5e0272] で `instanceof` は `canUseDock` 変数に集約済み。この変数をメソッド化する作業になる 〔JS: 同上〕
-- [ ] Task: `NPCShip.onLeaveArea()` を新設し、`npcMove()` (2296〜2311行) の宇宙域離脱時処理（連邦艦＝メッセージと減点、敵艦＝残存艦の士気低下とメッセージ）を各クラスへ移す。**減点値・士気の増減値は変えない** 〔JS: 同上〕
-- [ ] Task: `npcMove()` (2244〜2334行、約90行) を「移動先の決定」と「移動完了後の後処理」に分割する（例: `resolveNpcDestination()` / `onNpcMoveComplete()`）〔JS: 呼び出し側を単純に保つ〕
-- [ ] Task: 「連邦側かどうか」の判定を `isFriendly()` メソッドに切り出す（`GameObj` 既定 `false`、`PlayerShip` / `FederationShip` で `true`）。`fireBeam()` (2191行) と `update()` (1835〜1837行) の重複した判定式を置き換える 〔JS: 艦種による分岐〕
-- [ ] Task: `SpaceShip.clampDest()` (882〜893行) が自前で組み立てている障害物リストを、`GameObjs.getObstacles()` (670行) に統合する。`getObstacles({ ignore, includePlayer })` のようにオプション化する。リストの順序は結果に影響しない（最小 `t` を求めるだけ）〔JS: 不要なものを残さない（未参照メソッドの解消）〕
-- [ ] Task: 上記に伴い `clampDest()` (891行) の `instanceof FederationShip || instanceof EnemyShip` を `instanceof NPCShip` に置き換える（両クラスとも `NPCShip` を継承しており等価）〔JS: 艦種による分岐〕
-- [ ] Task: `GameObjs.purgeInactive()` を新設し、`finalizeEnemyTurn()` (2340行) の配列直接書き換え `gameObjs.enemies = gameObjs.enemies.filter(...)` を置き換える。配列の書き換えを `GameObjs` の中に閉じる 〔JS: 状態の所有者を明確にする〕
-- [ ] Task: `finalizeEnemyTurn()` (2353 / 2371行) の生の `filter(e => e.active).length` を、既存の `getActiveEnemyCount()` (480行) に置き換える 〔JS: 重複の排除〕
-- [ ] Task: `handlePointerDown()` のエネルギー枯渇チェック (1960〜1967行 / 1988〜1993行) を共通のヘルパーに集約する。差はメッセージ文言のみ。**2種類の文言はそのまま維持する** 〔JS: 重複の排除〕
-- [ ] Task: `spirit` / `fear()` / `isFleeing()` を `ObjWithShield` (778 / 824 / 831行) から `NPCShip` へ移す。現状は `StarBase` と `PlayerShip` も継承しているが、これらが士気を使うことはない 〔JS: 振る舞いの差はクラス側に持たせる〕
-- [ ] Task: Conductor - User Manual Verification 'Phase 5' (Protocol in workflow.md)
+- [x] Task: `NPCShip.getFleeThreats()` を新設し、`npcMove()` (2264〜2267行) の逃走時の脅威判定から `instanceof` 分岐を除く。敵艦は「自機と基地」から、連邦艦は「敵艦」から逃げる 〔JS: 艦種による分岐〕 [44f3c1a]
+- [x] Task: `NPCShip.canDockAtBase()` を新設し（既定 `false`、`FederationShip` で `true`）、`npcMove()` の分岐を置き換える。※ ドッキング修正 [b142ad0 / b5e0272] で `instanceof` は `canUseDock` 変数に集約済み。この変数をメソッド化する作業になる 〔JS: 同上〕 [44f3c1a]
+- [x] Task: `NPCShip.onLeaveArea()` を新設し、`npcMove()` (2296〜2311行) の宇宙域離脱時処理（連邦艦＝メッセージと減点、敵艦＝残存艦の士気低下とメッセージ）を各クラスへ移す。**減点値・士気の増減値は変えない** 〔JS: 同上〕 [44f3c1a]
+- [x] Task: `npcMove()` (2244〜2334行、約90行) を「移動先の決定」と「移動完了後の後処理」に分割する（例: `resolveNpcDestination()` / `onNpcMoveComplete()`）〔JS: 呼び出し側を単純に保つ〕 [bfba497]
+- [x] Task: 「連邦側かどうか」の判定を `isFriendly()` メソッドに切り出す（`GameObj` 既定 `false`、`PlayerShip` / `FederationShip` で `true`）。`fireBeam()` (2191行) と `update()` (1835〜1837行) の重複した判定式を置き換える 〔JS: 艦種による分岐〕 [44f3c1a]
+- [x] Task: `SpaceShip.clampDest()` (882〜893行) が自前で組み立てている障害物リストを、`GameObjs.getObstacles()` (670行) に統合する。`getObstacles({ ignore, includePlayer })` のようにオプション化する。リストの順序は結果に影響しない（最小 `t` を求めるだけ）。※ 実装では `includePlayer` を設けず、`ignore` に自分自身を渡す形にした（動く側から見た障害物は常に「自分以外のすべて」のため）〔JS: 不要なものを残さない（未参照メソッドの解消）〕 [f3f33e9]
+- [x] Task: 上記に伴い `clampDest()` (891行) の `instanceof FederationShip || instanceof EnemyShip` を置き換える。※ `ignore` に自分自身を渡す設計にしたことで、`instanceof` 自体が不要になった 〔JS: 艦種による分岐〕 [f3f33e9]
+- [x] Task: `GameObjs.purgeInactive()` を新設し、`finalizeEnemyTurn()` (2340行) の配列直接書き換え `gameObjs.enemies = gameObjs.enemies.filter(...)` を置き換える。配列の書き換えを `GameObjs` の中に閉じる 〔JS: 状態の所有者を明確にする〕 [9ba658f]
+- [x] Task: `finalizeEnemyTurn()` (2353 / 2371行) の生の `filter(e => e.active).length` を、既存の `getActiveEnemyCount()` (480行) に置き換える 〔JS: 重複の排除〕 [9ba658f]
+- [x] Task: `handlePointerDown()` のエネルギー枯渇チェック (1960〜1967行 / 1988〜1993行) を共通のヘルパーに集約する。差はメッセージ文言のみ。**2種類の文言はそのまま維持する** 〔JS: 重複の排除〕 [9ba658f]
+- [x] Task: `spirit` / `fear()` / `isFleeing()` を `ObjWithShield` (778 / 824 / 831行) から `NPCShip` へ移す。現状は `StarBase` と `PlayerShip` も継承しているが、これらが士気を使うことはない 〔JS: 振る舞いの差はクラス側に持たせる〕 [9ba658f]
+- [~] Task: Conductor - User Manual Verification 'Phase 5' (Protocol in workflow.md)
 
 ---
 
