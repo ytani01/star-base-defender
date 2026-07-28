@@ -126,11 +126,8 @@
        min-height: 0;
        min-width: 0;
        display: flex;             /* 追加: フレックスボックス化 */
-       /* 縦画面ではズームUIと宇宙域を縦に積む（横画面では下の @media で
-          横並びに戻し、ズームUIは重ねる） */
-       flex-direction: column;
-       justify-content: flex-start; /* 追加: 上詰め */
-       align-items: flex-start;     /* 追加: 左詰め */
+       justify-content: flex-start; /* 追加: 左詰め */
+       align-items: flex-start;     /* 追加: 上詰め */
        background: #000;          /* 余白部分を黒に */
      }
      #gameCanvas {
@@ -139,29 +136,45 @@
        max-width: 100%;
        max-height: 100%;
        aspect-ratio: 1 / 1;       /* 追加: 常に正方形を保つことで見切れと間延びを防止 */
-       /* 縦画面ではズームUIと高さを分け合う。height: 100% だけだと兄弟が
-          使った分を考慮せず、画面の下へはみ出す。flex-basis を 0 にして
-          「残っている分」を主サイズにする（Phaser は FIT なので、この
-          箱の中に正方形のキャンバスを収めてくれる） */
+       /* ズームUIと縦に並ぶ場合に高さを分け合う。height: 100% だけだと
+          兄弟が使った分を考慮せず、画面の下へはみ出す。flex-basis を 0 に
+          して「残っている分」を主サイズにする（Phaser は FIT なので、
+          この箱の中に正方形のキャンバスを収めてくれる） */
        flex: 1 1 0;
        min-height: 0;
        min-width: 0;
      }
 
+     /* 既定は盤面への重ね置き。場所を取らないので宇宙域を絶対に狭めない */
      #zoomUI {
-       /* 縦画面では宇宙域の真上に横一列で置き、盤面に重ねない。
-          縦画面の宇宙域は画面の幅で大きさが決まるため、上に場所を取っても
-          高さに余裕がある限り宇宙域は痩せない（余裕のない小さな画面では
-          痩せる。横画面では逆に高さが宇宙域を決めるので重ねたままにする） */
+       position: absolute;
+       top: 10px;
+       left: 10px;
        display: flex;
-       flex-direction: row;
+       flex-direction: column;
        gap: 10px;
-       padding: 6px 10px;
-       flex: 0 0 auto;
-       /* DOM 上はキャンバスの後ろにあるので、表示順だけ前に出す。
-          並べ替えのために DOM をいじると、横画面の重ね置きに影響する */
-       order: -1;
        z-index: 1000;
+     }
+
+     /* 縦長で高さに余裕がある画面だけ、盤面に重ねず真上へ出す。
+        条件は「ステータス欄とズームUIを引いた残りの高さが、画面の幅以上」。
+        ステータス欄は最大 40dvh、ズームUIは約 60px なので
+        0.6 × 高さ − 60 ≥ 幅、おおむね 幅/高さ ≤ 0.5 に落ちる。
+        これを超える画面で真上に出すと宇宙域がそのまま縮むため、
+        重ねたままにする（実測: 360x640 で 360→324、320x568 で 320→281）。
+        しきい値が正しいかは layout.spec.js が実際の寸法で確かめている。 */
+     @media (orientation: portrait) and (max-aspect-ratio: 1 / 2) {
+       #gameWrapper {
+         flex-direction: column;
+       }
+       #zoomUI {
+         position: static;
+         flex-direction: row;
+         padding: 6px 10px;
+         flex: 0 0 auto;
+         /* DOM 上はキャンバスの後ろにあるので、表示順だけ前に出す */
+         order: -1;
+       }
      }
      #zoomUI button {
        /* タップしやすい最小サイズ(48px)は確保しつつ、画面が小さい端末では
@@ -300,18 +313,6 @@
      @media (orientation: landscape) {
        #gameContainer {
          flex-direction: row;
-       }
-       /* 横画面は画面の高さが宇宙域の大きさを決める。ズームUIを上に置くと
-          その分だけ宇宙域が直接痩せるため、盤面に重ねる形に戻す */
-       #gameWrapper {
-         flex-direction: row;
-       }
-       #zoomUI {
-         position: absolute;
-         top: 10px;
-         left: 10px;
-         flex-direction: column;
-         padding: 0;
        }
        #statusPanel {
          /* 横画面ではパネルの幅がそのまま宇宙域の幅を削るため、中身が必要と

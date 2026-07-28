@@ -299,6 +299,15 @@ async function measureLayout(page) {
       vh: window.innerHeight,
       canvas: rect('#gameCanvas canvas'),
       panel: rect('#statusPanel'),
+      zoomUI: rect('#zoomUI'),
+      // ズームUIが盤面に重なっているか。重ねれば宇宙域を狭めずに済むが、
+      // 盤面の一部が隠れる。どちらを選んでいるかは画面の形で変わる
+      zoomOverlapsCanvas: (() => {
+        const z = document.getElementById('zoomUI').getBoundingClientRect();
+        const c = document.querySelector('#gameCanvas canvas').getBoundingClientRect();
+        return z.left < c.right && z.right > c.left
+               && z.top < c.bottom && z.bottom > c.top;
+      })(),
       isLandscape: window.innerWidth >= window.innerHeight,
       scrollWidth: document.documentElement.scrollWidth,
       // ヘッダはタイトルと著作権表示が折り返す設計（flex-wrap）なので除く

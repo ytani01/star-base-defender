@@ -115,6 +115,27 @@ test.describe('表示・操作環境', () => {
     }
   });
 
+  test('ズームボタンが盤面の外に出るのは、宇宙域を狭めずに済むときだけ', async ({ page }) => {
+    // 盤面に重ねれば宇宙域は狭まらないが一部が隠れる。外に出せば全部見える
+    // かわりに、高さに余裕のない画面では宇宙域がそのまま縮む。
+    // どちらを選ぶかは CSS のしきい値（max-aspect-ratio）が決めており、
+    // そのしきい値が実際の寸法と合っているかをここで確かめる。
+    for (const size of SIZES) {
+      await page.setViewportSize({ width: size.w, height: size.h });
+      await openGame(page);
+      await fillLog(page);
+      const m = await measure(page);
+
+      if (m.zoomOverlapsCanvas) {
+        continue; // 重ねている場合は宇宙域を狭めていないので問題ない
+      }
+      // 外に出しているなら、宇宙域は画面の幅いっぱいまで使えているはず。
+      // 使えていないなら、隠さないために狭めたことになり割に合わない
+      expect(m.canvas.width, `${size.label}: 盤面の外に出したのに宇宙域が狭い`)
+        .toBeGreaterThanOrEqual(Math.min(size.w, size.h) - 1);
+    }
+  });
+
   test('ズームボタンがタップできる大きさを保っている', async ({ page }) => {
     for (const size of SIZES) {
       await page.setViewportSize({ width: size.w, height: size.h });
