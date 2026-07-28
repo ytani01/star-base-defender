@@ -2535,7 +2535,7 @@
        const rankLabels = ['1ST', '2ND', '3RD', '4TH', '5TH'];
        list.forEach((s, i) => {
          const tr = document.createElement('tr');
-         const thisGame = (s.gameid == GAME_ID);
+         const thisGame = (s.gameid === GAME_ID);
          if ( thisGame ) {
            tr.className = 'hs-new';
          }
