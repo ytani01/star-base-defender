@@ -846,6 +846,14 @@
          return false;
        }
 
+       /**
+        * 連邦側（自機・味方）かどうか。敵味方で色や効果音を変える箇所が
+        * 複数あるため、呼び出し側で instanceof を並べずに済ませる。
+        */
+       isFriendly() {
+         return false;
+       }
+
      } // class GameObj
 
      /**
@@ -1360,6 +1368,29 @@
          return { target, distToTarget, canAttack, isFleeing };
        } // evaluateTactics()
 
+       /**
+        * 基地のドックを使えるか。使えるのは連邦艦だけなので既定は false。
+        */
+       canDockAtBase() {
+         return false;
+       }
+
+       /**
+        * 逃走時に距離を取りたい相手。「何を怖がるか」は艦種で異なるため、
+        * 呼び出し側で艦種を見分けずに済むようクラス側に持たせる。
+        * @return {Array<GameObj>} 距離を取る対象
+        */
+       getFleeThreats() {
+         return [gameObjs.player, gameObjs.starBase];
+       }
+
+       /**
+        * 宇宙域の外へ出たときの処理。撤退が戦局に与える意味は艦種で
+        * 正反対のため、サブクラスで実装する。既定では何もしない。
+        */
+       onLeaveArea() {
+       }
+
      } // class NPCShip
 
      /**
@@ -1542,6 +1573,26 @@
          }
        } // onAfterAttack()
 
+       /**
+        * override: 敵艦が撤退すると、残った敵の士気が下がる。
+        * 「撃破ではなく追い返す」ことに報いるための処理。
+        */
+       onLeaveArea() {
+         gameObjs.enemies.forEach(e => {
+           e.spirit = Math.max(
+             EnemyShip.SPIRIT.MIN, e.spirit - EnemyShip.SPIRIT.STEP
+           );
+         });
+         if (gameState.isGameOver) {
+           return;
+         }
+         if (getActiveEnemyCount() > 0) {
+           setMsg(SPEAKER.XO, "敵艦が戦場から離脱しました", MSG_COLOR.RETREAT);
+         } else {
+           setMsg(SPEAKER.XO, "すべての敵艦が撤退しました！", MSG_COLOR.WARN);
+         }
+       } // onLeaveArea()
+
        // --- 敵艦のターゲット候補 ---
        // ドッキング中の艦は基地の中にいるため狙わない（攻撃は基地が受ける）
        getPotentialTargets() {
@@ -1680,6 +1731,36 @@
          return targets;
        } // getAttractionTargets()
 
+       /**
+        * override: 連邦艦は基地のドックに入れる。
+        */
+       canDockAtBase() {
+         return true;
+       }
+
+       /**
+        * override: 連邦艦が距離を取りたいのは敵艦であって、基地や自機ではない
+        * （むしろそちらへは getAttractionTargets() で引き寄せられる）。
+        */
+       getFleeThreats() {
+         return gameObjs.enemies.filter(e => e.active && e !== this);
+       }
+
+       /**
+        * override: 味方の離脱は戦力の喪失なので減点する。
+        */
+       onLeaveArea() {
+         setMsg(SPEAKER.COMMS, "味方が戦場から離脱しました", MSG_COLOR.FRIENDLY);
+         gameState.score -= SCORE.DESTROY_PENALTY;
+       }
+
+       /**
+        * override
+        */
+       isFriendly() {
+         return true;
+       }
+
      } // class FederationShip
 
      /**
@@ -1746,6 +1827,13 @@
          endTurn();
          return true;
        } // onInteract()
+
+       /**
+        * override
+        */
+       isFriendly() {
+         return true;
+       }
 
      } // class PlayerShip
 
@@ -1975,9 +2063,8 @@
        allObjects.forEach((obj) => {
          if(!obj || !obj.active) return;
          
-         let color = (
-           obj === gameObjs.player || obj instanceof FederationShip
-         ) ? DRAW_COLOR.RANGE_FRIENDLY : DRAW_COLOR.RANGE_ENEMY;
+         let color = obj.isFriendly()
+           ? DRAW_COLOR.RANGE_FRIENDLY : DRAW_COLOR.RANGE_ENEMY;
 
          gameObjs.rangeGraphics.lineStyle(1, color, 0.5);
          gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.EffectiveRange());
@@ -2365,7 +2452,7 @@
        beam.lineBetween(srcObj.x, srcObj.y, targetObj.x, targetObj.y);
        scene.time.delayedCall(TIMING.BEAM_DUR, () => beam.destroy());
 
-       playBeamSound(srcObj === gameObjs.player || srcObj instanceof FederationShip);
+       playBeamSound(srcObj.isFriendly());
      } // fireBeam(..)
 
      // ---------------------------------------------------------
@@ -2429,7 +2516,7 @@
        // 連邦艦にとって基地は「障害物」ではなく「目的地」である。
        // これを destTarget として渡すと、接触位置ちょうどで停止するため、
        // 次のターンに必ず isAdjacentToBase() が成立する。
-       const canUseDock = npc instanceof FederationShip && isBaseActive;
+       const canUseDock = npc.canDockAtBase() && isBaseActive;
        const dockTarget = canUseDock ? base : null;
        // すでに基地に接している（＝前のターンまでに到着済み）かどうか
        const dockableNow = canUseDock && isAdjacentToBase(npc, base);
@@ -2445,11 +2532,7 @@
          // 連邦艦は基地に引き寄せられるため、接触位置で停止して次のターンに
          // ドッキングする。
          if (!isDocking) {
-           let threats = [gameObjs.player, base];
-           if (canUseDock) {
-             threats = gameObjs.enemies.filter(e => e.active && e !== npc);
-           }
-           const targetDest = threats.map(t => ({ x: t.x, y: t.y }));
+           const targetDest = npc.getFleeThreats().map(t => ({ x: t.x, y: t.y }));
            dest = npc.calculateDestination(targetDest, context.isFleeing, dockTarget);
          }
        } else { // 逃走中でない場合
@@ -2489,23 +2572,8 @@
          );
          if (distFromCenter > AREA_R) {
            npc.die();
-           if (npc instanceof FederationShip) {
-             setMsg(SPEAKER.COMMS, "味方が戦場から離脱しました", MSG_COLOR.FRIENDLY);
-             gameState.score -= SCORE.DESTROY_PENALTY;
-           }
-           if (npc instanceof EnemyShip) {
-             gameObjs.enemies.forEach(e => {
-               e.spirit = Math.max(EnemyShip.SPIRIT.MIN, e.spirit - EnemyShip.SPIRIT.STEP);
-             });
-             if (!gameState.isGameOver) {
-               if (getActiveEnemyCount() > 0) {
-                 setMsg(SPEAKER.XO, "敵艦が戦場から離脱しました", MSG_COLOR.RETREAT);
-               } else {
-                 setMsg(SPEAKER.XO, "すべての敵艦が撤退しました！", MSG_COLOR.WARN);
-               }
-             }
-           }
-         } // if (distFromCenter > AREA_R)
+           npc.onLeaveArea();
+         }
 
          // シールド回復処理
          if (isDocking) {
