@@ -290,7 +290,7 @@
     <div id="gameContainer">
       <div id="statusPanel">
         <div class="status-header">
-          <span class="game-title">StarBase Defender v0.3.17</span>
+          <span class="game-title" id="gameTitle">StarBase Defender</span>
           <div class="game-credits">&copy; 2026 Yoichi Tanibayashi</div>
         </div>
         <div>
@@ -369,6 +369,10 @@
      // 設定・定数の定義
      // ---------------------------------------------------------
      const GAME_ID = Phaser.Utils.String.UUID();
+
+     // リリースのたびに更新する。表示は起動時に .game-title へ流し込む
+     const GAME_NAME = 'StarBase Defender';
+     const VERSION = 'v0.3.17';
 
      const TIMING = {
        BEAM_DUR: 400,
@@ -1842,9 +1846,6 @@
 
        this.input.on('pointerdown', handlePointerDown, this);
 
-       document.getElementById('zoomIn').onclick = () => changeZoom(this, CAMERA.STEP);
-       document.getElementById('zoomOut').onclick = () => changeZoom(this, -CAMERA.STEP);
-
        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
          let zoomAmount = deltaY > 0 ? -CAMERA.STEP : CAMERA.STEP;
          changeZoom(this, zoomAmount);
@@ -2707,6 +2708,24 @@
        }
        overlay.style.display = 'flex';
      } // showHighScoreOverlay()
+
+     // タイトルとバージョンの表示。HTML に直書きせず、ここを唯一の出所とする
+     document.getElementById('gameTitle').textContent = `${GAME_NAME} ${VERSION}`;
+
+     // ズームボタンの登録は create() ではなくここで行う。create() は
+     // scene.restart() のたびに実行されるため、そちらに置くと
+     // addEventListener がミッションごとに積み重なってしまう。
+     document.getElementById('zoomIn').addEventListener('click', () => {
+       if (gameState.curScene) {
+         changeZoom(gameState.curScene, CAMERA.STEP);
+       }
+     });
+
+     document.getElementById('zoomOut').addEventListener('click', () => {
+       if (gameState.curScene) {
+         changeZoom(gameState.curScene, -CAMERA.STEP);
+       }
+     });
 
      document.getElementById('viewScoresBtn').addEventListener('click', () => {
        showHighScoreOverlay('view');
