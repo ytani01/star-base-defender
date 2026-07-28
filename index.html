@@ -452,6 +452,36 @@
          // 現在のカメラ倍率
          this.zoom = CAMERA.ZOOM_MIN;
        }
+
+       /**
+        * 次のミッションを開始できる状態にする（NEXT MISSION から呼ばれる）。
+        * スコア・ミッション番号・敵の数は nextMission() が更新済みのため
+        * ここでは触らない。ミッションクリア経由でしか到達しないので、
+        * isGameOver / flagClear も落とす必要がない。
+        */
+       resetForNewMission() {
+         this.turn = 1;
+         this.isPlayerTurn = true;
+         this.pendingScene = null;
+       }
+
+       /**
+        * ハイスコアの記録から再開できる状態にする。
+        * 記録されたミッションの「次」から始めるため、敗北状態の解除まで
+        * 含めてここで面倒を見る（敗北後の画面から呼ばれるため）。
+        * @param {{score:number, mission:(number|undefined)}} record ハイスコア1件
+        */
+       resumeFrom(record) {
+         this.score = record.score;
+         this.curMission = (record.mission !== undefined ? record.mission : 1) + 1;
+         this.turn = 1;
+         // 敵の初期生成数を、再開するミッションに合わせて再計算する
+         this.enemyQty = QTY.ENEMY_INIT + (this.curMission - 1);
+         this.isGameOver = false;
+         this.flagClear = false;
+         this.isPlayerTurn = true;
+         this.pendingScene = null;
+       }
      } // class GameState
 
      // グローバルなゲーム進行状態インスタンス
@@ -2640,26 +2670,10 @@
            <td>${s.date}</td>
          `;
          
-         // ★追加: 行をクリックした際の処理
+         // 行をクリックすると、その記録の続き（次のミッション）から再開する
          tr.addEventListener('click', () => {
-           // スコアを引き継ぐ
-           gameState.score = s.score;
-           // 記録されたステージの次からスタートする
-           gameState.curMission = (s.mission !== undefined ? s.mission : 1) + 1;
-           gameState.turn = 1;
-           
-           // 敵の初期生成数を、進行するステージに合わせて再計算
-           gameState.enemyQty = QTY.ENEMY_INIT + (gameState.curMission - 1);
-           
-           gameState.isGameOver = false;
-           gameState.flagClear = false;
-           gameState.isPlayerTurn = true;
-           gameState.pendingScene = null;
-           
-           // オーバーレイを非表示にする
+           gameState.resumeFrom(s);
            document.getElementById('highScoreOverlay').style.display = 'none';
-           
-           // シーンを再起動
            if (gameState.curScene) {
              gameState.curScene.scene.restart();
            }
@@ -2734,12 +2748,12 @@
      document.getElementById('hsRestartBtn').addEventListener('click', () => {
        if (gameState.pendingScene) {
          document.getElementById('highScoreOverlay').style.display = 'none';
-         gameState.turn = 1;
-         const s = gameState.pendingScene;
-         gameState.pendingScene = null;
-         gameState.isPlayerTurn = true;
-         s.scene.restart();
+         const scene = gameState.pendingScene;
+         gameState.resetForNewMission();
+         scene.scene.restart();
        } else {
+         // ミッションクリア以外（敗北・ハイスコア閲覧）からの RESTART は
+         // 最初からやり直すため、ページごと読み込み直す
          location.reload();
        }
      });
