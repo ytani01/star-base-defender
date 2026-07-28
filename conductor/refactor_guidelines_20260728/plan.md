@@ -59,14 +59,14 @@
 
 コミット種別: `refactor:` / **表示される色・文言・閾値の数値は一切変えない。**
 
-- [ ] Task: ログの色を意味で定義する。`setMsg()` の呼び出しに散在する `"#0ff"` `"#ff0"` `"#f00"` `"#0f0"` `"#8ff"` `"#88f"` `"#f40"` `"#fff"` を、`MSG_COLOR.INFO` / `.WARN` / `.DANGER` / `.GOOD` などの定数に置き換える 〔Product Guidelines: 色は意味を持たせる／色名を直接書かない〕
-- [ ] Task: ログの発信者名を定数化する。`"操舵手"` `"戦術士官"` `"機関部"` `"通信士"` `"副長"` `"基地"` `"司令部"` `"コンピュータ"` を `SPEAKER` 定数にまとめる。Product Guidelines の担当表と1対1で対応させる 〔Product Guidelines: 発信者を必ず名乗らせる〕
-- [ ] Task: ビームの色 (1370 / 1496 / 1431 / 1446行) を各クラスの `static` プロパティまたは色定数へ移す。外した弾の `0x444444` も含める 〔JS: マジックナンバーを置かない / Product Guidelines: 色は意味を持たせる〕
-- [ ] Task: シールド表示の閾値に名前を与える。`ObjWithShield.update()` (795 / 798行) の `0.5` / `0.25`、`updateGaugeDisplay()` (2404行) の `0.3` を定数化する 〔JS: マジックナンバーを置かない〕
-- [ ] Task: 報告の閾値に名前を与える。`EnemyShip.onAfterAttack()` (1376〜1390行) の `60` / `30`、`finalizeEnemyTurn()` (2391行) のエネルギー警告 `30` を定数化する 〔JS: 同上〕
-- [ ] Task: 移動判定の閾値に名前を与える。`resolveMovement()` (973行) と `resolveStuckAvoidance()` (2108行) の「ほぼ動けていない」判定 `10`、直進で足りるとみなす比率 `0.95` (946 / 990行) を定数化する。**値そのものは変えない**。※ `clampDest()` の停止マージン `1.5` は `SpaceShip.STOP_MARGIN` として実施済み [1d57cea] 〔JS: 同上〕
-- [ ] Task: `setMsg()` のログ保持行数 `50` (550行) を定数化する 〔JS: 同上〕
-- [ ] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
+- [x] Task: ログの色を意味で定義する。`setMsg()` の呼び出しに散在する `"#0ff"` `"#ff0"` `"#f00"` `"#0f0"` `"#8ff"` `"#88f"` `"#f40"` `"#fff"` を、`MSG_COLOR.INFO` / `.WARN` / `.DANGER` / `.GOOD` などの定数に置き換える 〔Product Guidelines: 色は意味を持たせる／色名を直接書かない〕 [f5af387]
+- [x] Task: ログの発信者名を定数化する。`"操舵手"` `"戦術士官"` `"機関部"` `"通信士"` `"副長"` `"基地"` `"司令部"` `"コンピュータ"` を `SPEAKER` 定数にまとめる。Product Guidelines の担当表と1対1で対応させる 〔Product Guidelines: 発信者を必ず名乗らせる〕 [f5af387]
+- [x] Task: ビームの色 (1370 / 1496 / 1431 / 1446行) を各クラスの `static` プロパティまたは色定数へ移す。外した弾の `0x444444` も含める。※ シールド円・射程円・境界・ドッキング表示の色も同種のため `DRAW_COLOR` にまとめた 〔JS: マジックナンバーを置かない / Product Guidelines: 色は意味を持たせる〕 [2caf342]
+- [x] Task: シールド表示の閾値に名前を与える。`ObjWithShield.update()` (795 / 798行) の `0.5` / `0.25`、`updateGaugeDisplay()` (2404行) の `0.3` を定数化する 〔JS: マジックナンバーを置かない〕 [2caf342]
+- [x] Task: 報告の閾値に名前を与える。`EnemyShip.onAfterAttack()` (1376〜1390行) の `60` / `30`、`finalizeEnemyTurn()` (2391行) のエネルギー警告 `30` を定数化する 〔JS: 同上〕 [2caf342]
+- [x] Task: 移動判定の閾値に名前を与える。`resolveMovement()` (973行) と `resolveStuckAvoidance()` (2108行) の「ほぼ動けていない」判定 `10`、直進で足りるとみなす比率 `0.95` (946 / 990行) を定数化する。**値そのものは変えない**。※ `clampDest()` の停止マージン `1.5` は `SpaceShip.STOP_MARGIN` として実施済み [1d57cea] 〔JS: 同上〕 [2caf342]
+- [x] Task: `setMsg()` のログ保持行数 `50` (550行) を定数化する 〔JS: 同上〕 [2caf342]
+- [~] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
 
 ---
 
