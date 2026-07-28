@@ -24,6 +24,7 @@
 - [x] Task: 動作しないボタン `#misc1` (338行) を HTML から削除する。JS からの参照が一切なく、押しても何も起きない 〔HTML/CSS: 不要なものを残さない / Product Guidelines: 常時表示は必要最小限に〕 [ee1ace4]
 - [x] Task: 対応する DOM 要素が存在しない CSS ルール `#creditUI` (154〜163行) を削除する 〔HTML/CSS: 対応する要素が存在しない CSS ルールを残さない〕 [ee1ace4]
 - [x] Task: CSS からも JS からも参照されていない `id` 属性（`#turn` 308行 / `#statusShip1` 315行 / `#statusShip2` 320行 / `#shipCount1` 330行 / `#shipCount2` 334行、および実施時に追加で発見した `#statusBase` / `#statusFederationShip` / `#statusEnemyShip`）を削除する。要素とレイアウトは維持する 〔HTML/CSS: どちらからも参照されない id を残さない〕 [ee1ace4]
+- [x] Task: 対応する要素が存在しない CSS セレクタ `#statusPanel .game-version` (73行) を削除する。※計画外。確認作業で HTML の id / class と CSS セレクタを機械的に突き合わせて発見した 〔HTML/CSS: 対応する要素が存在しない CSS ルールを残さない〕 [08adb5b]
 - [~] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
 
 ---
