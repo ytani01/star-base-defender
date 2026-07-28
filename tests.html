@@ -343,6 +343,48 @@
        });
 
        // -------------------------------------------------------
+       // カメラのスクロール範囲
+       // -------------------------------------------------------
+
+       describe('幾何計算 — カメラのスクロール範囲', () => {
+         const cx = g('AREA_CENTER.X');
+         const cy = g('AREA_CENTER.Y');
+         const r = g('AREA_R');
+         const clamp = (x, y) => g(`clampCameraCenter(${x}, ${y})`);
+         const distFromCenter = (p) => Math.hypot(p.x - cx, p.y - cy);
+
+         it('宇宙域の内側はそのまま返る', () => {
+           const p = clamp(cx + 10, cy - 20);
+           assertClose(p.x, cx + 10, 1e-9, 'x');
+           assertClose(p.y, cy - 20, 1e-9, 'y');
+         });
+         it('中心はそのまま返る', () => {
+           const p = clamp(cx, cy);
+           assertClose(distFromCenter(p), 0, 1e-9, '中心からの距離');
+         });
+         it('外側は宇宙域の縁まで引き戻される', () => {
+           const p = clamp(cx + r * 5, cy);
+           assertClose(distFromCenter(p), r, 1e-6, '縁の上に乗る');
+           assertClose(p.y, cy, 1e-9, '向きは変えない');
+         });
+         it('斜めに外れた場合も向きを保ったまま縁に乗る', () => {
+           const p = clamp(cx + 1000, cy + 1000);
+           assertClose(distFromCenter(p), r, 1e-6, '縁の上に乗る');
+           assertClose(p.x - cx, p.y - cy, 1e-6, '45度の向きが保たれる');
+         });
+         it('縁のちょうど上は動かさない', () => {
+           const p = clamp(cx + r, cy);
+           assertClose(p.x, cx + r, 1e-9, 'x');
+         });
+         it('縁をわずかに超えただけでも引き戻す', () => {
+           // 大きく外れた点だけで確かめると、判定の境界が広がっていても
+           // 正規化の側が結果を揃えてしまい、誤りに気づけない
+           const p = clamp(cx + r + 50, cy);
+           assertClose(p.x, cx + r, 1e-6, '縁まで戻る');
+         });
+       });
+
+       // -------------------------------------------------------
        // スコア計算（Product Guide「スコアの考え方」と対応）
        // -------------------------------------------------------
 
