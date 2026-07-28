@@ -29,10 +29,10 @@
 
 コミット種別: `docs:`
 
-- [ ] Task: `README.md` に「画面の見方」の節を新設し、「操作方法」の前に置いて図を貼る。図だけで伝わらないしきい値は図中に書く 〔spec: 参照〕
-- [ ] Task: `conductor/product-guidelines.md` の「レトロ SF スタイル」の色の対応表のあとに、図への参照を1行足す。**規約の内容自体は変えない** 〔spec: 参照〕
-- [ ] Task: 古い `docs/screenshot1.png` を削除し、README からの参照も外す。v0.3 期のもので現在の画面と食い違うため 〔spec: 古いスクリーンショットの削除〕
-- [ ] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: `README.md` に「画面の見方」の節を新設し、「操作方法」の前に置いて図を貼る。図だけで伝わらないしきい値は図中に書く。※ 射程による威力の変化は README 本文にも書いた 〔spec: 参照〕 [1334614]
+- [x] Task: `conductor/product-guidelines.md` の「レトロ SF スタイル」の色の対応表のあとに、図への参照を1行足す。**規約の内容自体は変えない** 〔spec: 参照〕 [1334614]
+- [x] Task: 古い `docs/screenshot1.png` を削除し、README からの参照も外す。v0.3 期のもので現在の画面と食い違うため 〔spec: 古いスクリーンショットの削除〕 [1334614]
+- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
 
 ---
 
