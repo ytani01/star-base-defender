@@ -16,12 +16,12 @@
 
 コミット種別: `docs:` / `index.html` には触れない。
 
-- [ ] Task: 図に載せる記号と色を `index.html` から洗い出し、対応表にまとめる。`preload()` の描画命令、`DRAW_COLOR` / `MSG_COLOR` / `:root`、`DISPLAY_THRESHOLD` が出どころ 〔spec: 艦の形は preload() の描画命令をそのまま転記する〕
-- [ ] Task: 区画1「ステータス欄」を描く。各行の意味、ゲージが赤に変わるしきい値（30%）、`Federation N (Dock M)` が自機を含むこと 〔spec: 機能要件 1.〕
-- [ ] Task: 区画2「盤面の記号」を描く。自機・連邦艦・敵艦・基地・恒星・宇宙域の境界。艦の形は `preload()` から転記する 〔spec: 機能要件 2.〕
-- [ ] Task: 区画3「艦のまわりの表示」を描く。シールド円（白 / 50%未満で黄 / 25%未満で赤、太さも残量に比例）、シールドバー、自機だけのエネルギーバー、射程円、ドッキングの輪、ビームの色 〔spec: 機能要件 3.〕
-- [ ] Task: GitHub で表示できる形に整える。外部参照・`<script>`・`<style>` を使わず色は属性に直接書く。`viewBox` を付ける。フォントは `monospace` のみ 〔spec: GitHub 上で表示できること〕
-- [ ] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
+- [x] Task: 図に載せる記号と色を `index.html` から洗い出し、対応表にまとめる。`preload()` の描画命令、`DRAW_COLOR` / `MSG_COLOR` / `:root`、`DISPLAY_THRESHOLD` が出どころ 〔spec: 艦の形は preload() の描画命令をそのまま転記する〕 [70a7092]
+- [x] Task: 区画1「ステータス欄」を描く。各行の意味、ゲージが赤に変わるしきい値（30%）、`Federation N (Dock M)` が自機を含むこと 〔spec: 機能要件 1.〕 [70a7092]
+- [x] Task: 区画2「盤面の記号」を描く。自機・連邦艦・敵艦・基地・恒星・宇宙域の境界。艦の形は `preload()` から転記する 〔spec: 機能要件 2.〕 [70a7092]
+- [x] Task: 区画3「艦のまわりの表示」を描く。シールド円（白 / 50%未満で黄 / 25%未満で赤、太さも残量に比例）、シールドバー、自機だけのエネルギーバー、射程円、ドッキングの輪、ビームの色 〔spec: 機能要件 3.〕 [70a7092]
+- [x] Task: GitHub で表示できる形に整える。外部参照・`<script>`・`<style>` を使わず色は属性に直接書く。`viewBox` を付ける。フォントは `monospace` のみ 〔spec: GitHub 上で表示できること〕 [70a7092]
+- [~] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
 
 ---
 
