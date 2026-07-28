@@ -456,6 +456,41 @@
        COMPUTER: 'コンピュータ', // 自動的な状況判定・緊急時の宣告
      };
 
+     // ログとして保持する行数。超えた分は古いものから捨てる。
+     const LOG_MAX_LINES = 50;
+
+     // 宇宙域に描く色（Phaser の 0xRRGGBB 形式）。CSS 用の MSG_COLOR とは
+     // 別に持つが、意味の割り当ては Product Guidelines に従う。
+     const DRAW_COLOR = {
+       BEAM_PLAYER: 0x00ffff,      // シアン: 自機のフェイザー
+       BEAM_FEDERATION: 0x0088ff,  // 青: 味方のフェイザー
+       BEAM_ENEMY: 0xff00ff,       // マゼンタ: 敵のフェイザー
+       BEAM_NEUTRAL: 0xffffff,     // 白: 艦種を特定しない既定のビーム
+       BEAM_MISS: 0x444444,        // 灰: 無駄撃ち（射程外・障害物）
+       SHIELD_OK: 0xffffff,        // 白: シールドに余裕がある
+       SHIELD_LOW: 0xffff00,       // 黄: シールド低下
+       SHIELD_CRITICAL: 0xff0000,  // 赤: シールド危険
+       RANGE_FRIENDLY: 0x00ffff,   // シアン: 自軍の射程円
+       RANGE_ENEMY: 0xffff00,      // 黄: 敵の射程円
+       BOUNDARY: 0x0088ff,         // 青: 宇宙域の境界
+       DOCKING_RING: 0x02ffff,     // シアン: ドッキング中を示す輪
+     };
+
+     // 残量に応じて表示を切り替える比率（0.0〜1.0）
+     const DISPLAY_THRESHOLD = {
+       SHIELD_LOW: 0.5,       // シールド円が黄に変わる
+       SHIELD_CRITICAL: 0.25, // シールド円が赤に変わる
+       GAUGE_DANGER: 0.3,     // ステータス欄のゲージが赤に変わる
+     };
+
+     // 乗員が報告を上げる残量（％）。読み手に危機感を伝えるための区切りであり、
+     // ゲームバランスそのものではない。
+     const REPORT_THRESHOLD = {
+       SHIELD_WARN: 60,    // これを下回ると被弾を報告し始める
+       SHIELD_DANGER: 30,  // これ以下は危険として強い色で告げる
+       ENERGY_WARN: 30,    // ターン終了時にエネルギー残量を警告する
+     };
+
      // デバッグログの有効/無効切り替え。開発時に true にすると各種ログが出力される。
      const DEBUG = false;
 
@@ -570,7 +605,7 @@
       */
      function drawBoundary(){
        gameObjs.boundaryGraphics.clear();
-       gameObjs.boundaryGraphics.lineStyle(2, 0x0088ff, 1);
+       gameObjs.boundaryGraphics.lineStyle(2, DRAW_COLOR.BOUNDARY, 1);
        gameObjs.boundaryGraphics.strokeCircle(AREA_CENTER.X, AREA_CENTER.Y, AREA_R);
      } // drawBoundary()
 
@@ -609,8 +644,7 @@
        el.appendChild(line);
 
        // メモリ及びパフォーマンス対策: ログが50行を超えたら古い行から削除
-       const maxLines = 50;
-       while (el.children.length > maxLines) {
+       while (el.children.length > LOG_MAX_LINES) {
          el.removeChild(el.firstChild);
        }
 
@@ -855,12 +889,12 @@
          // draw Shield circle
          //
          const shield_ratio = this.shield / this.constructor.SHIELD_MAX;
-         let shield_color = 0xffffff;
-         if ( shield_ratio < 0.5 ) {
-           shield_color = 0xffff00;
+         let shield_color = DRAW_COLOR.SHIELD_OK;
+         if ( shield_ratio < DISPLAY_THRESHOLD.SHIELD_LOW ) {
+           shield_color = DRAW_COLOR.SHIELD_LOW;
          }
-         if ( shield_ratio < 0.25 ) {
-           shield_color = 0xff0000;
+         if ( shield_ratio < DISPLAY_THRESHOLD.SHIELD_CRITICAL ) {
+           shield_color = DRAW_COLOR.SHIELD_CRITICAL;
          }
          this.shield_circle.clear();
          this.shield_circle.lineStyle(3 * shield_ratio, shield_color, 1);
@@ -934,6 +968,11 @@
        // 障害物に接触する手前で止まる余裕。ぴったり接触させると、次の移動で
        // 重なった状態から始まってしまうため、常にこの分だけ離して停止する。
        static STOP_MARGIN = 1.5;
+       // これ未満しか進めない移動は「ほぼ動けていない」とみなす
+       static MIN_MOVE_DIST = 10;
+       // 目的距離（または速度）のこの割合まで進めれば十分とみなし、
+       // 迂回路の探索を打ち切る
+       static ENOUGH_MOVE_RATIO = 0.95;
 
        constructor(
          scene, x, y, texture,
@@ -1036,7 +1075,7 @@
          let directMoveSq = (directDest.x - x)**2 + (directDest.y - y)**2;
 
          // 直線移動だけで目的距離の95%以上進めるなら、迂回探索はせずそのまま確定
-         if (directMoveSq >= reqDistSq * 0.95) {
+         if (directMoveSq >= reqDistSq * SpaceShip.ENOUGH_MOVE_RATIO) {
            return directDest;
          }
 
@@ -1063,7 +1102,7 @@
              let distToTargetSq = (clamped.x - desiredX)**2 + (clamped.y - desiredY)**2;
 
              // ほとんど動けない角度は候補にしない
-             if (moveDistSq < 10 * 10) {  // XXX TBD
+             if (moveDistSq < SpaceShip.MIN_MOVE_DIST ** 2) {
                continue;
              }
 
@@ -1080,7 +1119,7 @@
              }
 
              // 十分な速度で動ける角度が見つかったら、この振り幅(sign)側の探索は打ち切る
-             if (moveDistSq >= (speed * 0.95)**2) {
+             if (moveDistSq >= (speed * SpaceShip.ENOUGH_MOVE_RATIO) ** 2) {
                break;
              }
            } // for(i)
@@ -1237,7 +1276,7 @@
         * ビームの色（子クラスでオーバーライド）
         */
        getBeamColor() {
-         return 0xffffff; 
+         return DRAW_COLOR.BEAM_NEUTRAL;
        }
        
        /**
@@ -1407,7 +1446,7 @@
 
          // ドッキング状態
          if ( gameObjs.player.is_docked ) {
-           gameObjs.rangeGraphics.lineStyle(5, 0x02ffff, 1);
+           gameObjs.rangeGraphics.lineStyle(5, DRAW_COLOR.DOCKING_RING, 1);
            gameObjs.rangeGraphics.strokeCircle(
              gameObjs.starBase.x, gameObjs.starBase.y, StarBase.DOCKING_RANGE - 3
            );
@@ -1467,24 +1506,26 @@
        }
 
        getBeamColor() {
-         return 0xff00ff;
+         return DRAW_COLOR.BEAM_ENEMY;
        }
 
        // --- 敵艦が攻撃した後の処理 ---
        onAfterAttack(target) {
          const t_shield_p = Math.floor(target.shieldPercent() * 100);
 
-         if (target === gameObjs.player && t_shield_p < 60) {
-           if (t_shield_p > 30) {
+         if (target === gameObjs.player
+             && t_shield_p < REPORT_THRESHOLD.SHIELD_WARN) {
+           if (t_shield_p > REPORT_THRESHOLD.SHIELD_DANGER) {
              setMsg(SPEAKER.ENGINE, `シールド ${t_shield_p}% に低下`, MSG_COLOR.WARN);
            } else {
              setMsg(SPEAKER.ENGINE, `艦長！シールド ${t_shield_p}% 危険です！`, MSG_COLOR.DANGER);
            }
            updateStatus();
          }
-         if (target === gameObjs.starBase && t_shield_p < 60) {
+         if (target === gameObjs.starBase
+             && t_shield_p < REPORT_THRESHOLD.SHIELD_WARN) {
            setMsg(SPEAKER.BASE, `シールド ${t_shield_p}%、至急救援を求む！`, MSG_COLOR.WARN);
-           if (t_shield_p <= 30) {
+           if (t_shield_p <= REPORT_THRESHOLD.SHIELD_DANGER) {
              setMsg(SPEAKER.BASE, `シールド ${t_shield_p}%、至急救援を求む！`, MSG_COLOR.DANGER);
            }
            updateStatus();
@@ -1531,13 +1572,13 @@
 
          if (dist > player.weapon.MaxRange()) {
            setMsg(SPEAKER.TACTICAL, "射程範囲外のため敵艦にダメージなし", MSG_COLOR.WARN);
-           fireBeam(scene, player, this, 0x444444);
+           fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
            endTurn();
            return true;
          }
          if (isLOSBlocked(player, this, false)) {
            setMsg(SPEAKER.TACTICAL, "障害物に遮られました", MSG_COLOR.WARN);
-           fireBeam(scene, player, this, 0x444444);
+           fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
            endTurn();
            return true;
          }
@@ -1546,7 +1587,7 @@
          //setMsg(SPEAKER.TACTICAL, "攻撃命中！ 敵艦シールド低下！", "#f80");
          const damage = player.weapon.CalcDamage(dist);
          this.takeDamage(damage);
-         fireBeam(scene, player, this, 0x00ffff);
+         fireBeam(scene, player, this, DRAW_COLOR.BEAM_PLAYER);
 
          if (!this.active) {
            // 撃墜
@@ -1599,7 +1640,7 @@
         * override
         */
        getBeamColor() {
-         return 0x0088ff;
+         return DRAW_COLOR.BEAM_FEDERATION;
        }
 
        /**
@@ -1936,7 +1977,7 @@
          
          let color = (
            obj === gameObjs.player || obj instanceof FederationShip
-         ) ? 0x00ffff : 0xffff00;
+         ) ? DRAW_COLOR.RANGE_FRIENDLY : DRAW_COLOR.RANGE_ENEMY;
 
          gameObjs.rangeGraphics.lineStyle(1, color, 0.5);
          gameObjs.rangeGraphics.strokeCircle(obj.x, obj.y, obj.weapon.EffectiveRange());
@@ -2234,7 +2275,7 @@
        let actualDist = Phaser.Math.Distance.Between(gameObjs.player.x, gameObjs.player.y, destX, destY);
        debugLog('actualDist', actualDist);
 
-       if (actualDist >= 10) { // XXX TBD
+       if (actualDist >= SpaceShip.MIN_MOVE_DIST) {
          return { destX, destY, actualDist, isRerouted: false, cancelled: false };
        }
 
@@ -2542,7 +2583,7 @@
        }
 
        const enp = gameObjs.player.energy_p(); 
-       if ( enp < 30 ) {
+       if ( enp < REPORT_THRESHOLD.ENERGY_WARN ) {
          setMsg(SPEAKER.ENGINE, `エネルギー残り ${enp}%`, MSG_COLOR.WARN);
        }
        updateStatus();
@@ -2555,7 +2596,8 @@
       */
      function updateGaugeDisplay(valueElId, gaugeElId, value, max) {
        const ratio = value / max;
-       const color = ratio < 0.3 ? MSG_COLOR.DANGER : MSG_COLOR.GOOD;
+       const color = ratio < DISPLAY_THRESHOLD.GAUGE_DANGER
+         ? MSG_COLOR.DANGER : MSG_COLOR.GOOD;
        document.getElementById(valueElId).style.color = color;
        document.getElementById(valueElId).textContent = value;
        document.getElementById(gaugeElId).style.width = (ratio * 100) + '%';
