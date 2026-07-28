@@ -424,6 +424,8 @@
      const SCORE = {
        INIT: 100,
        DESTROY_PENALTY: 50,
+       // ミッションクリアのボーナス。深いミッションほど大きく加点する
+       CLEAR_BONUS_PER_MISSION: 100,
      };
      const HIGHSCORE = {
        MAX_ENTRIES: 5,
@@ -525,6 +527,15 @@
        }
 
        /**
+        * スコアを増減させる。計算そのものは calc*() 側にあり、ここは
+        * 適用するだけ。書き換えの入口をひとつに保つ。
+        * @param {number} delta 増減値（減点なら負の値）
+        */
+       addScore(delta) {
+         this.score += delta;
+       }
+
+       /**
         * 次のミッションを開始できる状態にする（NEXT MISSION から呼ばれる）。
         * スコア・ミッション番号・敵の数は nextMission() が更新済みのため
         * ここでは触らない。ミッションクリア経由でしか到達しないので、
@@ -557,6 +568,97 @@
 
      // グローバルなゲーム進行状態インスタンス
      const gameState = new GameState();
+
+     // ---------------------------------------------------------
+     // 純粋な計算
+     //
+     // ここに置く関数は gameState / gameObjs を参照せず、引数だけで
+     // 結果が決まる。将来テストを導入するとしたら、まずこの範囲が対象に
+     // なる（Tech Stack「テストと静的解析」参照）。
+     // ここへ関数を足すときは、グローバル状態を読まないことを守ること。
+     // ---------------------------------------------------------
+
+     /**
+      * 線分（始点からdx,dy方向へ、長さの2乗がa）と円（中心が始点からfx,fy、半径radius）
+      * の交差判定。線分をt=0(始点)〜t=1(終点)としてパラメータ化した交点位置を返す。
+      * 交差しない場合は null。
+      * clampDest()（衝突による移動停止）と hasObstacleOnPath()（LOS/経路上の障害物判定）
+      * で共通して使う、線分と円の交差の二次方程式を解く部分だけを切り出したもの。
+      */
+     function intersectSegmentCircle(dx, dy, a, fx, fy, radius) {
+       const b = 2 * (fx * dx + fy * dy);
+       const c = fx * fx + fy * fy - radius * radius;
+       const disc = b * b - 4 * a * c;
+       if (disc < 0) {
+         return null;
+       }
+       const sqrtDisc = Math.sqrt(disc);
+       return {
+         t1: (-b - sqrtDisc) / (2 * a),
+         t2: (-b + sqrtDisc) / (2 * a),
+       };
+     } // intersectSegmentCircle()
+
+     /**
+      * src から dst への線分が obj に遮られるか。
+      * 始点・終点のごく近傍（t < 0.05 / t > 0.95）は射手自身や目標との接触なので、
+      * 遮蔽とはみなさない。
+      */
+     function hasObstacleOnPath(src, dst, obj) {
+       const dx = dst.x - src.x, dy = dst.y - src.y;
+       const a = dx * dx + dy * dy;
+       if (a < 0.001) {
+         return false;
+       }
+       const fx = src.x - obj.x, fy = src.y - obj.y;
+       const hit = intersectSegmentCircle(dx, dy, a, fx, fy, obj.r);
+       if (!hit) {
+         return false;
+       }
+       return (hit.t1 > 0.05 && hit.t1 < 0.95) || (hit.t2 > 0.05 && hit.t2 < 0.95);
+     } // hasObstacleOnPath()
+
+     /**
+      * src から dst への射線が、渡された障害物のいずれかに遮られるか。
+      * 「どれを障害物とみなすか」は状況によって変わるため、集める側と
+      * 判定する側を分けてある（集める側は isLOSBlocked()）。
+      * @param {{x:number, y:number}} src 始点
+      * @param {{x:number, y:number}} dst 終点
+      * @param {Array<GameObj>} obstacles 遮蔽物の候補
+      * @return {boolean} 遮られていれば true
+      */
+     function isPathBlockedBy(src, dst, obstacles) {
+       return obstacles.some(o => hasObstacleOnPath(src, dst, o));
+     } // isPathBlockedBy()
+
+     /**
+      * ターン経過による減点。宇宙域に艦が残っているほど不利になり、
+      * もたつくと損をする（Product Guide「スコアの考え方」）。
+      * @param {number} enemyCount 生存している敵艦の数
+      * @param {number} federationCount 生存している連邦艦の数
+      * @return {number} スコアの増減（負の値）
+      */
+     function calcTurnPenalty(enemyCount, federationCount) {
+       return -(enemyCount + federationCount);
+     } // calcTurnPenalty()
+
+     /**
+      * 艦を1隻失ったときの減点。撃破も戦場からの離脱も同じ扱いとし、
+      * 「破壊は割に合わない」という中核ルールを支える。
+      * @return {number} スコアの増減（負の値）
+      */
+     function calcShipLossPenalty() {
+       return -SCORE.DESTROY_PENALTY;
+     } // calcShipLossPenalty()
+
+     /**
+      * ミッションクリアのボーナス。到達の深さを評価する。
+      * @param {number} mission クリアしたミッション番号
+      * @return {number} スコアの増減（正の値）
+      */
+     function calcMissionClearBonus(mission) {
+       return mission * SCORE.CLEAR_BONUS_PER_MISSION;
+     } // calcMissionClearBonus()
 
      // ---------------------------------------------------------
      // グローバルメソッド
@@ -943,7 +1045,7 @@
        takeDamage(amount) {
          this.shield -= amount;
          if (this.shield <= 0) {
-           gameState.score -= SCORE.DESTROY_PENALTY;
+           gameState.addScore(calcShipLossPenalty());
            this.die();
          }
        } // takeDamage()
@@ -1754,7 +1856,7 @@
         */
        onLeaveArea() {
          setMsg(SPEAKER.COMMS, "味方が戦場から離脱しました", MSG_COLOR.FRIENDLY);
-         gameState.score -= SCORE.DESTROY_PENALTY;
+         gameState.addScore(calcShipLossPenalty());
        }
 
        /**
@@ -2123,61 +2225,19 @@
        return { x, y };
      } // getSafeRandPos()
 
-     /**
-      * 線分（始点からdx,dy方向へ、長さの2乗がa）と円（中心が始点からfx,fy、半径radius）
-      * の交差判定。線分をt=0(始点)〜t=1(終点)としてパラメータ化した交点位置を返す。
-      * 交差しない場合は null。
-      * clampDest()（衝突による移動停止）と hasObstacleOnPath()（LOS/経路上の障害物判定）
-      * で共通して使う、線分と円の交差の二次方程式を解く部分だけを切り出したもの。
-      */
-     function intersectSegmentCircle(dx, dy, a, fx, fy, radius) {
-       const b = 2 * (fx * dx + fy * dy);
-       const c = fx * fx + fy * fy - radius * radius;
-       const disc = b * b - 4 * a * c;
-       if (disc < 0) {
-         return null;
-       }
-       const sqrtDisc = Math.sqrt(disc);
-       return {
-         t1: (-b - sqrtDisc) / (2 * a),
-         t2: (-b + sqrtDisc) / (2 * a),
-       };
-     } // intersectSegmentCircle()
-
-     /**
-      * src から dst への線分が obj に遮られるか。
-      * 始点・終点のごく近傍（t < 0.05 / t > 0.95）は射手自身や目標との接触なので、
-      * 遮蔽とはみなさない。
-      */
-     function hasObstacleOnPath(src, dst, obj) {
-       const dx = dst.x - src.x, dy = dst.y - src.y;
-       const a = dx * dx + dy * dy;
-       if (a < 0.001) {
-         return false;
-       }
-       const fx = src.x - obj.x, fy = src.y - obj.y;
-       const hit = intersectSegmentCircle(dx, dy, a, fx, fy, obj.r);
-       if (!hit) {
-         return false;
-       }
-       return (hit.t1 > 0.05 && hit.t1 < 0.95) || (hit.t2 > 0.05 && hit.t2 < 0.95);
-     } // hasObstacleOnPath()
 
      /**
       * LOS(Line of Sight、射線)がブロックされてないか？
       */
      function isLOSBlocked(srcObj, targetObj, checkBase = true) {
-       // 1. 星（障害物）による遮蔽の判定
-       let hitStar = gameObjs.stars.some(s => s.active && hasObstacleOnPath(srcObj, targetObj, s));
-       if (hitStar) return true;
-
-       // 2. 基地による遮蔽の判定（基地の見た目のサイズで正確に判定）
-       if (checkBase && gameObjs.starBase && gameObjs.starBase.active && gameObjs.starBase.shield > 0) {
-         if (hasObstacleOnPath(srcObj, targetObj, gameObjs.starBase)) {
-           return true;
-         }
+       // 遮蔽物を集めるところだけがグローバル状態に触れる。
+       // 実際の判定は純粋な isPathBlockedBy() に任せる。
+       const obstacles = gameObjs.stars.filter(s => s.active);
+       const base = gameObjs.starBase;
+       if (checkBase && base && base.active && base.shield > 0) {
+         obstacles.push(base);
        }
-       return false;
+       return isPathBlockedBy(srcObj, targetObj, obstacles);
      } // isLOSBlocked()
 
      /**
@@ -2652,8 +2712,9 @@
 
        gameState.turn++;
        // 減点
-       gameState.score -= getActiveEnemyCount();
-       gameState.score -= getActiveFederationShipCount();
+       gameState.addScore(calcTurnPenalty(
+         getActiveEnemyCount(), getActiveFederationShipCount()
+       ));
 
        // 増援の出現
        if (gameState.turn % NEW_ENEMY_INTERVAL === 0) {
@@ -2741,8 +2802,8 @@
       */
      function nextMission(scene) {
        const clearedMission = gameState.curMission;
-       let bonus = gameState.curMission * 100;
-       gameState.score += bonus;
+       const bonus = calcMissionClearBonus(gameState.curMission);
+       gameState.addScore(bonus);
        debugLog(`nextMission> bonus=${bonus}, gameState.score=${gameState.score}`);
 
        gameState.qtyFederationShip = getActiveFederationShipCount();
