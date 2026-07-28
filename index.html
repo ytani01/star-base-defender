@@ -37,6 +37,10 @@
        color: var(--color-primary);
        padding:15px;
        flex: 0 0 auto;
+       /* padding と border を高さに含める。既定の content-box では
+          max-height: 40dvh に padding 30px と border 2px が上乗せされ、
+          上限のつもりの指定が実際には 40dvh を超えてしまう。 */
+       box-sizing: border-box;
        /* 縦画面ではステータス欄が肥大化して宇宙域を圧迫しないよう上限を設ける
           （横画面では下の @media で解除し、これまで通りサイドパネル全高を使う） */
        max-height: 40vh;
