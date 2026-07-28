@@ -46,7 +46,7 @@ star-base-defender/
 
 ### 進行中
 
-なし
+- [docs_screen_guide_20260729](./docs_screen_guide_20260729/index.md) — 画面の見方を1枚の SVG で示し、README と Product Guidelines から参照する
 
 ### 完了・保管済み
 
