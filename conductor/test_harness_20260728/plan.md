@@ -50,10 +50,10 @@ Playwright が使えない環境でも Phase 1 だけで価値が出る。
 
 コミット種別: `test:`
 
-- [ ] Task: 決着（7項目）。ミッションクリアとボーナス、NEXT MISSION での敵の増加、敗北3種、敗北時に記録されないこと、ハイスコアからの再開と敵の初期数
-- [ ] Task: `localStorage` が使えない状況でもミッションクリアの処理が進むこと 〔Tech Stack: 読み込みは必ず失敗を想定します〕
-- [ ] Task: 敗北直後にシーンを再起動しても、古いハイスコア画面が後から開かないこと（Phase 2 で直した不具合の再発防止）
-- [ ] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
+- [x] Task: 決着（7項目）。ミッションクリアとボーナス、NEXT MISSION での敵の増加、敗北3種、敗北時に記録されないこと、ハイスコアからの再開と敵の初期数 [14c8bf0]
+- [x] Task: `localStorage` が使えない状況でもミッションクリアの処理が進むこと 〔Tech Stack: 読み込みは必ず失敗を想定します〕 [14c8bf0]
+- [x] Task: 敗北直後にシーンを再起動しても、古いハイスコア画面が後から開かないこと（Phase 2 で直した不具合の再発防止）。※ 不具合のある版で実際に検出できることを確認済み [14c8bf0]
+- [~] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
 
 ---
 
