@@ -83,7 +83,12 @@ async function waitForIdle(page, timeout = 20000) {
       return false;
     }
     const movingCount = scene.tweens.getTweens().length;
-    const pendingCount = (scene.time._active || []).length;
+    // 予約された直後の処理は _pendingInsertion に入り、次の更新まで
+    // _active へ移らない。ここを見落とすと「まだ何も始まっていない」
+    // 状態を「片付いた」と誤って判断してしまう。
+    const clock = scene.time;
+    const pendingCount = (clock._active || []).length
+      + (clock._pendingInsertion || []).length;
     return movingCount === 0 && pendingCount === 0;
   }, null, { timeout, polling: 50 });
 }
