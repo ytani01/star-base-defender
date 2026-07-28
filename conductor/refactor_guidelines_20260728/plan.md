@@ -33,10 +33,10 @@
 
 コミット種別: `fix:` / **Phase 1 とは別コミットにする**（種別が異なるため）。
 
-- [ ] Task: `gameOver()` (2478行) の `setTimeout()` を `scene.time.delayedCall()` に置き換える。現状はシーン再起動時に停止できず、前のミッションのハイスコア画面が後から開く可能性がある。`nextMission()` (2460行) は既に `delayedCall` を使っており、そちらに合わせる。※ `gameOver()` は scene を受け取っていないため、`gameState.curScene` を経由するか引数を追加する 〔JS: Phaser の作法 — setTimeout / setInterval を使わない〕
-- [ ] Task: `saveHighScore()` (2508行) の `localStorage.setItem()` を `try` / `catch` で保護する。プライベートブラウジングや容量超過で例外が飛ぶと、ミッションクリア処理が中断する。読み込み側 `loadHighScores()` (2482行) は既に保護されている 〔Tech Stack: 読み込みは必ず失敗を想定します〕
-- [ ] Task: `renderHSTable()` (2527行) の `s.gameid == GAME_ID` を `===` にする。両辺とも文字列のため結果は変わらない 〔JS §4: Always use identity operators〕
-- [ ] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: `gameOver()` (2478行) の `setTimeout()` を `scene.time.delayedCall()` に置き換える。現状はシーン再起動時に停止できず、前のミッションのハイスコア画面が後から開く可能性がある。`nextMission()` (2460行) は既に `delayedCall` を使っており、そちらに合わせる。※ `gameOver()` は scene を受け取っていないため、`gameState.curScene` を経由するか引数を追加する 〔JS: Phaser の作法 — setTimeout / setInterval を使わない〕 [233d094]
+- [x] Task: `saveHighScore()` (2508行) の `localStorage.setItem()` を `try` / `catch` で保護する。プライベートブラウジングや容量超過で例外が飛ぶと、ミッションクリア処理が中断する。読み込み側 `loadHighScores()` (2482行) は既に保護されている 〔Tech Stack: 読み込みは必ず失敗を想定します〕 [39703da]
+- [x] Task: `renderHSTable()` (2527行) の `s.gameid == GAME_ID` を `===` にする。両辺とも文字列のため結果は変わらない 〔JS §4: Always use identity operators〕 [4f39a4f]
+- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
 
 ---
 
