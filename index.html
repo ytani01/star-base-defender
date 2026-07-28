@@ -855,6 +855,10 @@
       * 全ての艦船の基底クラス (SpaceShip)
       */
      class SpaceShip extends ObjWithShield {
+       // 障害物に接触する手前で止まる余裕。ぴったり接触させると、次の移動で
+       // 重なった状態から始まってしまうため、常にこの分だけ離して停止する。
+       static STOP_MARGIN = 1.5;
+
        constructor(
          scene, x, y, texture,
          shield, shield_color, scale,
@@ -912,7 +916,7 @@
 
          if (minT < 1.0) {
            const len = Math.sqrt(lenSq);
-           const stopT = Math.max(0, minT - 1.5 / len); 
+           const stopT = Math.max(0, minT - SpaceShip.STOP_MARGIN / len);
            return { x: startX + dx * stopT, y: startY + dy * stopT };
          }
          return { x: destX, y: destY };
@@ -1288,6 +1292,9 @@
        static SHIELD_RECOVERY_RATE = 0.005;
        static SHIELD_COLOR = 0x00ffff;
        static DOCKING_RANGE = 50 * SCALE;
+       // 接触したとみなす許容差。NPC は移動後に座標を整数へ丸めるため、
+       // 接触位置ちょうどで止めても最大 √2 だけ離れうる。それを吸収する。
+       static CONTACT_TOLERANCE = 1.5;
 
        constructor(scene, x, y) {
          super(scene, x, y, 'baseImg', StarBase.SHIELD_MAX, StarBase.SHIELD_COLOR);
@@ -2006,7 +2013,7 @@
       */
      function isAdjacentToBase(ship, base) {
        const dist = Phaser.Math.Distance.Between(ship.x, ship.y, base.x, base.y);
-       const contactDist = base.r + ship.r + 1.5;
+       const contactDist = base.r + ship.r + StarBase.CONTACT_TOLERANCE;
        return dist <= contactDist;
      } // isAdjacentToBase()
 
