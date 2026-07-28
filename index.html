@@ -2034,6 +2034,31 @@
      } // dockShip()
 
      /**
+      * ドックを出る艦の移動先を、基地の外へ押し出した座標に補正する。
+      * ドッキング中の艦は基地の中心に重なっているため、そのまま動かすと
+      * 基地を障害物とする判定に引っかかって身動きが取れなくなる。
+      * @param {SpaceShip} ship 押し出す艦
+      * @param {{x:number, y:number}} dest 押し出し前の移動先
+      * @return {{x:number, y:number}} 押し出し後の移動先
+      */
+     function pushOutFromBase(ship, dest) {
+       const base = gameObjs.starBase;
+       const minPushDist = StarBase.R + ship.r;
+       const distFromBase = Phaser.Math.Distance.Between(
+         base.x, base.y, dest.x, dest.y
+       );
+       if (distFromBase >= minPushDist) {
+         return dest;
+       }
+       debugLog('distFromBase', distFromBase, 'minPushDist', minPushDist);
+       const pushAngle = Math.atan2(dest.y - base.y, dest.x - base.x);
+       return {
+         x: base.x + Math.cos(pushAngle) * minPushDist,
+         y: base.y + Math.sin(pushAngle) * minPushDist,
+       };
+     } // pushOutFromBase()
+
+     /**
       * 自機の速度を考慮した目的座標を計算する。
       * 移動距離が実質ゼロ（1未満）の場合は null を返す。
       */
@@ -2064,21 +2089,16 @@
          gameObjs.player.shield = PlayerShip.SHIELD_MAX;
 
          const ignoreObjs = [gameObjs.starBase];
-         let { x: destX, y: destY } = gameObjs.player.resolveMovement(
+         const moved = gameObjs.player.resolveMovement(
            desiredX, desiredY, moveDist, ignoreObjs
          );
-
-         const distFromBase = Phaser.Math.Distance.Between(
-           gameObjs.starBase.x, gameObjs.starBase.y, destX, destY
-         );
-         const minPushDist = StarBase.R + PlayerShip.R;
-         if (distFromBase < minPushDist) {
-           debugLog('distFromBase', distFromBase, 'minPushDist', minPushDist);
-           const pushAngle = Math.atan2(destY - gameObjs.starBase.y, destX - gameObjs.starBase.x);
-           destX = gameObjs.starBase.x + Math.cos(pushAngle) * minPushDist;
-           destY = gameObjs.starBase.y + Math.sin(pushAngle) * minPushDist;
-         }
-         return { destX, destY, ignoreObjs, precomputedDirectDest: null };
+         const pushed = pushOutFromBase(gameObjs.player, moved);
+         return {
+           destX: pushed.x,
+           destY: pushed.y,
+           ignoreObjs,
+           precomputedDirectDest: null,
+         };
        }
 
        // 通常移動およびドッキングを目的とする移動
