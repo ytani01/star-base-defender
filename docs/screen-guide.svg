@@ -96,12 +96,23 @@
   <circle cx="352" cy="672" r="9" fill="#a0a0a0"/>
   <circle cx="180" cy="740" r="9" fill="#a0a0a0"/>
 
-  <!-- 射程円: RANGE_FRIENDLY #00ffff / RANGE_ENEMY #ffff00 -->
-  <circle cx="196" cy="672" r="62" fill="none" stroke="#00ffff" stroke-width="1" opacity="0.55"/>
-  <circle cx="326" cy="600" r="56" fill="none" stroke="#ffff00" stroke-width="1" opacity="0.55"/>
+  <!-- 射程円: RANGE_FRIENDLY #00ffff / RANGE_ENEMY #ffff00。
+       境界 r=175 が実際の AREA_R=300 にあたるので、射程もその縮尺で描く
+       （有効 80 → 47、最大 160 → 93、敵の有効 70 → 41）。
+       最大射程の円は実装でも自機にだけ描かれる。 -->
+  <circle cx="197" cy="669" r="93" fill="none" stroke="#00ffff" stroke-width="1" opacity="0.32"/>
+  <circle cx="197" cy="669" r="47" fill="none" stroke="#00ffff" stroke-width="1" opacity="0.55"/>
+  <circle cx="143" cy="583" r="47" fill="none" stroke="#00ffff" stroke-width="1" opacity="0.55"/>
+  <circle cx="326" cy="596" r="41" fill="none" stroke="#ffff00" stroke-width="1" opacity="0.55"/>
 
   <!-- ビーム: BEAM_PLAYER #00ffff -->
   <line x1="200" y1="666" x2="322" y2="602" stroke="#00ffff" stroke-width="3" opacity="0.85"/>
+
+  <!-- シールドの輪: SHIELD_OK #ffffff。各艦と基地を囲む -->
+  <circle cx="230" cy="612" r="29" fill="none" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="197" cy="669" r="19" fill="none" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="143" cy="583" r="17" fill="none" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="326" cy="596" r="18" fill="none" stroke="#ffffff" stroke-width="2"/>
 
   <!-- 宇宙基地: HULL_BASE #88ffff（元は 100x100 の座標系） -->
   <g transform="translate(202,584) scale(0.56)">
@@ -150,56 +161,46 @@
   <!-- 引き出し線。ラベルは線源の高さの順に並べてあり、線どうしが
        できるだけ交差しないようにしている -->
   <g stroke="#0088ff" stroke-width="1" fill="none" opacity="0.6">
-    <path d="M271 452 L452 456"/>
-    <path d="M322 508 L452 500"/>
-    <path d="M154 562 L452 544"/>
-    <path d="M344 590 L452 588"/>
-    <path d="M250 596 L452 632"/>
-    <path d="M270 628 L452 676"/>
-    <path d="M256 662 L452 714"/>
-    <path d="M204 656 L452 758"/>
-    <path d="M216 694 L452 802"/>
+    <path d="M271 452 L452 454"/>
+    <path d="M322 508 L452 494"/>
+    <path d="M160 566 L452 534"/>
+    <path d="M344 588 L452 574"/>
+    <path d="M252 600 L452 614"/>
+    <path d="M340 610 L452 654"/>
+    <path d="M206 658 L452 694"/>
+    <path d="M290 669 L452 734"/>
+    <path d="M216 694 L452 808"/>
   </g>
 
   <g font-family="monospace" font-size="13">
-    <text x="460" y="460" fill="#0088ff">宇宙域の境界</text>
-    <text x="460" y="478" fill="#8ff">外へ出た敵は撤退する。自機も出られない</text>
+    <text x="460" y="458" fill="#0088ff">宇宙域の境界</text>
+    <text x="460" y="475" fill="#8ff">外へ出た敵は撤退する。自機も出られない</text>
 
-    <text x="460" y="504" fill="#a0a0a0">恒星（障害物）</text>
-    <text x="460" y="522" fill="#8ff">ぶつかれない。射線も遮る</text>
+    <text x="460" y="498" fill="#a0a0a0">恒星（障害物）</text>
+    <text x="460" y="515" fill="#8ff">ぶつかれない。射線も遮る</text>
 
-    <text x="460" y="548" fill="#4488ff">連邦艦（味方）</text>
-    <text x="460" y="566" fill="#8ff">自機と同系色で一段暗い。自律的に戦う</text>
+    <text x="460" y="538" fill="#4488ff">連邦艦（味方）</text>
+    <text x="460" y="555" fill="#8ff">自機と同系色で一段暗い。自律的に戦う</text>
 
-    <text x="460" y="592" fill="#3c3">敵艦</text>
-    <text x="460" y="610" fill="#8ff">緑。撃破ではなく、弱らせて宇宙域の外へ追い出す</text>
+    <text x="460" y="578" fill="#3c3">敵艦</text>
+    <text x="460" y="595" fill="#8ff">撃破ではなく、弱らせて宇宙域の外へ追い出す</text>
 
-    <text x="460" y="636" fill="#88ffff">宇宙基地</text>
-    <text x="460" y="654" fill="#8ff">守る対象。落ちると敗北。ドッキングで補給できる</text>
+    <text x="460" y="618" fill="#88ffff">宇宙基地</text>
+    <text x="460" y="635" fill="#8ff">守る対象。落ちると敗北。ドッキングで補給できる</text>
 
-    <text x="460" y="680" fill="#00ffff">ビーム（フェイザー砲）</text>
-    <text x="460" y="698" fill="#8ff">撃った側の色で伸びる</text>
+    <text x="460" y="658" fill="#ffffff">シールドの輪</text>
+    <text x="460" y="675" fill="#8ff">艦と基地を囲む。残量が減ると細くなり、色も変わる</text>
 
-    <text x="460" y="718" fill="#ffff00">射程円</text>
-    <text x="460" y="736" fill="#8ff">兵器の届く範囲（シアン=自軍 / 黄=敵）。</text>
-    <text x="460" y="753" fill="#8ff">遠いほど威力が落ちる</text>
+    <text x="460" y="698" fill="#66ddff">自機</text>
+    <text x="460" y="715" fill="#8ff">明るいシアン。操作できるのはこの艦だけ</text>
 
-    <text x="460" y="778" fill="#66ddff">自機</text>
-    <text x="460" y="796" fill="#8ff">明るいシアン。操作できるのはこの艦だけ</text>
+    <text x="460" y="738" fill="#00ffff">射程円（自機は二重）</text>
+    <text x="460" y="755" fill="#8ff">内側 = 有効射程。ここで威力は半分になる</text>
+    <text x="460" y="772" fill="#8ff">外側 = 最大射程。ここで威力は 5 分の 1。外は当たらない</text>
+    <text x="460" y="789" fill="#8ff">敵と味方は有効射程の円だけが出る（シアン=自軍 / 黄=敵）</text>
 
-    <text x="460" y="822" fill="#ffffff">艦の下のバー</text>
-    <text x="460" y="840" fill="#8ff">上=シールド量（色が艦種を示す）、</text>
-    <text x="460" y="857" fill="#ffff00">下=エネルギー量（自機だけ）</text>
+    <text x="460" y="812" fill="#ffffff">艦の下のバー</text>
+    <text x="460" y="829" fill="#8ff">上 = シールド量（色が艦種を示す）</text>
+    <text x="460" y="846" fill="#ffff00">下 = エネルギー量（自機だけ）</text>
   </g>
-
-  <!-- ビームの色の凡例。盤面の外に置く -->
-  <text x="30" y="838" fill="#8ff" font-family="monospace" font-size="13">ビームの色</text>
-  <line x1="34" y1="856" x2="66" y2="856" stroke="#00ffff" stroke-width="4"/>
-  <text x="74" y="860" fill="#00ffff" font-family="monospace" font-size="12">自機</text>
-  <line x1="120" y1="856" x2="152" y2="856" stroke="#0088ff" stroke-width="4"/>
-  <text x="160" y="860" fill="#0088ff" font-family="monospace" font-size="12">味方</text>
-  <line x1="206" y1="856" x2="238" y2="856" stroke="#ff00ff" stroke-width="4"/>
-  <text x="246" y="860" fill="#ff00ff" font-family="monospace" font-size="12">敵</text>
-  <line x1="278" y1="856" x2="310" y2="856" stroke="#444444" stroke-width="4"/>
-  <text x="318" y="860" fill="#888888" font-family="monospace" font-size="12">無駄撃ち</text>
 </svg>
