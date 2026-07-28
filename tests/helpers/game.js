@@ -170,6 +170,63 @@ async function snapshot(page) {
 }
 
 /**
+ * 決まった手順でターンを進め、毎ターンの状態を並べて返す。
+ *
+ * 接近 → 攻撃 → シールド回復 → 基地へ移動 を繰り返す。どれも実際の
+ * クリック操作として送るため、入力から決着までの一通りの経路を通る。
+ * 同じ種・同じ手順なら結果は完全に一致するはずで、一致しなければ
+ * 挙動が変わったということになる。
+ *
+ * 「接近」を挟むのは、いきなり敵を撃っても射程外で当たらず、
+ * ダメージの計算をまったく通らないため。当たる状況を作らないと、
+ * 威力や減衰の変化を取りこぼす。
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {number} turns 進めるターン数
+ * @return {Promise<Array<Object>>} 開始時を含む各ターンの状態
+ */
+async function playScriptedTurns(page, turns) {
+  const steps = [await snapshot(page)];
+  for (let i = 0; i < turns; i++) {
+    const targets = await page.evaluate(() => {
+      const enemy = gameObjs.enemies.find((e) => e.active);
+      const player = gameObjs.player;
+      let approach = null;
+      if (enemy) {
+        // 敵と自機を結ぶ線上の、敵の手前あたりを目指す
+        const dx = enemy.x - player.x;
+        const dy = enemy.y - player.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const stopAt = Math.max(0, dist - 40);
+        approach = {
+          x: player.x + (dx / dist) * stopAt,
+          y: player.y + (dy / dist) * stopAt,
+        };
+      }
+      return {
+        enemy: enemy ? { x: enemy.x, y: enemy.y } : null,
+        approach,
+        base: { x: gameObjs.starBase.x, y: gameObjs.starBase.y },
+        player: { x: player.x, y: player.y },
+      };
+    });
+
+    const step = i % 4;
+    if (step === 0 && targets.approach) {
+      await clickWorld(page, targets.approach);
+    } else if (step === 1 && targets.enemy) {
+      await clickWorld(page, targets.enemy);
+    } else if (step === 2) {
+      await clickWorld(page, targets.player);
+    } else {
+      await clickWorld(page, targets.base);
+    }
+    steps.push(await snapshot(page));
+  }
+  return steps;
+}
+
+/**
  * ステータス欄の表示内容。画面に出ている文字をそのまま読む。
  * @param {import('@playwright/test').Page} page
  */
@@ -240,6 +297,7 @@ module.exports = {
   toScreen,
   clickWorld,
   snapshot,
+  playScriptedTurns,
   readStatusPanel,
   readLog,
   collectConsoleIssues,

@@ -1,7 +1,8 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 const {
-  openGame, waitForPlayerTurn, snapshot, clickWorld, collectConsoleIssues,
+  openGame, waitForPlayerTurn, snapshot, clickWorld, playScriptedTurns,
+  collectConsoleIssues,
 } = require('./helpers/game');
 
 /**
@@ -11,31 +12,6 @@ const {
  * これが通らない限り、他のシナリオテストの結果は信用できない。
  * 失敗したときは、まずこのファイルから原因を追うこと。
  */
-
-/** 決まった手順で数ターン進め、毎ターンの状態を並べて返す */
-async function playScript(page, turns) {
-  const steps = [await snapshot(page)];
-  for (let i = 0; i < turns; i++) {
-    const targets = await page.evaluate(() => {
-      const enemy = gameObjs.enemies.find((e) => e.active);
-      return {
-        enemy: enemy ? { x: enemy.x, y: enemy.y } : null,
-        base: { x: gameObjs.starBase.x, y: gameObjs.starBase.y },
-        player: { x: gameObjs.player.x, y: gameObjs.player.y },
-      };
-    });
-    // 攻撃 → 基地へ移動 → シールド回復 を順に繰り返す
-    if (i % 3 === 0 && targets.enemy) {
-      await clickWorld(page, targets.enemy);
-    } else if (i % 3 === 1) {
-      await clickWorld(page, targets.base);
-    } else {
-      await clickWorld(page, targets.player);
-    }
-    steps.push(await snapshot(page));
-  }
-  return steps;
-}
 
 test.describe('テストの土台', () => {
   test('ゲームが起動し、盤面が揃っている', async ({ page }) => {
@@ -74,10 +50,10 @@ test.describe('テストの土台', () => {
 
   test('同じ操作を繰り返せば、数ターン後の状態まで一致する', async ({ page }) => {
     await openGame(page, { seed: 777 });
-    const first = await playScript(page, 6);
+    const first = await playScriptedTurns(page, 6);
 
     await openGame(page, { seed: 777 });
-    const second = await playScript(page, 6);
+    const second = await playScriptedTurns(page, 6);
 
     // ステップごとに比べる。ずれた場合にどのターンからかが分かる
     expect(second.length).toBe(first.length);
@@ -107,7 +83,7 @@ test.describe('テストの土台', () => {
   test('起動から数ターン進めてもコンソールにエラー・警告が出ない', async ({ page }) => {
     const issues = collectConsoleIssues(page);
     await openGame(page);
-    await playScript(page, 4);
+    await playScriptedTurns(page, 4);
     await waitForPlayerTurn(page);
 
     expect(issues.errors).toEqual([]);

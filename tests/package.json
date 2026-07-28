@@ -6,7 +6,8 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "install-browser": "playwright install chromium"
+    "install-browser": "playwright install chromium",
+    "baseline": "node make-baseline.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.0"
