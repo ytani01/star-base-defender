@@ -131,6 +131,6 @@
 
 ## 完了後
 
-- [ ] Task: `metadata.json` の `status` を `done` に更新する
-- [ ] Task: この Track を `conductor/archive/` へ移動し、`conductor/index.md` の Tracks 一覧を更新する
-- [ ] Task: バージョンを更新し、`chore:` コミットを作る（挙動が変わらないため、更新するかどうかは Workflow のバージョン更新方針に従って判断する）
+- [x] Task: `metadata.json` の `status` を `done` に更新する
+- [x] Task: この Track を `conductor/archive/` へ移動し、`conductor/index.md` の Tracks 一覧を更新する
+- [x] Task: バージョンを更新し、`chore:` コミットを作る。※ 挙動は変わらないが、自動テストの導入という進め方の変化があったため v0.4.0 とした [bdd4251]

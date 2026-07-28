@@ -46,10 +46,11 @@ star-base-defender/
 
 ### 進行中
 
-- [refactor_guidelines_20260728](./refactor_guidelines_20260728/index.md) — `conductor/` の規約に対する `index.html` の乖離を解消する（全8フェーズ）。Phase 6 まで完了
+なし
 
 ### 完了・保管済み
 
+- [refactor_guidelines_20260728](./archive/refactor_guidelines_20260728/index.md) — `conductor/` の規約に対する `index.html` の乖離を解消（全8フェーズ）
 - [test_harness_20260728](./archive/test_harness_20260728/index.md) — 確認シナリオを2層（`tests.html` と Playwright）で自動化
 - [refactor_config_20260706](./archive/refactor_config_20260706/index.md) — 設定値を `OBJ_CONF.*` から各クラスの static プロパティへ移行
 
@@ -58,5 +59,5 @@ star-base-defender/
 単発のリファクタリング計画などは `archives/` に日付プレフィックス付きで保管しています。
 
 - `archives/20260728a-refactoring-plan.md` — コード側から洗い出したリファクタリング計画。
-  規約を根拠として整理し直した [refactor_guidelines_20260728](./refactor_guidelines_20260728/index.md) が後継となる
+  規約を根拠として整理し直した [refactor_guidelines_20260728](./archive/refactor_guidelines_20260728/index.md) が後継となる
 - `archives/20260727a-refactoring-plan.md` — 前回計画（大部分は v0.3.17 で実施済み）
