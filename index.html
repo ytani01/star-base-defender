@@ -2474,7 +2474,12 @@
        gameState.isPlayerTurn = false;
        setMsg(from, msg);
        updateStatus();
-       setTimeout(() => showHighScoreOverlay('gameover', { msgstr }), TIMING.MISSION_OVER);
+       // シーン再起動で確実に止めるため setTimeout ではなく delayedCall を使う。
+       // setTimeout だと前のミッションのハイスコア画面が後から開いてしまう。
+       gameState.curScene.time.delayedCall(
+         TIMING.MISSION_OVER,
+         () => showHighScoreOverlay('gameover', { msgstr })
+       );
      } // gameOver()
 
      function loadHighScores() {
