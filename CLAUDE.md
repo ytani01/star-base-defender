@@ -33,7 +33,7 @@ cd tests && npx playwright test layout          # ファイル名で絞り込む
 # 挙動を変えないはずの変更をしたとき、変更前と突き合わせる
 cd tests && node make-baseline.js HEAD~5 && npx playwright test regression
 
-# 表示の実測（各画面のパネル幅・宇宙域・折り返しを一覧にする。/layout-check）
+# 表示の実測（各画面のパネル幅・宇宙域・折り返しを一覧にする）
 cd tests && node layout-report.js --out before   # 変更前を控える
 cd tests && node layout-report.js --compare before/report.json
 
@@ -42,6 +42,9 @@ awk '/<script>/{flag=1; next} /<\/script>/{flag=0} flag' index.html > /tmp/extra
 ```
 
 デバッグ時は `index.html` の `DEBUG` フラグ（既定 `false`）を `true` にすると `debugLog()` の出力が有効になる。
+
+表示を変えたときは Claude Code で `/layout-check` を使う（`.claude/skills/layout-check/`）。
+上の `layout-report.js` を、比べ方の手順つきで呼び出すもの。
 
 テストを書くときの注意（実際につまずいた点。詳細は `conductor/tech-stack.md`）:
 
