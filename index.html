@@ -99,6 +99,10 @@
      #statusPanel #logStatus {
        height: 90px;
        line-height: 1.2;
+       /* 禁則処理。既定では長音符や小書き仮名の前でも改行されるため、
+          「シ／ールド」のように語が割れて読み取りに一拍かかる。
+          報告を一目で読ませるための指定であって、見た目の好みではない。 */
+       line-break: strict;
        overflow-y: auto;
        background: #000;
        border: 1px solid rgba(0, 255, 255, 0.2);
@@ -485,6 +489,7 @@
        RANGE_ENEMY: 0xffff00,      // 黄: 敵の射程円
        BOUNDARY: 0x0088ff,         // 青: 宇宙域の境界
        DOCKING_RING: 0x02ffff,     // シアン: ドッキング中を示す輪
+
      };
 
      // 残量に応じて表示を切り替える比率（0.0〜1.0）
@@ -2788,7 +2793,11 @@
        const color = ratio < DISPLAY_THRESHOLD.GAUGE_DANGER
                            ? MSG_COLOR.DANGER : MSG_COLOR.GOOD;
        document.getElementById(valueElId).style.color = color;
-       document.getElementById(valueElId).textContent = value;
+       // 整数に丸めてから出す。いまのバランス数値ではたまたま割り切れて
+       // いるだけで、回復率や最大値を変えると 112.00000000000001 のような
+       // 値がそのまま画面に出る。17桁になると横画面で行が折り返し、
+       // 表示の崩れにまで波及する。
+       document.getElementById(valueElId).textContent = Math.round(value);
        document.getElementById(gaugeElId).style.width = (ratio * 100) + '%';
        document.getElementById(gaugeElId).style.background = color;
      } // updateGaugeDisplay()

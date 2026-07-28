@@ -96,10 +96,19 @@ test.describe('表示・操作環境', () => {
     // 幅を詰めた結果、ラベルと数値が泣き別れては読めない。
     // 「宇宙域を広げる」より「読めること」が優先だという線引きを固定する。
     // ヘッダはタイトルと著作権表示が折り返す設計（flex-wrap）なので除く。
+    //
+    // 起動直後の値（シールド 400 など）だけで測ると、桁が増えたときの
+    // 崩れを見逃す。実際に遊べば必ず通る「削られた状態」で測る。
     for (const size of SIZES.filter((s) => s.w >= s.h)) {
       await page.setViewportSize({ width: size.w, height: size.h });
       await openGame(page);
       await fillLog(page);
+      await page.evaluate(() => {
+        gameObjs.player.shield = PlayerShip.SHIELD_MAX * 0.28;
+        gameObjs.player.energy = PlayerShip.ENERGY_MAX * 0.55;
+        gameObjs.starBase.shield = StarBase.SHIELD_MAX * 0.42;
+        updateStatus();
+      });
       const m = await measure(page);
 
       expect(m.wrappedRows, `${size.label}: 折り返した行がない`).toEqual([]);
