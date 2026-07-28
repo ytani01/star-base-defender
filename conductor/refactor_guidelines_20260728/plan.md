@@ -101,18 +101,18 @@
 
 ---
 
-## Phase 7: 命名規約の統一
+## Phase 7: 命名規約の統一 [checkpoint: 82a55c3]
 
 コミット種別: `style:` / **差分が大きいため、他の変更と絶対に混ぜないこと。** 1項目ずつ全置換して確認する。
 
-- [ ] Task: `Weapon` クラスのメソッド名を `lowerCamelCase` にする。`EffectiveRange()` → `effectiveRange()` (696行、呼び出し 1840行) / `MaxRange()` → `maxRange()` (700行、呼び出し 1206 / 1429 / 1844行) / `Effectiveness()` → `effectiveness()` (707行、呼び出し 713行) / `CalcDamage()` → `calcDamage()` (712行、呼び出し 1156 / 1444行) 〔JS §6: Methods are lowerCamelCase〕
-- [ ] Task: `Weapon` のフィールド `max_power` / `area_r` を `maxPower` / `areaR` にする 〔JS §6: Fields are lowerCamelCase〕
-- [ ] Task: `PlayerShip.is_docked` を `isDocked` にする（参照箇所が多いため単独で実施）〔JS §6〕
-- [ ] Task: ゲージ関連フィールド `shield_gauge` / `shield_circle` / `shield_gauge_color` / `energy_gauge` / `energy_gauge_color` / `gauge_h` / `gauge_w` / `gauge_y` を `lowerCamelCase` にする 〔JS §6〕
-- [ ] Task: `energy_p()` (1255行) を `energyPercent()` にする（既存の `shieldPercent()` と対にする）〔JS §6〕
-- [ ] Task: ローカル変数の `snake_case` を `lowerCamelCase` にする（`dist_target_to_base` / `target_is_base` / `speed_p` / `qty_enemies` / `qty_federation` / `t_shield_p` / `d_shield` / `energy_supply` ほか）〔JS §6〕
-- [ ] Task: `DEBUG = true` に切り替えて全ログが出力されることを確認する（改名漏れの検出）〔Workflow: デバッグ確認〕
-- [ ] Task: Conductor - User Manual Verification 'Phase 7' (Protocol in workflow.md)
+- [x] Task: `Weapon` クラスのメソッド名を `lowerCamelCase` にする。`EffectiveRange()` → `effectiveRange()` (696行、呼び出し 1840行) / `MaxRange()` → `maxRange()` (700行、呼び出し 1206 / 1429 / 1844行) / `Effectiveness()` → `effectiveness()` (707行、呼び出し 713行) / `CalcDamage()` → `calcDamage()` (712行、呼び出し 1156 / 1444行) 〔JS §6: Methods are lowerCamelCase〕
+- [x] Task: `Weapon` のフィールド `max_power` / `area_r` を `maxPower` / `areaR` にする 〔JS §6: Fields are lowerCamelCase〕
+- [x] Task: `PlayerShip.is_docked` を `isDocked` にする（参照箇所が多いため単独で実施）〔JS §6〕
+- [x] Task: ゲージ関連フィールド `shield_gauge` / `shield_circle` / `shield_gauge_color` / `energy_gauge` / `energy_gauge_color` / `gauge_h` / `gauge_w` / `gauge_y` を `lowerCamelCase` にする 〔JS §6〕
+- [x] Task: `energy_p()` (1255行) を `energyPercent()` にする（既存の `shieldPercent()` と対にする）〔JS §6〕
+- [x] Task: ローカル変数の `snake_case` を `lowerCamelCase` にする（`dist_target_to_base` / `target_is_base` / `speed_p` / `qty_enemies` / `qty_federation` / `t_shield_p` / `d_shield` / `energy_supply` ほか）〔JS §6〕
+- [x] Task: `DEBUG = true` に切り替えて全ログが出力されることを確認する（改名漏れの検出）〔Workflow: デバッグ確認〕
+- [x] Task: Conductor - User Manual Verification 'Phase 7' (Protocol in workflow.md) [82a55c3]
 
 ---
 
