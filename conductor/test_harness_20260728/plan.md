@@ -68,13 +68,13 @@ Playwright が使えない環境でも Phase 1 だけで価値が出る。
 
 ---
 
-## Phase 6: 変更前後の突き合わせ
+## Phase 6: 変更前後の突き合わせ [checkpoint: 223fc6c]
 
 コミット種別: `test:` / リファクタリング時にリグレッションを検出するための仕組み。
 
 - [x] Task: 2つの `index.html`（変更前・変更後）を同じ盤面・同じ操作列で走らせ、全状態の列を突き合わせるテストを作る。使い方をコメントに書く。※ 比較のもとは `make-baseline.js` で任意のリビジョンから取り出す [04e329c]
 - [x] Task: 同一ファイル同士で必ず一致することを確かめる自己テストを入れる。これが通らない限り比較結果を信用しない [04e329c]
-- [~] Task: Conductor - User Manual Verification 'Phase 6' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 6' (Protocol in workflow.md) [223fc6c]
 
 ---
 
