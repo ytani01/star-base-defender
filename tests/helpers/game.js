@@ -322,6 +322,8 @@ async function measureLayout(page) {
       vh: window.innerHeight,
       canvas: rect('#gameCanvas canvas'),
       panel: rect('#statusPanel'),
+      // ステータス欄を除いた、宇宙域とズームUIが分け合う領域
+      wrapper: rect('#gameWrapper'),
       zoomUI: rect('#zoomUI'),
       // ズームUIが盤面に重なっているか。重ねれば宇宙域を狭めずに済むが、
       // 盤面の一部が隠れる。どちらを選んでいるかは画面の形で変わる

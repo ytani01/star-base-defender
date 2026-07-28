@@ -126,9 +126,18 @@
        min-height: 0;
        min-width: 0;
        display: flex;             /* 追加: フレックスボックス化 */
-       justify-content: flex-start; /* 追加: 左詰め */
-       align-items: flex-start;     /* 追加: 上詰め */
+       /* ズームUIを流し込むときに縦へ積むため、常に column にしておく。
+          重ね置きのときは絶対配置で流れの外に出るので、この向きは効かない */
+       flex-direction: column;
+       justify-content: flex-start; /* 追加: 上詰め */
+       align-items: flex-start;     /* 追加: 左詰め */
        background: #000;          /* 余白部分を黒に */
+       /* ズームUIの置き場所を、この要素自身の形から決めるための宣言。
+          判断に要るのは「ステータス欄を除いて残った領域」の縦横比であって
+          画面全体の比ではない。ステータス欄の高さはログの量と文字サイズで
+          変わるので、画面の比から逆算しようとすると必ず外れる */
+       container-type: size;
+       container-name: playfield;
      }
      #gameCanvas {
        width: 100%;
@@ -156,17 +165,19 @@
        z-index: 1000;
      }
 
-     /* 縦長で高さに余裕がある画面だけ、盤面に重ねず真上へ出す。
-        条件は「ステータス欄とズームUIを引いた残りの高さが、画面の幅以上」。
-        ステータス欄は最大 40dvh、ズームUIは約 60px なので
-        0.6 × 高さ − 60 ≥ 幅、おおむね 幅/高さ ≤ 0.5 に落ちる。
-        これを超える画面で真上に出すと宇宙域がそのまま縮むため、
-        重ねたままにする（実測: 360x640 で 360→324、320x568 で 320→281）。
-        しきい値が正しいかは layout.spec.js が実際の寸法で確かめている。 */
-     @media (orientation: portrait) and (max-aspect-ratio: 1 / 2) {
-       #gameWrapper {
-         flex-direction: column;
-       }
+     /* 残った領域が縦に余っているときだけ、ズームUIを盤面に重ねず真上へ出す。
+        条件は「残りの高さからズームUIの1段ぶんを引いても、まだ幅以上ある」。
+        ズームUIは約 60px なので 高さ − 60 ≥ 幅、つまり 幅/高さ ≤ 1 − 60/高さ。
+        高さ 340〜640 では 0.82〜0.91 に収まるので、余裕を見て 0.85 とする。
+        これを超える領域で真上に出すと宇宙域がそのまま縮む
+        （実測: 360x640 で 360→324、320x568 で 320→281）。
+
+        画面全体ではなくこの領域を見るのが肝心。ステータス欄の高さはログの量と
+        文字サイズで変わるため、画面の比から逆算すると外れる。実際、画面の比で
+        判断していたときは Pixel 9a（411x785、ステータス欄が高さの 33%）で
+        余裕があるのに重ねてしまっていた。
+        しきい値が妥当かは layout.spec.js が実際の寸法で両方向から確かめている。 */
+     @container playfield (max-aspect-ratio: 85 / 100) {
        #zoomUI {
          position: static;
          flex-direction: row;
@@ -436,7 +447,7 @@
 
      // リリースのたびに更新する。表示は起動時に .game-title へ流し込む
      const GAME_NAME = 'StarBase Defender';
-     const VERSION = 'v0.5.0';
+     const VERSION = 'v0.5.1';
 
      const TIMING = {
        BEAM_DUR: 400,

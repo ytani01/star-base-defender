@@ -126,13 +126,26 @@ test.describe('表示・操作環境', () => {
       await fillLog(page);
       const m = await measure(page);
 
+      // 横一列に並べ替えたときにズームUIが使う高さ。ボタン1段ぶんと余白
+      const rowHeight = m.tapTargets[0].h + 12;
+
       if (m.zoomOverlapsCanvas) {
-        continue; // 重ねている場合は宇宙域を狭めていないので問題ない
+        // 重ねてよいのは、外に出すと宇宙域が狭くなるときだけ。
+        // 余裕があるのに重ねていては、ただ盤面を隠しているだけになる
+        if (!m.isLandscape) {
+          expect(m.wrapper.height - rowHeight,
+                 `${size.label}: 余裕があるのに盤面へ重ねている`)
+            .toBeLessThan(m.wrapper.width);
+        }
+        continue;
       }
-      // 外に出しているなら、宇宙域は画面の幅いっぱいまで使えているはず。
-      // 使えていないなら、隠さないために狭めたことになり割に合わない
+      // 外に出しているなら、宇宙域は重ねていたときと同じ大きさのはず。
+      // 宇宙域は正方形なので、残った領域の短いほうがその大きさになる。
+      // 小さくなっているなら、隠さないために狭めたことになり割に合わない
+      // （画面の短辺と比べてはいけない。横画面ではステータス欄が幅を
+      //   決めているので、ズームUIとは関係なく宇宙域のほうが小さい）
       expect(m.canvas.width, `${size.label}: 盤面の外に出したのに宇宙域が狭い`)
-        .toBeGreaterThanOrEqual(Math.min(size.w, size.h) - 1);
+        .toBeGreaterThanOrEqual(Math.min(m.wrapper.width, m.wrapper.height) - 1);
     }
   });
 
