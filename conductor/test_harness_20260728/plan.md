@@ -15,11 +15,11 @@ Playwright が使えない環境でも Phase 1 だけで価値が出る。
 
 コミット種別: `test:` / `index.html` には触れない。
 
-- [ ] Task: `tests.html` の骨格を作る。`index.html` を iframe で読み込み、その realm の関数を呼べるようにする。結果は成功／失敗の一覧として画面に出し、失敗時は期待値と実際の値を並べる 〔Tech Stack: tests.html は依存ゼロを保つ〕
-- [ ] Task: 幾何計算のテストを書く。`intersectSegmentCircle()` の交差あり／なし／接する場合、`hasObstacleOnPath()` の始点・終点の近傍を遮蔽とみなさない境界、`isPathBlockedBy()` の空リスト・複数障害物 〔spec: 計算のテスト〕
-- [ ] Task: スコア計算のテストを書く。`calcTurnPenalty()` / `calcShipLossPenalty()` / `calcMissionClearBonus()` の値と符号。Product Guide の「時間経過・撃破・味方の喪失は減点」「クリアは深いほど加点」と対応づける 〔Product Guide: スコアの考え方〕
-- [ ] Task: 威力減衰のテストを書く。`Effectiveness()` が有効射程で 1/2、最大射程で `MAX_DAMAGE_RATIO` になること、`MaxRange()` がその定義と整合すること、`CalcDamage()` が距離とともに単調に減ること 〔Product Guide: 距離のジレンマ〕
-- [ ] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
+- [x] Task: `tests.html` の骨格を作る。`index.html` を iframe で読み込み、その realm の関数を呼べるようにする。結果は成功／失敗の一覧として画面に出し、失敗時は期待値と実際の値を並べる 〔Tech Stack: tests.html は依存ゼロを保つ〕 [973fd06]
+- [x] Task: 幾何計算のテストを書く。`intersectSegmentCircle()` の交差あり／なし／接する場合、`hasObstacleOnPath()` の始点・終点の近傍を遮蔽とみなさない境界、`isPathBlockedBy()` の空リスト・複数障害物 〔spec: 計算のテスト〕 [973fd06]
+- [x] Task: スコア計算のテストを書く。`calcTurnPenalty()` / `calcShipLossPenalty()` / `calcMissionClearBonus()` の値と符号。Product Guide の「時間経過・撃破・味方の喪失は減点」「クリアは深いほど加点」と対応づける 〔Product Guide: スコアの考え方〕 [973fd06]
+- [x] Task: 威力減衰のテストを書く。`Effectiveness()` が有効射程で 1/2、最大射程で `MAX_DAMAGE_RATIO` になること、`MaxRange()` がその定義と整合すること、`CalcDamage()` が距離とともに単調に減ること 〔Product Guide: 距離のジレンマ〕 [973fd06]
+- [~] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
 
 ---
 
