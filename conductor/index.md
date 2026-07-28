@@ -44,7 +44,8 @@ star-base-defender/
 
 ### 進行中
 
-- [refactor_guidelines_20260728](./refactor_guidelines_20260728/index.md) — `conductor/` の規約に対する `index.html` の乖離を解消する（全8フェーズ）
+- [test_harness_20260728](./test_harness_20260728/index.md) — 確認シナリオを2層で自動化する（全7フェーズ）
+- [refactor_guidelines_20260728](./refactor_guidelines_20260728/index.md) — `conductor/` の規約に対する `index.html` の乖離を解消する（全8フェーズ）。Phase 6 まで完了。**Phase 7 は自動テストの整備後に再開する**
 
 ### 完了・保管済み
 
