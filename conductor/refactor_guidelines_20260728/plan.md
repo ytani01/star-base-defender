@@ -70,7 +70,7 @@
 
 ---
 
-## Phase 5: 責務の分離
+## Phase 5: 責務の分離 [checkpoint: 10c5b72]
 
 コミット種別: `refactor:` / **本 Track で最もデリケートなフェーズ。1タスクごとに動作確認する。**
 
@@ -85,7 +85,7 @@
 - [x] Task: `finalizeEnemyTurn()` (2353 / 2371行) の生の `filter(e => e.active).length` を、既存の `getActiveEnemyCount()` (480行) に置き換える 〔JS: 重複の排除〕 [9ba658f]
 - [x] Task: `handlePointerDown()` のエネルギー枯渇チェック (1960〜1967行 / 1988〜1993行) を共通のヘルパーに集約する。差はメッセージ文言のみ。**2種類の文言はそのまま維持する** 〔JS: 重複の排除〕 [9ba658f]
 - [x] Task: `spirit` / `fear()` / `isFleeing()` を `ObjWithShield` (778 / 824 / 831行) から `NPCShip` へ移す。現状は `StarBase` と `PlayerShip` も継承しているが、これらが士気を使うことはない 〔JS: 振る舞いの差はクラス側に持たせる〕 [9ba658f]
-- [~] Task: Conductor - User Manual Verification 'Phase 5' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 5' (Protocol in workflow.md) [10c5b72]
 
 ---
 
