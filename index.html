@@ -328,6 +328,7 @@
         <div>
           Federation
           <span id="statusFederationShipCount">1</span>
+          (Dock <span id="statusFederationShipDocked">0</span>)
         </div>
         <div>
           Enemy
@@ -670,6 +671,18 @@
      function getActiveFederationShipCount() {
        return gameObjs.federationShips.filter(f => f.active).length;
      } // getActiveFederationShipCount()
+
+     /**
+      * 基地にドッキング中の艦の数。
+      * ドッキング中の艦は補給を受ける代わりに戦力から外れるため、
+      * 「Federation の数のうち何隻が今は戦えないか」として表示する。
+      * Federation の表示数が自機を含むので、こちらも自機を含めて数える。
+      */
+     function getDockedShipCount() {
+       const federationDocked =
+             gameObjs.federationShips.filter(f => f.active && f.isDocked).length;
+       return federationDocked + (gameObjs.player.isDocked ? 1 : 0);
+     } // getDockedShipCount()
 
      /**
       * 生存中の敵艦の数。
@@ -2780,6 +2793,7 @@
        const PlayerShield = gameObjs.player.shield > 0 ? gameObjs.player.shield : 0;
        const baseShield = gameObjs.starBase.shield > 0 ? gameObjs.starBase.shield : 0;
        const federationCount = getActiveFederationShipCount() + 1; // 自機を含めて表示
+       const dockedCount = getDockedShipCount();
        const enemyCount = getActiveEnemyCount();
 
        document.getElementById('statusTurn').textContent = `${gameState.turn}`;
@@ -2788,6 +2802,10 @@
 
        document.getElementById('statusFederationShipCount').style.color = MSG_COLOR.WARN;
        document.getElementById('statusFederationShipCount').textContent = `${federationCount}`;
+
+       // 色は指定しない。ドッキング中は自軍にとって有利でも不利でもないため、
+       // パネル既定のシアン（自軍の色）のままにする。
+       document.getElementById('statusFederationShipDocked').textContent = `${dockedCount}`;
 
        document.getElementById('statusEnemyShipCount').style.color = MSG_COLOR.WARN;
        document.getElementById('statusEnemyShipCount').textContent = `${enemyCount}`;

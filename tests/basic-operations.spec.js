@@ -1,7 +1,7 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 const {
-  openGame, waitForPlayerTurn, snapshot, clickWorld, readLog,
+  openGame, waitForPlayerTurn, snapshot, clickWorld, readLog, readStatusPanel,
 } = require('./helpers/game');
 
 /**
@@ -307,5 +307,41 @@ test.describe('基本操作', () => {
     }));
     expect(after.docked, 'ドッキングが解除される').toBe(false);
     expect(after.dist, '基地の外へ押し出される').toBeGreaterThanOrEqual(setup.minPush - 0.01);
+  });
+
+  test('ドッキング中の艦の数がステータス欄に出る', async ({ page }) => {
+    await openGame(page);
+    // 連邦艦は clearField() で片付く。ここで数えたいのは自機の分だけにして、
+    // NPC が勝手に発進して数が動くことのないようにする
+    await clearField(page);
+    const base = await page.evaluate(() => {
+      const b = gameObjs.starBase;
+      b.x = AREA_CENTER.X;
+      b.y = AREA_CENTER.Y;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      // 接触する距離に置く
+      p.x = b.x + b.r + p.r;
+      p.y = b.y;
+      updateStatus();
+      return { x: b.x, y: b.y };
+    });
+
+    expect((await readStatusPanel(page)).docked,
+           'まだ誰も入っていない').toBe('0');
+
+    // 自機がドッキングすると増える
+    await clickWorld(page, base);
+    expect(await page.evaluate(() => gameObjs.player.isDocked),
+           'ドッキングした').toBe(true);
+    expect((await readStatusPanel(page)).docked,
+           '自機の分が数えられる').toBe('1');
+
+    // 自機が発進すると減る
+    await clickWorld(page, { x: base.x + 150, y: base.y });
+    expect(await page.evaluate(() => gameObjs.player.isDocked),
+           'ドッキングが解除された').toBe(false);
+    expect((await readStatusPanel(page)).docked,
+           '0隻に戻る').toBe('0');
   });
 });
