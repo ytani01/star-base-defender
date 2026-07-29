@@ -663,8 +663,9 @@
       * 線分（始点からdx,dy方向へ、長さの2乗がa）と円（中心が始点からfx,fy、半径radius）
       * の交差判定。線分をt=0(始点)〜t=1(終点)としてパラメータ化した交点位置を返す。
       * 交差しない場合は null。
-      * clampDest()（衝突による移動停止）と hasObstacleOnPath()（LOS/経路上の障害物判定）
-      * で共通して使う、線分と円の交差の二次方程式を解く部分だけを切り出したもの。
+      * clampDest()（衝突による移動停止）と findFirstBlockerOnPath()（射線上で
+      * 最も手前にあるものの判定）で共通して使う、線分と円の交差の
+      * 二次方程式を解く部分だけを切り出したもの。
       */
      function intersectSegmentCircle(dx, dy, a, fx, fy, radius) {
        const b = 2 * (fx * dx + fy * dy);
@@ -702,37 +703,7 @@
        };
      } // clampCameraCenter()
 
-     /**
-      * src から dst への線分が obj に遮られるか。
-      * 始点・終点のごく近傍（t < 0.05 / t > 0.95）は射手自身や目標との接触なので、
-      * 遮蔽とはみなさない。
-      */
-     function hasObstacleOnPath(src, dst, obj) {
-       const dx = dst.x - src.x, dy = dst.y - src.y;
-       const a = dx * dx + dy * dy;
-       if (a < 0.001) {
-         return false;
-       }
-       const fx = src.x - obj.x, fy = src.y - obj.y;
-       const hit = intersectSegmentCircle(dx, dy, a, fx, fy, obj.r);
-       if (!hit) {
-         return false;
-       }
-       return (hit.t1 > 0.05 && hit.t1 < 0.95) || (hit.t2 > 0.05 && hit.t2 < 0.95);
-     } // hasObstacleOnPath()
 
-     /**
-      * src から dst への射線が、渡された障害物のいずれかに遮られるか。
-      * 「どれを障害物とみなすか」は状況によって変わるため、集める側と
-      * 判定する側を分けてある（集める側は isLOSBlocked()）。
-      * @param {{x:number, y:number}} src 始点
-      * @param {{x:number, y:number}} dst 終点
-      * @param {Array<GameObj>} obstacles 遮蔽物の候補
-      * @return {boolean} 遮られていれば true
-      */
-     function isPathBlockedBy(src, dst, obstacles) {
-       return obstacles.some(o => hasObstacleOnPath(src, dst, o));
-     } // isPathBlockedBy()
 
      /**
       * src から dst へ向かう向きに、距離 length だけ進んだ点を返す。
@@ -766,7 +737,7 @@
       * 誤射になるため、順序まで分かる形が要る。
       *
       * 交点の近さは intersectSegmentCircle() が返す t（0 が始点、1 が終点）で
-      * 比べる。除外する近傍の範囲は hasObstacleOnPath() と揃えてあり、
+      * 比べる。始点・終点のごく近傍（t < 0.05 / t > 0.95）は除いてあり、
       * 射手自身や目標との接触を拾わない。
       *
       * @param {{x:number, y:number}} src 始点
@@ -2509,19 +2480,6 @@
      } // getSafeRandPos()
 
 
-     /**
-      * LOS(Line of Sight、射線)がブロックされてないか？
-      */
-     function isLOSBlocked(srcObj, targetObj, checkBase = true) {
-       // 遮蔽物を集めるところだけがグローバル状態に触れる。
-       // 実際の判定は純粋な isPathBlockedBy() に任せる。
-       const obstacles = gameObjs.stars.filter(s => s.active);
-       const base = gameObjs.starBase;
-       if (checkBase && base && base.active && base.shield > 0) {
-         obstacles.push(base);
-       }
-       return isPathBlockedBy(srcObj, targetObj, obstacles);
-     } // isLOSBlocked()
 
      /**
       * 射線上に何があるかを調べ、ビームがどこで止まるかを返す。
