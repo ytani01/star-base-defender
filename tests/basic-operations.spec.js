@@ -393,6 +393,336 @@ async function cameraCenter(page) {
   });
 }
 
+/**
+ * NPC のターンを空振りさせ、プレイヤーの行動の結果だけを見えるようにする。
+ *
+ * これを入れないと、クリックのあとに敵と味方が撃ち合った分まで数えてしまい、
+ * 「自機の一撃が誰に当たったか」を測れない。
+ * 差し替えるのは npcTurn だけで、攻撃の処理そのものには手を触れない。
+ */
+async function suppressNpcTurn(page) {
+  await page.evaluate(() => {
+    npcTurn = (scene) => {
+      gameState.isPlayerTurn = true;
+    };
+  });
+}
+
+/**
+ * 自機・味方・敵を一直線に並べる。
+ * 射線上に味方がいる状況は、座標を作らないと安定して再現できない。
+ * @return {Promise<{enemy:{x:number,y:number}, friend:{x:number,y:number}}>}
+ */
+async function lineUpPlayerFriendEnemy(page, { friendOffset = 60 } = {}) {
+  return page.evaluate((offset) => {
+    const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+    // 基地は射線から外す。基地も誤射の対象なので、残すと結果が混ざる
+    gameObjs.starBase.x = cx;
+    gameObjs.starBase.y = cy - 250;
+
+    const p = gameObjs.player;
+    p.isDocked = false;
+    p.x = cx - 100;
+    p.y = cy;
+
+    newFederationShip(gameState.curScene, 0.1, 0.2);
+    const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+    f.active = true;
+    f.sprite.setVisible(true);
+    f.isDocked = false;
+    f.shield = FederationShip.SHIELD_MAX;
+    f.x = cx - 100 + offset;   // 自機と敵のあいだ
+    f.y = cy;
+
+    const e = gameObjs.enemies[0];
+    e.active = true;
+    e.sprite.setVisible(true);
+    e.shield = EnemyShip.SHIELD_MAX;
+    e.x = cx - 100 + 130;
+    e.y = cy;
+
+    return { enemy: { x: e.x, y: e.y }, friend: { x: f.x, y: f.y } };
+  }, friendOffset);
+}
+
+/** 味方（最後に足した連邦艦）と敵の状態 */
+async function readLineUp(page) {
+  return page.evaluate(() => {
+    const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+    const e = gameObjs.enemies[0];
+    return {
+      friendShield: f.shield, friendActive: f.active,
+      enemyShield: e.shield,
+      energy: gameObjs.player.energy,
+      baseShield: gameObjs.starBase.shield,
+    };
+  });
+}
+
+test.describe('射線上の味方への誤射', () => {
+  test('味方越しに敵を撃つと、味方に当たって敵には届かない', async ({ page }) => {
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const pos = await lineUpPlayerFriendEnemy(page);
+    const before = await readLineUp(page);
+
+    await clickWorld(page, pos.enemy);
+    const after = await readLineUp(page);
+
+    expect(after.friendShield, '味方のシールドが減る')
+      .toBeLessThan(before.friendShield);
+    expect(after.enemyShield, '敵は無傷').toBe(before.enemyShield);
+    expect(after.energy, 'エネルギーは消費する').toBeLessThan(before.energy);
+    expect((await readLog(page, 3)).join('\n')).toContain('誤射');
+  });
+
+  test('味方が射線から外れていれば、今までどおり敵に当たる', async ({ page }) => {
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const pos = await lineUpPlayerFriendEnemy(page);
+    // 味方だけを射線の外へ動かす
+    await page.evaluate(() => {
+      const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+      f.y = AREA_CENTER.Y - 120;
+    });
+    const before = await readLineUp(page);
+
+    await clickWorld(page, pos.enemy);
+    const after = await readLineUp(page);
+
+    expect(after.enemyShield, '敵のシールドが減る').toBeLessThan(before.enemyShield);
+    expect(after.friendShield, '味方は無傷').toBe(before.friendShield);
+  });
+
+  test('恒星が味方より手前にあれば、誤射ではなく無駄撃ちになる', async ({ page }) => {
+    // 手前にあるほうが優先される。恒星が先なら誰にもダメージは入らない
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const pos = await lineUpPlayerFriendEnemy(page);
+    await page.evaluate(() => {
+      const s = gameObjs.stars[0];
+      s.active = true;
+      s.sprite.setVisible(true);
+      s.x = gameObjs.player.x + 30;   // 味方より手前
+      s.y = gameObjs.player.y;
+    });
+    const before = await readLineUp(page);
+
+    await clickWorld(page, pos.enemy);
+    const after = await readLineUp(page);
+
+    expect(after.friendShield, '味方は無傷').toBe(before.friendShield);
+    expect(after.enemyShield, '敵も無傷').toBe(before.enemyShield);
+    expect((await readLog(page, 3)).join('\n')).toContain('障害物に遮られました');
+  });
+
+  test('ドック内の味方は射線上にいても当たらない', async ({ page }) => {
+    // 基地の中にいるため。敵の標的から外れるのと同じ扱い
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const pos = await lineUpPlayerFriendEnemy(page);
+    await page.evaluate(() => {
+      gameObjs.federationShips[gameObjs.federationShips.length - 1].isDocked = true;
+    });
+    const before = await readLineUp(page);
+
+    await clickWorld(page, pos.enemy);
+    const after = await readLineUp(page);
+
+    expect(after.enemyShield, '敵に当たる').toBeLessThan(before.enemyShield);
+    expect(after.friendShield, 'ドック内の味方は無傷').toBe(before.friendShield);
+  });
+
+  test('基地が射線上にあると基地を誤射する', async ({ page }) => {
+    // 以前はプレイヤーだけが基地越しに撃てていた。その非対称を解消した
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const pos = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.x = cx - 120;
+      p.y = cy;
+      gameObjs.starBase.x = cx - 40;   // 自機と敵のあいだ
+      gameObjs.starBase.y = cy;
+      const e = gameObjs.enemies[0];
+      e.active = true;
+      e.sprite.setVisible(true);
+      e.shield = EnemyShip.SHIELD_MAX;
+      // 最大射程（160）の内側に置く。外に置くと射程外の判定が先に立ち、
+      // 射線の判定まで到達しない
+      e.x = cx + 20;
+      e.y = cy;
+      return { x: e.x, y: e.y };
+    });
+    const before = await page.evaluate(() => ({
+      base: gameObjs.starBase.shield, enemy: gameObjs.enemies[0].shield,
+    }));
+
+    await clickWorld(page, pos);
+    const after = await page.evaluate(() => ({
+      base: gameObjs.starBase.shield, enemy: gameObjs.enemies[0].shield,
+    }));
+
+    expect(after.base, '基地のシールドが減る').toBeLessThan(before.base);
+    expect(after.enemy, '敵は無傷').toBe(before.enemy);
+    expect((await readLog(page, 3)).join('\n')).toContain('誤射');
+  });
+
+  test('狙った敵が射程外でも、手前の味方には当たる', async ({ page }) => {
+    // ビームは最大射程まで飛んでいる。狙いが届かないことと、
+    // 途中にいる味方に当たらないことは別の話。
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const pos = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.x = cx - 200;
+      p.y = cy;
+      gameObjs.starBase.x = cx - 140;   // 自機のすぐ先。射程の内側
+      gameObjs.starBase.y = cy;
+      const e = gameObjs.enemies[0];
+      e.active = true;
+      e.sprite.setVisible(true);
+      e.shield = EnemyShip.SHIELD_MAX;
+      // 最大射程より遠くに置く。狙い自体は届かない
+      e.x = p.x + p.weapon.maxRange() + 80;
+      e.y = cy;
+      return { x: e.x, y: e.y };
+    });
+    const before = await page.evaluate(() => ({
+      base: gameObjs.starBase.shield, enemy: gameObjs.enemies[0].shield,
+    }));
+
+    await clickWorld(page, pos);
+    const after = await page.evaluate(() => ({
+      base: gameObjs.starBase.shield, enemy: gameObjs.enemies[0].shield,
+    }));
+
+    expect(after.base, '射程内にある基地には当たる').toBeLessThan(before.base);
+    expect(after.enemy, '射程外の敵には届かない').toBe(before.enemy);
+    expect((await readLog(page, 3)).join('\n')).toContain('誤射');
+  });
+
+  test('味方も敵も射程の外なら、射程外として報告する', async ({ page }) => {
+    // 射線上にいても、ビームが届いていなければ当たらない
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const pos = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.x = cx - 260;
+      p.y = cy;
+      // 基地も敵も最大射程の外に置く
+      gameObjs.starBase.x = p.x + p.weapon.maxRange() + 40;
+      gameObjs.starBase.y = cy;
+      const e = gameObjs.enemies[0];
+      e.active = true;
+      e.sprite.setVisible(true);
+      e.shield = EnemyShip.SHIELD_MAX;
+      e.x = p.x + p.weapon.maxRange() + 140;
+      e.y = cy;
+      return { x: e.x, y: e.y };
+    });
+    const before = await page.evaluate(() => ({
+      base: gameObjs.starBase.shield, enemy: gameObjs.enemies[0].shield,
+    }));
+
+    await clickWorld(page, pos);
+    const after = await page.evaluate(() => ({
+      base: gameObjs.starBase.shield, enemy: gameObjs.enemies[0].shield,
+    }));
+
+    expect(after.base, '射程外の基地には当たらない').toBe(before.base);
+    expect(after.enemy, '敵にも当たらない').toBe(before.enemy);
+    expect((await readLog(page, 3)).join('\n')).toContain('射程範囲外');
+  });
+
+  test('奥の敵を狙っても、射線上の手前の敵に当たる', async ({ page }) => {
+    // 当たるかどうかを相手の所属で変えない。味方では止まるのに敵は
+    // 素通りする、という非対称を作らないため
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const far = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      gameObjs.starBase.x = cx;
+      gameObjs.starBase.y = cy - 250;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.x = cx - 100;
+      p.y = cy;
+      gameObjs.enemies.forEach((e, i) => {
+        e.active = i < 2;
+        e.sprite.setVisible(i < 2);
+        e.shield = EnemyShip.SHIELD_MAX;
+        e.y = cy;
+      });
+      gameObjs.enemies[0].x = cx - 40;   // 手前
+      gameObjs.enemies[1].x = cx + 20;   // 奥（狙う相手）
+      return { x: gameObjs.enemies[1].x, y: cy };
+    });
+    const before = await page.evaluate(() => ({
+      near: gameObjs.enemies[0].shield, far: gameObjs.enemies[1].shield,
+    }));
+
+    await clickWorld(page, far);
+    const after = await page.evaluate(() => ({
+      near: gameObjs.enemies[0].shield, far: gameObjs.enemies[1].shield,
+    }));
+
+    expect(after.near, '手前の敵に当たる').toBeLessThan(before.near);
+    expect(after.far, '奥の敵は無傷').toBe(before.far);
+    expect((await readLog(page, 3)).join('\n')).toContain('射線上の敵艦に命中');
+  });
+
+  test('手前に何も無ければ、狙った敵に当たる', async ({ page }) => {
+    // 上の裏返し。手前の敵をどけると今までどおり狙いが通る
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const far = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      gameObjs.starBase.x = cx;
+      gameObjs.starBase.y = cy - 250;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.x = cx - 100;
+      p.y = cy;
+      gameObjs.enemies.forEach((e, i) => {
+        e.active = i < 2;
+        e.sprite.setVisible(i < 2);
+        e.shield = EnemyShip.SHIELD_MAX;
+        e.y = cy;
+      });
+      gameObjs.enemies[0].x = cx - 40;
+      gameObjs.enemies[0].y = cy - 120;   // 射線から外す
+      gameObjs.enemies[1].x = cx + 20;
+      return { x: gameObjs.enemies[1].x, y: cy };
+    });
+    const before = await page.evaluate(() => ({
+      near: gameObjs.enemies[0].shield, far: gameObjs.enemies[1].shield,
+    }));
+
+    await clickWorld(page, far);
+    const after = await page.evaluate(() => ({
+      near: gameObjs.enemies[0].shield, far: gameObjs.enemies[1].shield,
+    }));
+
+    expect(after.far, '狙った敵に当たる').toBeLessThan(before.far);
+    expect(after.near, '射線の外の敵は無傷').toBe(before.near);
+  });
+});
+
 test.describe('ズーム中のスクロール', () => {
   test('ズーム中にドラッグすると宇宙域がスクロールする', async ({ page }) => {
     await openGame(page);

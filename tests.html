@@ -297,48 +297,87 @@
          });
        });
 
-       describe('幾何計算 — 射線の遮蔽', () => {
-         const blocked = (sx, sy, tx, ty, ox, oy, or_) => g(
-           `hasObstacleOnPath({x:${sx}, y:${sy}}, {x:${tx}, y:${ty}},` +
-           ` {x:${ox}, y:${oy}, r:${or_}})`
+       // -------------------------------------------------------
+       // 射線上の一点
+       // -------------------------------------------------------
+
+       describe('幾何計算 — 射線上の一点', () => {
+         const along = (sx, sy, dx, dy, len) => g(
+           `pointAlongPath({x:${sx}, y:${sy}}, {x:${dx}, y:${dy}}, ${len})`
          );
-         it('射線の中ほどにある障害物は遮蔽とみなす', () => {
-           assertTrue(blocked(0, 0, 100, 0, 50, 0, 10), '中央の障害物');
+         const distFrom = (sx, sy, p) => Math.hypot(p.x - sx, p.y - sy);
+
+         it('指定した距離だけ進んだ点を返す', () => {
+           const p = along(0, 0, 100, 0, 60);
+           assertClose(p.x, 60, 1e-9, 'x');
+           assertClose(p.y, 0, 1e-9, 'y');
          });
-         it('射線から外れた障害物は遮蔽にならない', () => {
-           assertFalse(blocked(0, 0, 100, 0, 50, 40, 10), '離れた障害物');
+         it('斜めでも距離は指定どおり', () => {
+           // 向きだけを使い、終点までの距離には引きずられない
+           const p = along(0, 0, 30, 40, 10);   // 終点までは 50
+           assertClose(distFrom(0, 0, p), 10, 1e-6, '始点からの距離');
+           assertClose(p.x / p.y, 30 / 40, 1e-6, '向きが保たれる');
          });
-         it('射手自身に重なる位置は遮蔽とみなさない', () => {
-           // t < 0.05 の近傍。自分自身や密着した相手で撃てなくならないための除外
-           assertFalse(blocked(0, 0, 100, 0, 1, 0, 3), '始点のごく近く');
+         it('終点より遠い距離を指定しても、その向きに伸ばす', () => {
+           const p = along(0, 0, 10, 0, 100);
+           assertClose(p.x, 100, 1e-9, '終点を越えて伸びる');
          });
-         it('目標に重なる位置は遮蔽とみなさない', () => {
-           // t > 0.95 の近傍。目標そのものを遮蔽と数えないための除外
-           assertFalse(blocked(0, 0, 100, 0, 99, 0, 3), '終点のごく近く');
-         });
-         it('始点と終点が同じなら遮蔽なし', () => {
-           assertFalse(blocked(50, 50, 50, 50, 50, 50, 10), '長さゼロの射線');
+         it('始点と終点が同じなら始点を返す', () => {
+           const p = along(50, 50, 50, 50, 30);
+           assertClose(p.x, 50, 1e-9, 'x');
+           assertClose(p.y, 50, 1e-9, 'y');
          });
        });
 
-       describe('幾何計算 — 複数の障害物', () => {
-         const anyBlocked = (obstacles) => g(
-           `isPathBlockedBy({x:0, y:0}, {x:100, y:0}, ${JSON.stringify(obstacles)})`
+       // -------------------------------------------------------
+       // 射線上で最も手前にあるもの
+       // -------------------------------------------------------
+
+       describe('幾何計算 — 射線上で最も手前にあるもの', () => {
+         // (0,0) から (100,0) への射線。obj は {x, y, r, name} で渡す
+         const first = (objs) => g(
+           `findFirstBlockerOnPath({x:0, y:0}, {x:100, y:0}, ${JSON.stringify(objs)})`
          );
-         it('障害物がなければ遮られない', () => {
-           assertFalse(anyBlocked([]), '空のリスト');
+         const nameOf = (o) => (o === null ? null : o.name);
+
+         it('射線上に何も無ければ null', () => {
+           assertEqual(first([]), null, '空のリスト');
+           assertEqual(first([{x: 50, y: 40, r: 10, name: '外れ'}]), null, '射線の外');
          });
-         it('1つでも遮っていれば遮蔽とみなす', () => {
-           assertTrue(anyBlocked([
-             {x: 50, y: 40, r: 10},
-             {x: 50, y: 0, r: 10},
-           ]), '2つ目が遮る');
+         it('射線上のものを返す', () => {
+           assertEqual(nameOf(first([{x: 50, y: 0, r: 10, name: '真ん中'}])),
+                       '真ん中', '1つだけ');
          });
-         it('どれも遮っていなければ通る', () => {
-           assertFalse(anyBlocked([
-             {x: 50, y: 40, r: 10},
-             {x: 50, y: -40, r: 10},
-           ]), 'どちらも射線の外');
+         it('複数あるときは手前のものを返す', () => {
+           // 「遮られているか」だけでは決まらない、この順序が要点。
+           // 手前が恒星なら無駄撃ち、手前が味方なら誤射に分かれる
+           assertEqual(nameOf(first([
+             {x: 70, y: 0, r: 10, name: '奥'},
+             {x: 30, y: 0, r: 10, name: '手前'},
+           ])), '手前', '奥を先に渡しても手前が返る');
+         });
+         it('渡す順番を変えても結果は同じ', () => {
+           assertEqual(nameOf(first([
+             {x: 30, y: 0, r: 10, name: '手前'},
+             {x: 70, y: 0, r: 10, name: '奥'},
+           ])), '手前', '手前を先に渡した場合');
+         });
+         it('射線から外れたものは、手前にあっても選ばない', () => {
+           assertEqual(nameOf(first([
+             {x: 30, y: 40, r: 10, name: '手前だが射線の外'},
+             {x: 70, y: 0, r: 10, name: '奥だが射線上'},
+           ])), '奥だが射線上', '距離ではなく射線で選ぶ');
+         });
+         it('始点と終点のごく近傍は拾わない', () => {
+           // 射手自身や目標との接触を遮蔽とみなさないため
+           assertEqual(first([{x: 2, y: 0, r: 3, name: '始点の上'}]), null, '始点の近傍');
+           assertEqual(first([{x: 98, y: 0, r: 3, name: '終点の上'}]), null, '終点の近傍');
+         });
+         it('始点と終点が同じなら null', () => {
+           assertEqual(
+             g(`findFirstBlockerOnPath({x:50, y:50}, {x:50, y:50}, ` +
+               `[{x:50, y:50, r:10, name:'同じ場所'}])`),
+             null, '長さゼロの射線');
          });
        });
 

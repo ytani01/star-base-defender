@@ -447,7 +447,7 @@
 
      // リリースのたびに更新する。表示は起動時に .game-title へ流し込む
      const GAME_NAME = 'StarBase Defender';
-     const VERSION = 'v0.5.1';
+     const VERSION = 'v0.6.0';
 
      const TIMING = {
        BEAM_DUR: 400,
@@ -663,8 +663,9 @@
       * 線分（始点からdx,dy方向へ、長さの2乗がa）と円（中心が始点からfx,fy、半径radius）
       * の交差判定。線分をt=0(始点)〜t=1(終点)としてパラメータ化した交点位置を返す。
       * 交差しない場合は null。
-      * clampDest()（衝突による移動停止）と hasObstacleOnPath()（LOS/経路上の障害物判定）
-      * で共通して使う、線分と円の交差の二次方程式を解く部分だけを切り出したもの。
+      * clampDest()（衝突による移動停止）と findFirstBlockerOnPath()（射線上で
+      * 最も手前にあるものの判定）で共通して使う、線分と円の交差の
+      * 二次方程式を解く部分だけを切り出したもの。
       */
      function intersectSegmentCircle(dx, dy, a, fx, fy, radius) {
        const b = 2 * (fx * dx + fy * dy);
@@ -702,37 +703,76 @@
        };
      } // clampCameraCenter()
 
+
+
      /**
-      * src から dst への線分が obj に遮られるか。
-      * 始点・終点のごく近傍（t < 0.05 / t > 0.95）は射手自身や目標との接触なので、
-      * 遮蔽とはみなさない。
+      * src から dst へ向かう向きに、距離 length だけ進んだ点を返す。
+      *
+      * 射程外へ撃ったときに、ビームを届く範囲までで切るために使う。
+      * 相手の位置まで線を引いてしまうと、届いていないのに届いたように見える。
+      *
+      * @param {{x:number, y:number}} src 始点
+      * @param {{x:number, y:number}} dst 向きを決める点
+      * @param {number} length 始点からの距離
+      * @return {{x:number, y:number}} 進んだ先の点。src と dst が同じなら src
       */
-     function hasObstacleOnPath(src, dst, obj) {
+     function pointAlongPath(src, dst, length) {
+       const dx = dst.x - src.x;
+       const dy = dst.y - src.y;
+       const dist = Math.hypot(dx, dy);
+       if (dist < 0.001) {
+         return { x: src.x, y: src.y };
+       }
+       return {
+         x: src.x + (dx / dist) * length,
+         y: src.y + (dy / dist) * length,
+       };
+     } // pointAlongPath()
+
+     /**
+      * src から dst への射線上で、src に最も近い対象を返す。
+      *
+      * 「遮られているか」だけでは、恒星と味方が両方とも射線上にいるときに
+      * どちらが先かを決められない。手前が恒星なら無駄撃ち、手前が味方なら
+      * 誤射になるため、順序まで分かる形が要る。
+      *
+      * 交点の近さは intersectSegmentCircle() が返す t（0 が始点、1 が終点）で
+      * 比べる。始点・終点のごく近傍（t < 0.05 / t > 0.95）は除いてあり、
+      * 射手自身や目標との接触を拾わない。
+      *
+      * @param {{x:number, y:number}} src 始点
+      * @param {{x:number, y:number}} dst 終点
+      * @param {Array<GameObj>} objs 調べる対象
+      * @return {?GameObj} 最も手前の対象。射線上に無ければ null
+      */
+     function findFirstBlockerOnPath(src, dst, objs) {
        const dx = dst.x - src.x, dy = dst.y - src.y;
        const a = dx * dx + dy * dy;
        if (a < 0.001) {
-         return false;
+         return null;
        }
-       const fx = src.x - obj.x, fy = src.y - obj.y;
-       const hit = intersectSegmentCircle(dx, dy, a, fx, fy, obj.r);
-       if (!hit) {
-         return false;
-       }
-       return (hit.t1 > 0.05 && hit.t1 < 0.95) || (hit.t2 > 0.05 && hit.t2 < 0.95);
-     } // hasObstacleOnPath()
 
-     /**
-      * src から dst への射線が、渡された障害物のいずれかに遮られるか。
-      * 「どれを障害物とみなすか」は状況によって変わるため、集める側と
-      * 判定する側を分けてある（集める側は isLOSBlocked()）。
-      * @param {{x:number, y:number}} src 始点
-      * @param {{x:number, y:number}} dst 終点
-      * @param {Array<GameObj>} obstacles 遮蔽物の候補
-      * @return {boolean} 遮られていれば true
-      */
-     function isPathBlockedBy(src, dst, obstacles) {
-       return obstacles.some(o => hasObstacleOnPath(src, dst, o));
-     } // isPathBlockedBy()
+       let nearest = null;
+       let nearestT = Infinity;
+       for (const obj of objs) {
+         if (!obj) {
+           continue;
+         }
+         const hit = intersectSegmentCircle(dx, dy, a, src.x - obj.x, src.y - obj.y, obj.r);
+         if (!hit) {
+           continue;
+         }
+         // 線分に入った側（t1）を採る。src が対象に食い込んでいる場合は
+         // t1 が範囲外になるので、抜ける側（t2）で拾う
+         const t = (hit.t1 > 0.05 && hit.t1 < 0.95) ? hit.t1
+                 : (hit.t2 > 0.05 && hit.t2 < 0.95) ? hit.t2 : null;
+         if (t !== null && t < nearestT) {
+           nearestT = t;
+           nearest = obj;
+         }
+       }
+       return nearest;
+     } // findFirstBlockerOnPath()
 
      /**
       * ターン経過による減点。宇宙域に艦が残っているほど不利になり、
@@ -1495,15 +1535,36 @@
        /**
         * 攻撃実行の共通処理
         */
-       attack(target, distance) {
-         // 自身の scene と getBeamColor() を使用してビームを描画
-         fireBeam(this.scene, this, target, this.getBeamColor());
-         
-         const damage = this.weapon.calcDamage(distance);
-         target.takeDamage(damage);
+       attack(target) {
+         // 当たるのは射線上で最も手前にあるもの。プレイヤーの攻撃と同じ規則で
+         // 解決する。評価（evaluateTactics）から実行までのあいだに味方が
+         // 動くことがあるため、撃つ時点でもう一度見る。
+         // 距離も実際の位置から取る。評価時の値を持ち回すと、動いたぶんだけ
+         // 威力がずれる
+         const reach = this.weapon.maxRange();
+         const path = resolveBeamPath(this, target);
+         const hitDist = Phaser.Math.Distance.Between(
+           this.x, this.y, path.obj.x, path.obj.y
+         );
+
+         if (path.kind === 'blocked' || hitDist > reach) {
+           // 遮られた、または届かなかった。無駄撃ちとして撃つ姿だけ見せる
+           fireBeam(this.scene, this, pointAlongPath(this, target, Math.min(hitDist, reach)),
+                    DRAW_COLOR.BEAM_MISS);
+           return;
+         }
+
+         const victim = path.obj;
+         fireBeam(this.scene, this, victim, this.getBeamColor());
+         victim.takeDamage(this.weapon.calcDamage(hitDist));
+
+         if (path.kind === 'friendly') {
+           onFriendlyFire(this.scene, victim);
+           return;
+         }
 
          // 艦種ごとの攻撃後処理（メッセージ通知や撃破判定）を呼び出し
-         this.onAfterAttack(target);
+         this.onAfterAttack(victim);
        } // attack()
 
        /**
@@ -1522,6 +1583,20 @@
        shouldIgnoreTarget(target) {
          return false;
        } // shouldIgnoreTarget()
+
+       /**
+        * 射線上にいたら巻き込んでしまう相手（子クラスで実装）。
+        *
+        * 「味方」が誰かは撃つ側によって変わる。基地は自軍にとっては
+        * 守る対象だが、敵にとっては標的なので、faction ごとに答えが違う。
+        * 呼び出し側で instanceof を並べずに済むよう、艦種側に持たせる。
+        *
+        * ドック内の艦は含めない。基地の中にいるため当たらない
+        * （敵の標的からも同じ理由で外れる。getPotentialTargets() 参照）。
+        */
+       getFriendlyFireTargets() {
+         return [];
+       } // getFriendlyFireTargets()
 
        // --- 戦術評価の実行 ---
        evaluateTactics() {
@@ -1548,10 +1623,13 @@
              closestTarget = t;
            }
 
-           // 攻撃可能な対象を評価
+           // 攻撃可能な対象を評価。
+           // 射線が通らない相手は狙わない。恒星に遮られる場合はもちろん、
+           // 味方に当たってしまう場合も撃たない（NPC は誤射を避ける）。
+           // 手前に別の敵がいる場合は、そちらに当たるだけなので撃ってよい
            if (!isFleeing && d <= this.weapon.maxRange() * (1.0 - this.spirit)) {
-             const checkBaseObstacle = (t !== gameObjs.starBase);
-             if (!isLOSBlocked(this, t, checkBaseObstacle)) {
+             const path = resolveBeamPath(this, t);
+             if (path.kind === 'hit') {
                if (d < bestAttackableDist) {
                  bestAttackableDist = d;
                  bestAttackableTarget = t;
@@ -1826,6 +1904,14 @@
          return targets;
        } // getPotentialTargets()
 
+       /**
+        * override: 敵にとっての味方は他の敵艦だけ。
+        * 基地と自機は標的なので、巻き込みではなく命中として扱う。
+        */
+       getFriendlyFireTargets() {
+         return gameObjs.enemies.filter(e => e !== this && e.active);
+       } // getFriendlyFireTargets()
+
        // 敵艦に対するクリック操作（攻撃）
        onInteract(player, scene, endTurn) {
          if (player.isDocked) {
@@ -1839,30 +1925,56 @@
 
          // 発射
          player.energy -= player.weapon.cost;
-         const dist = Phaser.Math.Distance.Between(player.x, player.y, this.x, this.y);
 
-         if (dist > player.weapon.maxRange()) {
+         // ビームは最大射程まで飛び、その範囲で最初に当たったものに命中する。
+         // 狙った敵が射程外でも、手前にあるものには当たる（撃った以上、
+         // ビームはそこまで飛んでいる）。基地を素通りさせる特例
+         // （かつての checkBase = false）はない
+         const reach = player.weapon.maxRange();
+         const path = resolveBeamPath(player, this);
+         const hitDist = Phaser.Math.Distance.Between(
+           player.x, player.y, path.obj.x, path.obj.y
+         );
+
+         if (hitDist > reach) {
+           // 射線上のものにも狙った相手にも届かなかった。
+           // ビームは最大射程で切る。相手まで線を引くと、届いていないのに
+           // 届いたように見えてしまう
            setMsg(SPEAKER.TACTICAL, "射程範囲外のため敵艦にダメージなし", MSG_COLOR.WARN);
-           fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
+           fireBeam(scene, player, pointAlongPath(player, this, reach),
+                    DRAW_COLOR.BEAM_MISS);
            endTurn();
            return true;
          }
-         if (isLOSBlocked(player, this, false)) {
+
+         if (path.kind === 'blocked') {
            setMsg(SPEAKER.TACTICAL, "障害物に遮られました", MSG_COLOR.WARN);
-           fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
+           fireBeam(scene, player, path.obj, DRAW_COLOR.BEAM_MISS);
            endTurn();
            return true;
          }
 
-         // 命中
-         //setMsg(SPEAKER.TACTICAL, "攻撃命中！ 敵艦シールド低下！", "#f80");
-         const damage = player.weapon.calcDamage(dist);
-         this.takeDamage(damage);
-         fireBeam(scene, player, this, DRAW_COLOR.BEAM_PLAYER);
+         // 命中。当たったのは狙った相手とは限らない
+         const victim = path.obj;
+         fireBeam(scene, player, victim, DRAW_COLOR.BEAM_PLAYER);
+         victim.takeDamage(player.weapon.calcDamage(hitDist));
 
-         if (!this.active) {
+         if (path.kind === 'friendly') {
+           // 撃ってしまった以上、なかったことにはしない。
+           // エネルギーはすでに消費しており、ダメージも味方に入っている
+           onFriendlyFire(scene, victim);
+           endTurn();
+           return true;
+         }
+
+         if (victim !== this) {
+           // 手前にいた別の敵に当たった。狙ったとおりではないので断っておく
+           setMsg(SPEAKER.TACTICAL, "射線上の敵艦に命中しました", MSG_COLOR.WARN);
+         }
+
+         if (!victim.active) {
            // 撃墜
-           gameObjs.removeEnemy(this);
+           gameObjs.removeEnemy(victim);
            spawnEnemy(scene, 0.8, 0.95);
            setMsg(SPEAKER.TACTICAL, "敵艦を撃破！ 別の新たな敵艦を検知しました！", MSG_COLOR.WARN);
          }
@@ -1934,6 +2046,17 @@
        shouldIgnoreTarget(target) {
          return target.isFleeing();
        }
+
+       /**
+        * override: 自機・他の連邦艦・基地を巻き込まない。
+        */
+       getFriendlyFireTargets() {
+         return [
+           gameObjs.starBase,
+           gameObjs.player,
+           ...gameObjs.federationShips.filter(f => f !== this),
+         ].filter(o => o && o.active && !o.isDocked);
+       } // getFriendlyFireTargets()
 
        /**
         * override: 逃走中は他の連邦艦・基地・自機に引き寄せられる。
@@ -2054,6 +2177,16 @@
        isFriendly() {
          return true;
        }
+
+       /**
+        * override: 連邦艦と基地を巻き込まない。
+        */
+       getFriendlyFireTargets() {
+         return [
+           gameObjs.starBase,
+           ...gameObjs.federationShips,
+         ].filter(o => o && o.active && !o.isDocked);
+       } // getFriendlyFireTargets()
 
      } // class PlayerShip
 
@@ -2347,19 +2480,63 @@
      } // getSafeRandPos()
 
 
+
      /**
-      * LOS(Line of Sight、射線)がブロックされてないか？
+      * 射線上に何があるかを調べ、ビームがどこで止まるかを返す。
+      *
+      * プレイヤーの攻撃（EnemyShip.onInteract）と NPC の攻撃（SpaceShip.attack）は
+      * 経路が分かれているため、判定を両方から呼べる形にしてある。
+      * 片方だけ直すと、同じ盤面なのに撃つ側によって結果が変わってしまう。
+      *
+      * 恒星と味方の両方が射線上にいることがあるので、手前にあるほうを採る。
+      * 恒星が手前なら無駄撃ち、味方が手前なら誤射になる。
+      *
+      * @param {GameObj} srcObj 撃つ側
+      * @param {GameObj} targetObj 狙った相手
+      * @return {{kind:string, obj:?GameObj}}
+      *   kind は 'hit'（標的に命中）/ 'blocked'（恒星に遮られた）/
+      *   'friendly'（味方に当たった）。obj は 'friendly' のときだけ意味を持つ
       */
-     function isLOSBlocked(srcObj, targetObj, checkBase = true) {
-       // 遮蔽物を集めるところだけがグローバル状態に触れる。
-       // 実際の判定は純粋な isPathBlockedBy() に任せる。
-       const obstacles = gameObjs.stars.filter(s => s.active);
-       const base = gameObjs.starBase;
-       if (checkBase && base && base.active && base.shield > 0) {
-         obstacles.push(base);
+     function resolveBeamPath(srcObj, targetObj) {
+       // 当たるかどうかを相手の所属で変えない。射線上にあるものは
+       // 恒星でも敵でも味方でも、手前にあるほうが当たる。
+       // ドック中の艦は基地の中にいるので除く（敵の標的から外れるのと同じ）
+       const candidates = gameObjs
+             .getObstacles([srcObj, targetObj])
+             .filter(o => !o.isDocked);
+
+       const first = findFirstBlockerOnPath(srcObj, targetObj, candidates);
+       if (!first) {
+         return { kind: 'hit', obj: targetObj };
        }
-       return isPathBlockedBy(srcObj, targetObj, obstacles);
-     } // isLOSBlocked()
+       if (gameObjs.stars.includes(first)) {
+         return { kind: 'blocked', obj: first };
+       }
+       // 味方かどうかはログの言い分けにだけ使う。当たり判定には影響しない
+       const isFriend = srcObj.getFriendlyFireTargets().includes(first);
+       return { kind: isFriend ? 'friendly' : 'hit', obj: first };
+     } // resolveBeamPath()
+
+     /**
+      * 誤射したときの報告。
+      *
+      * 「遮られた」とは言い分けている。遮蔽は運が悪かっただけだが、
+      * 誤射は撃つ前に避けられた失敗で、次の一手が変わるため。
+      *
+      * @param {Phaser.Scene} scene
+      * @param {GameObj} victim 巻き込んだ相手
+      */
+     function onFriendlyFire(scene, victim) {
+       if (victim === gameObjs.starBase) {
+         setMsg(SPEAKER.BASE, "こちら基地！ 味方の誤射を受けている！", MSG_COLOR.DANGER);
+         return;
+       }
+       if (!victim.active) {
+         setMsg(SPEAKER.COMMS, "味方を撃墜してしまいました……", MSG_COLOR.DANGER);
+         return;
+       }
+       setMsg(SPEAKER.TACTICAL, "射線上に味方！ 誤射しました！", MSG_COLOR.DANGER);
+     } // onFriendlyFire()
 
      /**
       * エネルギーが最小活動限界を下回っていれば敗北させる。
@@ -2701,6 +2878,14 @@
      /**
       * ビームの描画と発射音の再生。
       * 一定時間後に自動で破棄される、その場限りのグラフィックスとして描く。
+      *
+      * 終点は座標しか見ないので、艦だけでなく座標そのものも渡せる。
+      * 射程外へ撃ったときに、届く範囲までで線を切るのに使う。
+      *
+      * @param {Phaser.Scene} scene
+      * @param {GameObj} srcObj 撃った側
+      * @param {{x:number, y:number}} targetObj 終点。艦でも座標でもよい
+      * @param {number} color
       */
      function fireBeam(scene, srcObj, targetObj, color) {
        const beam = scene.add.graphics();
@@ -2752,7 +2937,7 @@
        if (context.isFleeing) {
          npcMove(scene, npc, context);
        } else if (context.canAttack && !npc.isDocked) {
-         npc.attack(context.target, context.distToTarget);
+         npc.attack(context.target);
        } else {
          // ドッキング中は自機と同じく兵器を使用できないため、攻撃したい
          // 状況ならまずドックを出る（npcMove() が押し出しを行う）

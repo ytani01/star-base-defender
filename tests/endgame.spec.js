@@ -12,6 +12,34 @@ const {
  */
 
 /** 記録を消し、盤面を整える */
+/**
+ * 敵を的のすぐ隣へ寄せる。
+ *
+ * attack() は撃った時点の位置から距離と射線を取るので、遠くから
+ * 呼んでも届かず何も起きない。的に密着させて、確実に当たる状況を作る。
+ * 射線上に他のものが入らないよう、他の敵は退けておく。
+ */
+async function placeEnemyNextTo(page, targetName) {
+  await page.evaluate((name) => {
+    const target = name === 'base' ? gameObjs.starBase : gameObjs.player;
+    const enemy = gameObjs.enemies.find((e) => e.active);
+    gameObjs.enemies.forEach((e) => {
+      if (e !== enemy) { e.active = false; e.sprite.setVisible(false); }
+    });
+    if (name === 'base') {
+      gameObjs.player.x = AREA_CENTER.X;
+      gameObjs.player.y = AREA_CENTER.Y - 250;   // 射線から外す
+    } else {
+      gameObjs.starBase.x = AREA_CENTER.X;
+      gameObjs.starBase.y = AREA_CENTER.Y - 250;
+      gameObjs.player.x = AREA_CENTER.X;
+      gameObjs.player.y = AREA_CENTER.Y;
+    }
+    enemy.x = target.x + target.r + enemy.r + 2;
+    enemy.y = target.y;
+  }, targetName);
+}
+
 async function prepare(page, enemyCount = 2) {
   await page.evaluate((n) => {
     localStorage.removeItem(HIGHSCORE.STORAGE_KEY);
@@ -114,11 +142,11 @@ test.describe('決着', () => {
     await openGame(page);
     await prepare(page);
 
+    await placeEnemyNextTo(page, 'base');
     await page.evaluate(() => {
       // 実際の攻撃処理をそのまま通す（被弾 → 撃破判定 の順序を守るため）
       gameObjs.starBase.shield = 1;
-      const enemy = gameObjs.enemies.find((e) => e.active);
-      enemy.attack(gameObjs.starBase, 0);
+      gameObjs.enemies.find((e) => e.active).attack(gameObjs.starBase);
     });
     await waitForIdle(page, 30000);
 
@@ -131,10 +159,10 @@ test.describe('決着', () => {
     await openGame(page);
     await prepare(page);
 
+    await placeEnemyNextTo(page, 'player');
     await page.evaluate(() => {
       gameObjs.player.shield = 1;
-      const enemy = gameObjs.enemies.find((e) => e.active);
-      enemy.attack(gameObjs.player, 0);
+      gameObjs.enemies.find((e) => e.active).attack(gameObjs.player);
     });
     await waitForIdle(page, 30000);
 
@@ -172,11 +200,11 @@ test.describe('決着', () => {
   test('敗北時はハイスコアに記録されない', async ({ page }) => {
     await openGame(page);
     await prepare(page);
+    await placeEnemyNextTo(page, 'player');
     await page.evaluate(() => {
       gameState.score = 9999;  // 記録されるなら必ず上位に入る点数
       gameObjs.player.shield = 1;
-      const enemy = gameObjs.enemies.find((e) => e.active);
-      enemy.attack(gameObjs.player, 0);
+      gameObjs.enemies.find((e) => e.active).attack(gameObjs.player);
     });
     await waitForIdle(page, 30000);
 

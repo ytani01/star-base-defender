@@ -50,6 +50,7 @@ star-base-defender/
 
 ### 完了・保管済み
 
+- [feat_friendly_fire_20260729](./archive/feat_friendly_fire_20260729/index.md) — ビームが射線上で最も近いオブジェクトに当たるようにし、NPC は味方を巻き込む射線では撃たないようにする
 - [docs_screen_guide_20260729](./archive/docs_screen_guide_20260729/index.md) — 画面の見方を1枚の SVG で示し、README と Product Guidelines から参照
 - [refactor_guidelines_20260728](./archive/refactor_guidelines_20260728/index.md) — `conductor/` の規約に対する `index.html` の乖離を解消（全8フェーズ）
 - [test_harness_20260728](./archive/test_harness_20260728/index.md) — 確認シナリオを2層（`tests.html` と Playwright）で自動化
