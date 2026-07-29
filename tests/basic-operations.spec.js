@@ -646,6 +646,81 @@ test.describe('射線上の味方への誤射', () => {
     expect(after.enemy, '敵にも当たらない').toBe(before.enemy);
     expect((await readLog(page, 3)).join('\n')).toContain('射程範囲外');
   });
+
+  test('奥の敵を狙っても、射線上の手前の敵に当たる', async ({ page }) => {
+    // 当たるかどうかを相手の所属で変えない。味方では止まるのに敵は
+    // 素通りする、という非対称を作らないため
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const far = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      gameObjs.starBase.x = cx;
+      gameObjs.starBase.y = cy - 250;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.x = cx - 100;
+      p.y = cy;
+      gameObjs.enemies.forEach((e, i) => {
+        e.active = i < 2;
+        e.sprite.setVisible(i < 2);
+        e.shield = EnemyShip.SHIELD_MAX;
+        e.y = cy;
+      });
+      gameObjs.enemies[0].x = cx - 40;   // 手前
+      gameObjs.enemies[1].x = cx + 20;   // 奥（狙う相手）
+      return { x: gameObjs.enemies[1].x, y: cy };
+    });
+    const before = await page.evaluate(() => ({
+      near: gameObjs.enemies[0].shield, far: gameObjs.enemies[1].shield,
+    }));
+
+    await clickWorld(page, far);
+    const after = await page.evaluate(() => ({
+      near: gameObjs.enemies[0].shield, far: gameObjs.enemies[1].shield,
+    }));
+
+    expect(after.near, '手前の敵に当たる').toBeLessThan(before.near);
+    expect(after.far, '奥の敵は無傷').toBe(before.far);
+    expect((await readLog(page, 3)).join('\n')).toContain('射線上の敵艦に命中');
+  });
+
+  test('手前に何も無ければ、狙った敵に当たる', async ({ page }) => {
+    // 上の裏返し。手前の敵をどけると今までどおり狙いが通る
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const far = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      gameObjs.starBase.x = cx;
+      gameObjs.starBase.y = cy - 250;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.x = cx - 100;
+      p.y = cy;
+      gameObjs.enemies.forEach((e, i) => {
+        e.active = i < 2;
+        e.sprite.setVisible(i < 2);
+        e.shield = EnemyShip.SHIELD_MAX;
+        e.y = cy;
+      });
+      gameObjs.enemies[0].x = cx - 40;
+      gameObjs.enemies[0].y = cy - 120;   // 射線から外す
+      gameObjs.enemies[1].x = cx + 20;
+      return { x: gameObjs.enemies[1].x, y: cy };
+    });
+    const before = await page.evaluate(() => ({
+      near: gameObjs.enemies[0].shield, far: gameObjs.enemies[1].shield,
+    }));
+
+    await clickWorld(page, far);
+    const after = await page.evaluate(() => ({
+      near: gameObjs.enemies[0].shield, far: gameObjs.enemies[1].shield,
+    }));
+
+    expect(after.far, '狙った敵に当たる').toBeLessThan(before.far);
+    expect(after.near, '射線の外の敵は無傷').toBe(before.near);
+  });
 });
 
 test.describe('ズーム中のスクロール', () => {

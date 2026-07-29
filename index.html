@@ -1906,51 +1906,53 @@
 
          // 発射
          player.energy -= player.weapon.cost;
-         const dist = Phaser.Math.Distance.Between(player.x, player.y, this.x, this.y);
 
-         // ビームは最大射程まで飛ぶ。その範囲で最初に当たったものが結果を決める。
-         // 狙った敵が射程外でも、手前の味方や恒星には当たる（撃った以上、
-         // ビームはそこまで飛んでいる）。基地も味方として扱うため、
-         // ここで基地を素通りさせる特例（かつての checkBase = false）はない
+         // ビームは最大射程まで飛び、その範囲で最初に当たったものに命中する。
+         // 狙った敵が射程外でも、手前にあるものには当たる（撃った以上、
+         // ビームはそこまで飛んでいる）。基地を素通りさせる特例
+         // （かつての checkBase = false）はない
          const reach = player.weapon.maxRange();
          const path = resolveBeamPath(player, this);
-         const distTo = (obj) =>
-               Phaser.Math.Distance.Between(player.x, player.y, obj.x, obj.y);
+         const hitDist = Phaser.Math.Distance.Between(
+           player.x, player.y, path.obj.x, path.obj.y
+         );
 
-         if (path.kind === 'blocked' && distTo(path.obj) <= reach) {
-           setMsg(SPEAKER.TACTICAL, "障害物に遮られました", MSG_COLOR.WARN);
-           fireBeam(scene, player, path.obj, DRAW_COLOR.BEAM_MISS);
-           endTurn();
-           return true;
-         }
-
-         if (path.kind === 'friendly' && distTo(path.obj) <= reach) {
-           // 撃ってしまった以上、なかったことにはしない。
-           // エネルギーはすでに消費しており、ダメージも味方に入る
-           fireBeam(scene, player, path.obj, DRAW_COLOR.BEAM_PLAYER);
-           path.obj.takeDamage(player.weapon.calcDamage(distTo(path.obj)));
-           onFriendlyFire(scene, path.obj);
-           endTurn();
-           return true;
-         }
-
-         // 射線上の何にも届かなかった場合に、初めて射程外を報告する
-         if (dist > reach) {
+         if (hitDist > reach) {
+           // 射線上のものにも狙った相手にも届かなかった
            setMsg(SPEAKER.TACTICAL, "射程範囲外のため敵艦にダメージなし", MSG_COLOR.WARN);
            fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
            endTurn();
            return true;
          }
 
-         // 命中
-         //setMsg(SPEAKER.TACTICAL, "攻撃命中！ 敵艦シールド低下！", "#f80");
-         const damage = player.weapon.calcDamage(dist);
-         this.takeDamage(damage);
-         fireBeam(scene, player, this, DRAW_COLOR.BEAM_PLAYER);
+         if (path.kind === 'blocked') {
+           setMsg(SPEAKER.TACTICAL, "障害物に遮られました", MSG_COLOR.WARN);
+           fireBeam(scene, player, path.obj, DRAW_COLOR.BEAM_MISS);
+           endTurn();
+           return true;
+         }
 
-         if (!this.active) {
+         // 命中。当たったのは狙った相手とは限らない
+         const victim = path.obj;
+         fireBeam(scene, player, victim, DRAW_COLOR.BEAM_PLAYER);
+         victim.takeDamage(player.weapon.calcDamage(hitDist));
+
+         if (path.kind === 'friendly') {
+           // 撃ってしまった以上、なかったことにはしない。
+           // エネルギーはすでに消費しており、ダメージも味方に入っている
+           onFriendlyFire(scene, victim);
+           endTurn();
+           return true;
+         }
+
+         if (victim !== this) {
+           // 手前にいた別の敵に当たった。狙ったとおりではないので断っておく
+           setMsg(SPEAKER.TACTICAL, "射線上の敵艦に命中しました", MSG_COLOR.WARN);
+         }
+
+         if (!victim.active) {
            // 撃墜
-           gameObjs.removeEnemy(this);
+           gameObjs.removeEnemy(victim);
            spawnEnemy(scene, 0.8, 0.95);
            setMsg(SPEAKER.TACTICAL, "敵艦を撃破！ 別の新たな敵艦を検知しました！", MSG_COLOR.WARN);
          }
@@ -2487,18 +2489,23 @@
       *   'friendly'（味方に当たった）。obj は 'friendly' のときだけ意味を持つ
       */
      function resolveBeamPath(srcObj, targetObj) {
-       const stars = gameObjs.stars.filter(s => s.active);
-       // 狙った相手自身は巻き込みではなく命中なので、候補から外す
-       const friends = srcObj.getFriendlyFireTargets().filter(o => o !== targetObj);
+       // 当たるかどうかを相手の所属で変えない。射線上にあるものは
+       // 恒星でも敵でも味方でも、手前にあるほうが当たる。
+       // ドック中の艦は基地の中にいるので除く（敵の標的から外れるのと同じ）
+       const candidates = gameObjs
+             .getObstacles([srcObj, targetObj])
+             .filter(o => !o.isDocked);
 
-       const first = findFirstBlockerOnPath(srcObj, targetObj, [...stars, ...friends]);
+       const first = findFirstBlockerOnPath(srcObj, targetObj, candidates);
        if (!first) {
          return { kind: 'hit', obj: targetObj };
        }
-       if (friends.includes(first)) {
-         return { kind: 'friendly', obj: first };
+       if (gameObjs.stars.includes(first)) {
+         return { kind: 'blocked', obj: first };
        }
-       return { kind: 'blocked', obj: first };
+       // 味方かどうかはログの言い分けにだけ使う。当たり判定には影響しない
+       const isFriend = srcObj.getFriendlyFireTargets().includes(first);
+       return { kind: isFriend ? 'friendly' : 'hit', obj: first };
      } // resolveBeamPath()
 
      /**
