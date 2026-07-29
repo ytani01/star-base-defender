@@ -44,7 +44,7 @@
 - [x] Task: 実際のゲーム画面と図を並べて見比べる。説明もれの記号がないこと、図にしかない記号がないことを確かめる。※ 画面要素22件を実装から列挙して照合。未説明だったズームボタンを追加した 〔spec: 完了の定義〕 [527b710]
 - [x] Task: `npx playwright test` を通す。`index.html` は変更していないが、意図しない差分が混ざっていないことの確認として実行する。※ 全73件通過 [527b710]
 - [x] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` の「進行中」を「なし」に戻して「完了・保管済み」へ加える
-- [ ] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md) [b04b7f4]
 
 ---
 
