@@ -1568,6 +1568,20 @@
          return false;
        } // shouldIgnoreTarget()
 
+       /**
+        * 射線上にいたら巻き込んでしまう相手（子クラスで実装）。
+        *
+        * 「味方」が誰かは撃つ側によって変わる。基地は自軍にとっては
+        * 守る対象だが、敵にとっては標的なので、faction ごとに答えが違う。
+        * 呼び出し側で instanceof を並べずに済むよう、艦種側に持たせる。
+        *
+        * ドック内の艦は含めない。基地の中にいるため当たらない
+        * （敵の標的からも同じ理由で外れる。getPotentialTargets() 参照）。
+        */
+       getFriendlyFireTargets() {
+         return [];
+       } // getFriendlyFireTargets()
+
        // --- 戦術評価の実行 ---
        evaluateTactics() {
          const isFleeing = this.isFleeing();
@@ -1871,6 +1885,14 @@
          return targets;
        } // getPotentialTargets()
 
+       /**
+        * override: 敵にとっての味方は他の敵艦だけ。
+        * 基地と自機は標的なので、巻き込みではなく命中として扱う。
+        */
+       getFriendlyFireTargets() {
+         return gameObjs.enemies.filter(e => e !== this && e.active);
+       } // getFriendlyFireTargets()
+
        // 敵艦に対するクリック操作（攻撃）
        onInteract(player, scene, endTurn) {
          if (player.isDocked) {
@@ -1892,9 +1914,26 @@
            endTurn();
            return true;
          }
-         if (isLOSBlocked(player, this, false)) {
+         // 射線上に何があるかで結果が変わる。基地も味方として扱うため、
+         // ここで基地を素通りさせる特例（かつての checkBase = false）はない
+         const path = resolveBeamPath(player, this);
+
+         if (path.kind === 'blocked') {
            setMsg(SPEAKER.TACTICAL, "障害物に遮られました", MSG_COLOR.WARN);
            fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
+           endTurn();
+           return true;
+         }
+
+         if (path.kind === 'friendly') {
+           // 撃ってしまった以上、なかったことにはしない。
+           // エネルギーはすでに消費しており、ダメージも味方に入る
+           const friendlyDamage = player.weapon.calcDamage(
+             Phaser.Math.Distance.Between(player.x, player.y, path.obj.x, path.obj.y)
+           );
+           fireBeam(scene, player, path.obj, DRAW_COLOR.BEAM_PLAYER);
+           path.obj.takeDamage(friendlyDamage);
+           onFriendlyFire(scene, path.obj);
            endTurn();
            return true;
          }
@@ -1979,6 +2018,17 @@
        shouldIgnoreTarget(target) {
          return target.isFleeing();
        }
+
+       /**
+        * override: 自機・他の連邦艦・基地を巻き込まない。
+        */
+       getFriendlyFireTargets() {
+         return [
+           gameObjs.starBase,
+           gameObjs.player,
+           ...gameObjs.federationShips.filter(f => f !== this),
+         ].filter(o => o && o.active && !o.isDocked);
+       } // getFriendlyFireTargets()
 
        /**
         * override: 逃走中は他の連邦艦・基地・自機に引き寄せられる。
@@ -2099,6 +2149,16 @@
        isFriendly() {
          return true;
        }
+
+       /**
+        * override: 連邦艦と基地を巻き込まない。
+        */
+       getFriendlyFireTargets() {
+         return [
+           gameObjs.starBase,
+           ...gameObjs.federationShips,
+         ].filter(o => o && o.active && !o.isDocked);
+       } // getFriendlyFireTargets()
 
      } // class PlayerShip
 
@@ -2405,6 +2465,58 @@
        }
        return isPathBlockedBy(srcObj, targetObj, obstacles);
      } // isLOSBlocked()
+
+     /**
+      * 射線上に何があるかを調べ、ビームがどこで止まるかを返す。
+      *
+      * プレイヤーの攻撃（EnemyShip.onInteract）と NPC の攻撃（SpaceShip.attack）は
+      * 経路が分かれているため、判定を両方から呼べる形にしてある。
+      * 片方だけ直すと、同じ盤面なのに撃つ側によって結果が変わってしまう。
+      *
+      * 恒星と味方の両方が射線上にいることがあるので、手前にあるほうを採る。
+      * 恒星が手前なら無駄撃ち、味方が手前なら誤射になる。
+      *
+      * @param {GameObj} srcObj 撃つ側
+      * @param {GameObj} targetObj 狙った相手
+      * @return {{kind:string, obj:?GameObj}}
+      *   kind は 'hit'（標的に命中）/ 'blocked'（恒星に遮られた）/
+      *   'friendly'（味方に当たった）。obj は 'friendly' のときだけ意味を持つ
+      */
+     function resolveBeamPath(srcObj, targetObj) {
+       const stars = gameObjs.stars.filter(s => s.active);
+       // 狙った相手自身は巻き込みではなく命中なので、候補から外す
+       const friends = srcObj.getFriendlyFireTargets().filter(o => o !== targetObj);
+
+       const first = findFirstBlockerOnPath(srcObj, targetObj, [...stars, ...friends]);
+       if (!first) {
+         return { kind: 'hit', obj: targetObj };
+       }
+       if (friends.includes(first)) {
+         return { kind: 'friendly', obj: first };
+       }
+       return { kind: 'blocked', obj: first };
+     } // resolveBeamPath()
+
+     /**
+      * 誤射したときの報告。
+      *
+      * 「遮られた」とは言い分けている。遮蔽は運が悪かっただけだが、
+      * 誤射は撃つ前に避けられた失敗で、次の一手が変わるため。
+      *
+      * @param {Phaser.Scene} scene
+      * @param {GameObj} victim 巻き込んだ相手
+      */
+     function onFriendlyFire(scene, victim) {
+       if (victim === gameObjs.starBase) {
+         setMsg(SPEAKER.BASE, "こちら基地！ 味方の誤射を受けている！", MSG_COLOR.DANGER);
+         return;
+       }
+       if (!victim.active) {
+         setMsg(SPEAKER.COMMS, "味方を撃墜してしまいました……", MSG_COLOR.DANGER);
+         return;
+       }
+       setMsg(SPEAKER.TACTICAL, "射線上に味方！ 誤射しました！", MSG_COLOR.DANGER);
+     } // onFriendlyFire()
 
      /**
       * エネルギーが最小活動限界を下回っていれば敗北させる。
