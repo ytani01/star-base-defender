@@ -58,9 +58,9 @@ Phase 1 の判定を Phase 2・3 の両方が使う。ここが曖昧なまま�
 
 コミット種別: `docs:` / `conductor:`
 
-- [~] Task: `conductor/product.md` にメカニクスとして記述する。「味方は守る対象であり頼る対象でもある」との関係、位置取りの重みが増すこと 〔spec: 背景〕
-- [ ] Task: `README.md` の「操作方法」と「コツ」に、誤射と、それを踏まえた立ち回りを書く
-- [ ] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` を更新する
+- [x] Task: `conductor/product.md` にメカニクスとして記述する。「味方は守る対象であり頼る対象でもある」との関係、位置取りの重みが増すこと 〔spec: 背景〕 [5e1bd3a] [1872788]
+- [x] Task: `README.md` の「操作方法」と「コツ」に、誤射と、それを踏まえた立ち回りを書く [5e1bd3a] [1872788]
+- [x] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` を更新する
 - [ ] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
 
 ---
