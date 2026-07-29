@@ -115,8 +115,13 @@ GameObj (座標・サイズを Phaser スプライトへ委譲。get x/y/r)
 
 **艦種による振る舞いの差は、基底クラスのメソッドをオーバーライドして表現する。**
 `getBeamColor()` / `getAttractionTargets()` / `getPotentialTargets()` / `shouldIgnoreTarget()` /
-`onAfterAttack()` / `canDockAtBase()` / `getFleeThreats()` / `onLeaveArea()` / `isFriendly()`。
+`onAfterAttack()` / `canDockAtBase()` / `getFleeThreats()` / `onLeaveArea()` / `isFriendly()` /
+`getFriendlyFireTargets()`。
 `instanceof` による分岐を呼び出し側に散らさないこと（現在ファイル内に残る `instanceof` は1箇所のみ）。
+
+**ビームは射線上で最も手前にあるものに当たる。** 判定は `resolveBeamPath()` にまとまっており、
+プレイヤーの攻撃（`EnemyShip.onInteract()`）と NPC の攻撃（`SpaceShip.attack()`）の両方が通る。
+**経路が2つあるので、片方だけ直さないこと。**
 
 クリック時の反応も同様に `GameObj.onInteract(player, scene, endTurn)` のオーバーライドで実現している
 （敵=攻撃 / 基地=ドッキング / 自機=シールド回復）。`handlePointerTap()` は対象を探して `onInteract()` を呼ぶだけ。
