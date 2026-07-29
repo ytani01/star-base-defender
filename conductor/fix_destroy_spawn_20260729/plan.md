@@ -64,11 +64,28 @@
 
 コミット種別: `refactor:` / 挙動は変えない。プレイヤー経路の中身を関数に切り出すだけ。
 
-- [ ] Task: 敵の撃破後にやること（`gameObjs.removeEnemy()` + `spawnEnemy()`）を1つの関数にまとめる。`EnemyShip.onInteract()` の中身をそこへ移し、呼び出しに置き換える 〔spec: 撃破と増援は1箇所にまとめる〕
-- [ ] Task: ログの文面は経路ごとに変わるため、まとめた関数の外に置くか引数で受けるかを決める。プレイヤー経路の文面（「敵艦を撃破！ 別の新たな敵艦を検知しました！」）はこの時点で変えない
-- [ ] Task: ゲームオーバー後・全滅後に増援を出さない条件をこの関数に持たせる 〔spec: 機能要件〕
-- [ ] Task: Phase 1 のテストが**まだ落ちたままである**ことを確かめる（この Phase では挙動を変えていない）。既存のテスト（`basic-operations` / `turn-progress` / `endgame` / `source-rules`）は全て通ること
-- [ ] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: 敵の撃破後にやること（`gameObjs.removeEnemy()` + `spawnEnemy()`）を1つの関数にまとめる。`EnemyShip.onInteract()` の中身をそこへ移し、呼び出しに置き換える 〔spec: 撃破と増援は1箇所にまとめる〕 [93c9ec3]
+
+  `spawnEnemy()` の直後に `onEnemyDestroyed(scene, enemy)` を新設した。
+- [x] Task: ログの文面は経路ごとに変わるため、まとめた関数の外に置くか引数で受けるかを決める。プレイヤー経路の文面（「敵艦を撃破！ 別の新たな敵艦を検知しました！」）はこの時点で変えない [93c9ec3]
+
+  **決定: 関数の外（呼び出し側）に置く。** 発信者（戦術士官・通信士）と
+  文面が経路ごとに異なり、引数で渡すと呼び出し側が読みにくくなるため。
+- [x] Task: ゲームオーバー後・全滅後に増援を出さない条件をこの関数に持たせる 〔spec: 機能要件〕 [93c9ec3]
+
+  **決定: 番人は入れない。** 調べたところ、プレイヤーの攻撃は
+  `handlePointerTap()`（`index.html:2625`）が、NPC の攻撃は
+  `execNPCAction()`（`index.html:2928`）が、それぞれ入口で `isGameOver` を
+  見て弾いており到達しない。到達しないコードを足さず、
+  そう言える理由を `onEnemyDestroyed()` の JSDoc に書いた。
+  全滅判定（`finalizeEnemyTurn()` の `enemies.length === 0`）は、
+  撃破のたびに1隻補充されるため 0 にならず、噛み合う。
+- [x] Task: Phase 1 のテストが**まだ落ちたままである**ことを確かめる（この Phase では挙動を変えていない）。既存のテスト（`basic-operations` / `turn-progress` / `endgame` / `source-rules`）は全て通ること [93c9ec3]
+
+  テスト一式 86 passed / 3 failed（Phase 1 の3件のみ）。
+  さらに `node make-baseline.js HEAD` → `npx playwright test regression` で
+  2 passed。**挙動が変わっていないことを実測で確かめた。**
+- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
 
 ---
 
