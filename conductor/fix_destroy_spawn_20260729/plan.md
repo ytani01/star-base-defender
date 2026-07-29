@@ -1,0 +1,81 @@
+# Implementation Plan: 敵の撃破に伴う増援を、撃った相手によらず出す
+
+対象: `index.html`、`tests/`。
+
+**進め方:** [Workflow](../workflow.md) に従う。着手時に `[ ]` → `[~]`、完了時に `[x]` + コミットハッシュ7桁。
+`plan.md` の更新は別コミット（`conductor(plan): ...`）にする。
+フェーズ完了時はユーザーの承認を得てからチェックポイントを作る。
+
+**フェーズは「落ちるテストを書く → 撃破の後処理を1箇所にまとめる → 全経路から通す」の順。**
+先にテストを書くのは、この不具合が「静かに起きない」種類のもので、
+直したつもりで直っていないことに気づけないため。
+
+**バランス数値には触れない。** 増援の隻数・出現距離・間隔・減点はいずれも現状のまま。
+挙動は変わる（敵が減らなくなる）ので、`regression` の突き合わせは
+「一致すること」ではなく「差が撃破後の敵数だけであること」を見る。
+
+---
+
+## Phase 1: 不具合を検出するテストを先に書く
+
+コミット種別: `test:`（`fix:` の前に置き、修正前のコードで落ちることを記録に残す）
+
+- [ ] Task: 連邦艦が敵を撃破する盤面を組めるか調べる。`Math.random` の差し替えで狙った配置を作れるか、あるいはテストから直接 `FederationShip.attack()` を呼ぶ形にするかを決める。決めた理由を plan に追記する 〔tech-stack: 盤面の再現はページのスクリプトより先に `Math.random` を差し替える〕
+- [ ] Task: 「連邦艦が敵を撃破すると敵の総数が減らない」ことを確かめるテストを追加する。`getActiveEnemyCount()` で撃破の前後を比べる 〔spec: 完了の定義〕
+- [ ] Task: 「敵が誤射で別の敵を撃破しても敵の総数が減らない」ことを確かめるテストを追加する
+- [ ] Task: 「敵が撤退したときは増援が出ない」ことを確かめるテストを追加する。撃破と撤退を取り違える修正を弾くため 〔spec: 撤退では増援は出ない〕
+- [ ] Task: **修正前のコードで上記が実際に失敗することを確かめる。** 失敗の内容（どのテストが、どういう差で落ちたか）を plan に記録する
+- [ ] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
+
+---
+
+## Phase 2: 撃破の後処理を1箇所にまとめる
+
+コミット種別: `refactor:` / 挙動は変えない。プレイヤー経路の中身を関数に切り出すだけ。
+
+- [ ] Task: 敵の撃破後にやること（`gameObjs.removeEnemy()` + `spawnEnemy()`）を1つの関数にまとめる。`EnemyShip.onInteract()` の中身をそこへ移し、呼び出しに置き換える 〔spec: 撃破と増援は1箇所にまとめる〕
+- [ ] Task: ログの文面は経路ごとに変わるため、まとめた関数の外に置くか引数で受けるかを決める。プレイヤー経路の文面（「敵艦を撃破！ 別の新たな敵艦を検知しました！」）はこの時点で変えない
+- [ ] Task: ゲームオーバー後・全滅後に増援を出さない条件をこの関数に持たせる 〔spec: 機能要件〕
+- [ ] Task: Phase 1 のテストが**まだ落ちたままである**ことを確かめる（この Phase では挙動を変えていない）。既存のテスト（`basic-operations` / `turn-progress` / `endgame` / `source-rules`）は全て通ること
+- [ ] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+
+---
+
+## Phase 3: すべての撃破経路から通す
+
+コミット種別: `fix:`
+
+- [ ] Task: `FederationShip.onAfterAttack()` を、Phase 2 でまとめた関数を呼ぶ形に変える。経路 2・3（狙った敵／射線上の別の敵）の両方がここを通ることを確かめる 〔spec: 撃破が起こりうる経路〕
+- [ ] Task: 敵の誤射で別の敵が撃破された場合（`onFriendlyFire()`）にも通す。ここは味方（敵から見た味方＝別の敵）を撃った経路のため、撃破された相手が敵艦かどうかで分ける必要がある。**`instanceof` による分岐を呼び出し側に散らさない**方法をとる 〔CLAUDE.md: 艦種による振る舞いの差はオーバーライドで表現する〕
+- [ ] Task: 増援のログを整える。連邦艦の撃破は通信士、誤射は……と、発信者の担当を `conductor/product-guidelines.md` で確認してから決める 〔spec: 機能要件〕
+- [ ] Task: Phase 1 のテストが全て通ることを確かめる
+- [ ] Task: 挙動の変化を確かめる。`node make-baseline.js <この Track の前の SHA>` → `npx playwright test regression`。差が出た場合、それが撃破後の敵数に由来するものだけであることを読む
+- [ ] Task: 確認シナリオを全項目通しで実行する（モバイルの縦画面・横画面を含む）〔workflow: フェーズ完了時の確認〕
+- [ ] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
+
+---
+
+## Phase 4: 仕上げ
+
+コミット種別: `docs:` / `chore:` / `conductor:`
+
+- [ ] Task: `conductor/product.md` の増援に関する記述が実装と合っているか確かめる。今回の修正で記述どおりになるはずなので、**変更が要るかどうかの判断**まで行う（要らなければ「不要」と記録する）
+- [ ] Task: 士気（spirit）の乖離を `docs/TBD.md` に書き残す。「撃破すれば士気が上がり」が増援間隔でしか起きていない件 〔spec: 範囲外〕
+- [ ] Task: `index.html` のバージョンを更新し、バージョン更新だけの `chore:` コミットを1つ作る（不具合修正なので `v0.6.1`）
+- [ ] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` を更新する
+- [ ] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
+
+---
+
+## 補足: この Track で気をつける点
+
+- **撃破の経路は4つある**（spec の表）。プレイヤー経路だけを見て「直った」としない。
+  同じ形の見落としが [feat_friendly_fire_20260729](../archive/feat_friendly_fire_20260729/index.md) でも起きている。
+- **撤退と撃破を取り違えない。** `onLeaveArea()` も `die()` を通るが、
+  撤退は勝利条件そのもので、増援を出してはならない。
+- **敵の数は `getActiveEnemyCount()` で数える。** `gameObjs.enemies.length` には
+  撃破・撤退済みが残る場合がある（`purgeInactive()` は `finalizeEnemyTurn()` の冒頭でしか走らない）。
+- **`finalizeEnemyTurn()` の全滅判定に影響する。** 撃破の直後に敵を1隻足すため、
+  「敵が0になったらミッションクリア」の判定と噛み合うかを確かめる。
+  特に**最後の1隻を撃破した場合**にクリアにならないこと（＝増援が出ること）は、
+  現在のプレイヤー経路の挙動でもあり、変えない。

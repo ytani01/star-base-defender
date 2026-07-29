@@ -46,7 +46,7 @@ star-base-defender/
 
 ### 進行中
 
-なし
+- [fix_destroy_spawn_20260729](./fix_destroy_spawn_20260729/index.md) — 敵を撃破したときの増援出現を、プレイヤー・連邦艦・敵の誤射のすべての経路から通す
 
 ### 完了・保管済み
 
