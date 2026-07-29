@@ -29,12 +29,12 @@ Phase 1 の判定を Phase 2・3 の両方が使う。ここが曖昧なまま�
 
 コミット種別: `feat:`
 
-- [ ] Task: 艦種ごとに「巻き込んではいけない相手」を返す `getFriendlyFireTargets()` を追加する。`GameObj` に既定（空）、`PlayerShip` / `FederationShip` / `EnemyShip` でオーバーライドする。`instanceof` による分岐を呼び出し側に作らない 〔spec: 誰が「味方」か〕
-- [ ] Task: プレイヤーの攻撃（`EnemyShip.onInteract()`）で誤射を解決する。恒星・味方を合わせた中から最も手前のものを求め、恒星なら今までどおり無駄撃ち、味方ならその味方にダメージ。標的の敵には届かない 〔spec: プレイヤーの攻撃〕
-- [ ] Task: 基地を誤射の対象に含める。プレイヤーが基地越しに撃てる現状の非対称を解消する（`isLOSBlocked(player, this, false)` の `false`）〔spec: 決定事項 2〕
-- [ ] Task: 誤射のログを追加する。「遮られた」ではなく「味方に当てた」と分かる文面にする。発信者は戦術士官（攻撃の報告）〔product-guidelines: 発信者を必ず名乗らせる〕
-- [ ] Task: シナリオテストを追加する。味方越しに撃つと味方が減り敵は無傷、恒星が手前なら無駄撃ち、ドック内の味方は当たらない、エネルギーは消費する。**修正前のコードで失敗することを確かめる**
-- [ ] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: 艦種ごとに「巻き込んではいけない相手」を返す `getFriendlyFireTargets()` を追加する。`GameObj` に既定（空）、`PlayerShip` / `FederationShip` / `EnemyShip` でオーバーライドする。`instanceof` による分岐を呼び出し側に作らない 〔spec: 誰が「味方」か〕 [5c526c1]
+- [x] Task: プレイヤーの攻撃（`EnemyShip.onInteract()`）で誤射を解決する。恒星・味方を合わせた中から最も手前のものを求め、恒星なら今までどおり無駄撃ち、味方ならその味方にダメージ。標的の敵には届かない 〔spec: プレイヤーの攻撃〕 [5c526c1]
+- [x] Task: 基地を誤射の対象に含める。プレイヤーが基地越しに撃てる現状の非対称を解消する（`isLOSBlocked(player, this, false)` の `false`）〔spec: 決定事項 2〕 [5c526c1]
+- [x] Task: 誤射のログを追加する。「遮られた」ではなく「味方に当てた」と分かる文面にする。発信者は戦術士官（攻撃の報告）〔product-guidelines: 発信者を必ず名乗らせる〕 [5c526c1]
+- [x] Task: シナリオテストを追加する。味方越しに撃つと味方が減り敵は無傷、恒星が手前なら無駄撃ち、ドック内の味方は当たらない、エネルギーは消費する。**修正前のコードで失敗することを確かめる** [5c526c1]
+- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
 
 ---
 
