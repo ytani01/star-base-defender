@@ -40,10 +40,10 @@
 
 コミット種別: `docs:` / `conductor:`
 
-- [~] Task: 図の色としきい値を `index.html` の定義と突き合わせる。16進の値を並べて目視で照合する 〔spec: 完了の定義〕
-- [ ] Task: 実際のゲーム画面と図を並べて見比べる。説明もれの記号がないこと、図にしかない記号がないことを確かめる 〔spec: 完了の定義〕
-- [ ] Task: `npx playwright test` を通す。`index.html` は変更していないが、意図しない差分が混ざっていないことの確認として実行する
-- [ ] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` の「進行中」を「なし」に戻して「完了・保管済み」へ加える
+- [x] Task: 図の色としきい値を `index.html` の定義と突き合わせる。16進の値を並べて目視で照合する。※ 出どころは DRAW_COLOR / MSG_COLOR のほか、クラスの SHIELD_COLOR・ENERGY_COLOR、drawGauge()、CSS にまたがっていた。盤面の背景色のずれを1件修正 〔spec: 完了の定義〕 [527b710]
+- [x] Task: 実際のゲーム画面と図を並べて見比べる。説明もれの記号がないこと、図にしかない記号がないことを確かめる。※ 画面要素22件を実装から列挙して照合。未説明だったズームボタンを追加した 〔spec: 完了の定義〕 [527b710]
+- [x] Task: `npx playwright test` を通す。`index.html` は変更していないが、意図しない差分が混ざっていないことの確認として実行する。※ 全73件通過 [527b710]
+- [x] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` の「進行中」を「なし」に戻して「完了・保管済み」へ加える
 - [ ] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
 
 ---

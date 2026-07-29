@@ -46,10 +46,11 @@ star-base-defender/
 
 ### 進行中
 
-- [docs_screen_guide_20260729](./docs_screen_guide_20260729/index.md) — 画面の見方を1枚の SVG で示し、README と Product Guidelines から参照する
+なし
 
 ### 完了・保管済み
 
+- [docs_screen_guide_20260729](./archive/docs_screen_guide_20260729/index.md) — 画面の見方を1枚の SVG で示し、README と Product Guidelines から参照
 - [refactor_guidelines_20260728](./archive/refactor_guidelines_20260728/index.md) — `conductor/` の規約に対する `index.html` の乖離を解消（全8フェーズ）
 - [test_harness_20260728](./archive/test_harness_20260728/index.md) — 確認シナリオを2層（`tests.html` と Playwright）で自動化
 - [refactor_config_20260706](./archive/refactor_config_20260706/index.md) — 設定値を `OBJ_CONF.*` から各クラスの static プロパティへ移行
