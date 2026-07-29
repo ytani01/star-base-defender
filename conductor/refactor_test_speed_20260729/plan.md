@@ -14,7 +14,7 @@
 
 ---
 
-## Phase 0: 基準を取る
+## Phase 0: 基準を取る [checkpoint: fe21e39]
 
 コミット種別: `conductor:`（測るだけ。コードは変えない）
 
@@ -79,7 +79,7 @@
 
   **気づき:** (D) が1件しか捕まえていない。表示の壊れ方に対する網は
   ふるまいの側より粗い。この Track の範囲外だが、記録しておく。
-- [~] Task: Conductor - User Manual Verification 'Phase 0' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 0' (Protocol in workflow.md) [fe21e39]
 
 ---
 
@@ -87,12 +87,12 @@
 
 コミット種別: `chore:`（設定の変更。テストの中身は変えない）
 
-- [ ] Task: `playwright.config.js` の `workers` を上げる。`fullyParallel: false` は保ち、**ファイル内は直列のまま**にする。台数は実行環境の CPU に合わせて決め、決め方を書き残す
-- [ ] Task: 現在の設定コメント「ゲームの状態を共有するため、1ファイル内は直列に実行する」を実態に合わせて書き直す。**共有しているのはゲームの状態ではなく、同じページ**であることを明確にする 〔spec: 時間がどこへ消えているか〕
-- [ ] Task: 並列化しても安全であることを確かめ、根拠を記録する。テストごとに Playwright のコンテキストが分かれること（`localStorage` の独立）、`webServer` は静的配信で共有してよいこと
-- [ ] Task: **不安定さを確かめる。** 通し実行を5回まわし、1回でも落ちたらワーカー数を下げる。`helpers/game.js` が警告しているとおり、**負荷が上がるとヘッドレスの描画が間引かれ、実時間とゲーム内時間がずれる**
-- [ ] Task: Phase 0 で控えた「わざと壊したときに落ちる集合」が変わらないことを確かめる
-- [ ] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
+- [~] Task: `playwright.config.js` の `workers` を上げる。`fullyParallel: false` は保ち、**ファイル内は直列のまま**にする。台数は実行環境の CPU に合わせて決め、決め方を書き残す
+- [~] Task: 現在の設定コメント「ゲームの状態を共有するため、1ファイル内は直列に実行する」を実態に合わせて書き直す。**共有しているのはゲームの状態ではなく、同じページ**であることを明確にする 〔spec: 時間がどこへ消えているか〕
+- [~] Task: 並列化しても安全であることを確かめ、根拠を記録する。テストごとに Playwright のコンテキストが分かれること（`localStorage` の独立）、`webServer` は静的配信で共有してよいこと
+- [~] Task: **不安定さを確かめる。** 通し実行を5回まわし、1回でも落ちたらワーカー数を下げる。`helpers/game.js` が警告しているとおり、**負荷が上がるとヘッドレスの描画が間引かれ、実時間とゲーム内時間がずれる**
+- [~] Task: Phase 0 で控えた「わざと壊したときに落ちる集合」が変わらないことを確かめる
+- [~] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
 
 ---
 
