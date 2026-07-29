@@ -1,0 +1,226 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 880" width="960" role="img"
+     aria-label="Starbase Defender の画面の見方">
+  <title>Starbase Defender — 画面の見方</title>
+
+  <!-- 艦の形は index.html の preload() の描画命令をそのまま移したもの。
+       元は 60x60（基地は 100x100）の座標系なので、transform で置いている。
+       色は index.html と同じ値を使う。出どころは DRAW_COLOR / MSG_COLOR /
+       各クラスの SHIELD_COLOR・ENERGY_COLOR / drawGauge() のゲージ背景 /
+       CSS のカスタムプロパティ。盤面の背景 #0a0a2a は Phaser の backgroundColor。
+
+       図のためだけに使っている色は次の2つ。ゲームには出てこない。
+         #0a0a1e  この図の地の色
+         #33cc33  敵艦のラベル文字。艦体の #008800 は暗すぎて文字だと読めないため。
+                  艦体そのものは #008800 で描いてある
+
+       GitHub は SVG から style と script を取り除くため、
+       指定はすべて属性に直接書いてある。 -->
+
+  <rect width="960" height="880" fill="#0a0a1e"/>
+
+  <text x="24" y="36" fill="#ffffff" font-family="monospace" font-size="21"
+        font-weight="bold" letter-spacing="1">Starbase Defender — 画面の見方</text>
+  <line x1="24" y1="48" x2="936" y2="48" stroke="#0088ff" stroke-width="2"/>
+
+  <!-- ============ 区画1: ステータス欄 ============ -->
+  <text x="24" y="82" fill="#0ff" font-family="monospace" font-size="17"
+        font-weight="bold">① ステータス欄</text>
+
+  <rect x="24" y="96" width="300" height="198" fill="#111" stroke="#0088ff" stroke-width="2"/>
+  <text x="38" y="120" fill="#ffffff" font-family="monospace" font-size="14"
+        font-weight="bold">StarBase Defender v0.5.1</text>
+  <line x1="38" y1="128" x2="310" y2="128" stroke="#0ff" stroke-width="1" stroke-dasharray="3 3"/>
+
+  <text x="38" y="152" fill="#0ff" font-family="monospace" font-size="15">Turn 1-12</text>
+  <rect x="150" y="138" width="94" height="20" fill="none" stroke="#0ff" stroke-width="1"/>
+  <text x="157" y="153" fill="#0ff" font-family="monospace" font-size="13">SCORE 268</text>
+
+  <text x="38" y="180" fill="#0ff" font-family="monospace" font-size="15">Shield</text>
+  <rect x="120" y="168" width="60" height="14" fill="#222" stroke="#0088ff" stroke-width="1"/>
+  <rect x="121" y="169" width="16" height="12" fill="#f00"/>
+  <text x="190" y="180" fill="#f00" font-family="monospace" font-size="15">112</text>
+
+  <text x="38" y="206" fill="#0ff" font-family="monospace" font-size="15">Energy</text>
+  <rect x="120" y="194" width="60" height="14" fill="#222" stroke="#0088ff" stroke-width="1"/>
+  <rect x="121" y="195" width="33" height="12" fill="#0f0"/>
+  <text x="190" y="206" fill="#0f0" font-family="monospace" font-size="15">2750</text>
+
+  <text x="38" y="232" fill="#0ff" font-family="monospace" font-size="15">Base Shield</text>
+  <rect x="176" y="220" width="52" height="14" fill="#222" stroke="#0088ff" stroke-width="1"/>
+  <rect x="177" y="221" width="22" height="12" fill="#0f0"/>
+  <text x="238" y="232" fill="#0f0" font-family="monospace" font-size="15">1680</text>
+
+  <text x="38" y="258" fill="#0ff" font-family="monospace" font-size="15">Federation</text>
+  <text x="158" y="258" fill="#ff0" font-family="monospace" font-size="15">2</text>
+  <text x="172" y="258" fill="#0ff" font-family="monospace" font-size="15">(Dock</text>
+  <text x="240" y="258" fill="#ff0" font-family="monospace" font-size="15">1)</text>
+
+  <text x="38" y="284" fill="#0ff" font-family="monospace" font-size="15">Enemy</text>
+  <text x="118" y="284" fill="#ff0" font-family="monospace" font-size="15">3</text>
+
+  <g stroke="#0088ff" stroke-width="1" fill="none">
+    <path d="M256 138 L256 112 L372 112"/>
+    <path d="M324 150 L372 150"/>
+    <path d="M324 186 L372 186"/>
+    <path d="M324 230 L372 230"/>
+    <path d="M324 256 L372 256"/>
+    <path d="M324 282 L372 282"/>
+  </g>
+  <g font-family="monospace" font-size="13" fill="#8ff">
+    <text x="380" y="116">SCORE を押すとハイスコア一覧が開く</text>
+    <text x="380" y="147">ミッション番号 - そのミッション内のターン数</text>
+    <text x="380" y="176">自機のシールドとエネルギー。</text>
+    <text x="380" y="193">ゲージと数値を必ず併記する</text>
+    <text x="380" y="210" fill="#ff0">残量 30% 未満で緑から赤に変わる</text>
+    <text x="380" y="234">基地のシールド。0 になると敗北</text>
+    <text x="380" y="252">自軍の艦数。自機を含む。( ) 内はドック内の数</text>
+    <text x="380" y="269">ドック内の艦は攻撃できず、敵にも狙われない</text>
+    <text x="380" y="286">宇宙域に残っている敵の数。0 でミッションクリア</text>
+  </g>
+
+  <rect x="24" y="306" width="300" height="70" fill="#000" stroke="#0ff" stroke-width="1"/>
+  <text x="34" y="326" fill="#0ff" font-family="monospace" font-size="12">001.0012 操舵手&gt;進路上に障害物</text>
+  <text x="34" y="344" fill="#ff0" font-family="monospace" font-size="12">001.0012 戦術士官&gt;新たな敵を検知！</text>
+  <text x="34" y="362" fill="#f00" font-family="monospace" font-size="12">001.0012 機関部&gt;艦長！シールド 28%</text>
+  <path d="M324 340 L372 340" stroke="#0088ff" stroke-width="1" fill="none"/>
+  <g font-family="monospace" font-size="13" fill="#8ff">
+    <text x="380" y="330">戦況の報告。誰からの報告かを必ず名乗る</text>
+    <text x="380" y="352">色が重要度を表す（シアン=通常 / 黄=警告 / 赤=危険）。</text>
+    <text x="380" y="369">さかのぼって読める</text>
+  </g>
+
+  <!-- ============ 区画2: 宇宙域 ============ -->
+  <text x="24" y="418" fill="#0ff" font-family="monospace" font-size="17"
+        font-weight="bold">② 宇宙域（キャンバス）</text>
+
+  <!-- 盤面の背景と境界 -->
+  <rect x="30" y="432" width="400" height="380" fill="#0a0a2a"/>
+  <circle cx="230" cy="622" r="175" fill="none" stroke="#0088ff" stroke-width="2"/>
+
+  <!-- ズームボタン。実際の画面でもキャンバスの左上に重なって出る
+       （縦に余裕のある画面では盤面の外へ出る） -->
+  <circle cx="58" cy="462" r="17" fill="#0088ff" fill-opacity="0.5" stroke="#0ff" stroke-width="2"/>
+  <text x="58" y="469" fill="#ffffff" font-family="monospace" font-size="19"
+        text-anchor="middle">＋</text>
+  <circle cx="58" cy="502" r="17" fill="#0088ff" fill-opacity="0.5" stroke="#0ff" stroke-width="2"/>
+  <text x="58" y="509" fill="#ffffff" font-family="monospace" font-size="19"
+        text-anchor="middle">－</text>
+
+  <!-- 恒星（障害物）: HULL_STAR #a0a0a0 -->
+  <circle cx="128" cy="536" r="9" fill="#a0a0a0"/>
+  <circle cx="316" cy="512" r="9" fill="#a0a0a0"/>
+  <circle cx="106" cy="676" r="9" fill="#a0a0a0"/>
+  <circle cx="256" cy="762" r="9" fill="#a0a0a0"/>
+  <circle cx="352" cy="672" r="9" fill="#a0a0a0"/>
+  <circle cx="180" cy="740" r="9" fill="#a0a0a0"/>
+
+  <!-- 射程円: RANGE_FRIENDLY #00ffff / RANGE_ENEMY #ffff00。
+       境界 r=175 が実際の AREA_R=300 にあたるので、射程もその縮尺で描く
+       （有効 80 → 47、最大 160 → 93、敵の有効 70 → 41）。
+       最大射程の円は実装でも自機にだけ描かれる。 -->
+  <circle cx="197" cy="669" r="93" fill="none" stroke="#00ffff" stroke-width="1" opacity="0.32"/>
+  <circle cx="197" cy="669" r="47" fill="none" stroke="#00ffff" stroke-width="1" opacity="0.55"/>
+  <circle cx="143" cy="583" r="47" fill="none" stroke="#00ffff" stroke-width="1" opacity="0.55"/>
+  <circle cx="326" cy="596" r="41" fill="none" stroke="#ffff00" stroke-width="1" opacity="0.55"/>
+
+  <!-- ビーム: BEAM_PLAYER #00ffff -->
+  <line x1="200" y1="666" x2="322" y2="602" stroke="#00ffff" stroke-width="3" opacity="0.85"/>
+
+  <!-- シールドの輪: SHIELD_OK #ffffff。各艦と基地を囲む -->
+  <circle cx="230" cy="612" r="29" fill="none" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="197" cy="669" r="19" fill="none" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="143" cy="583" r="17" fill="none" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="326" cy="596" r="18" fill="none" stroke="#ffffff" stroke-width="2"/>
+
+  <!-- 宇宙基地: HULL_BASE #88ffff（元は 100x100 の座標系） -->
+  <g transform="translate(202,584) scale(0.56)">
+    <ellipse cx="50" cy="50" rx="10" ry="45" fill="#88ffff"/>
+    <ellipse cx="50" cy="20" rx="12.5" ry="12.5" fill="#88ffff"/>
+    <ellipse cx="50" cy="80" rx="12.5" ry="12.5" fill="#88ffff"/>
+    <ellipse cx="50" cy="50" rx="20" ry="15" fill="#88ffff"/>
+    <ellipse cx="50" cy="50" rx="40" ry="15" fill="none" stroke="#88ffff" stroke-width="8"/>
+  </g>
+  <rect x="212" y="620" width="36" height="5" fill="#888888"/>
+  <rect x="212" y="620" width="27" height="5" fill="#00ffff"/>
+
+  <!-- 自機: HULL_PLAYER #66ddff -->
+  <g transform="translate(178,650) scale(0.62)" fill="#66ddff">
+    <rect x="20" y="36" width="20" height="6"/>
+    <rect x="26" y="25" width="8" height="20"/>
+    <rect x="13" y="32" width="7" height="19"/>
+    <rect x="40" y="32" width="7" height="19"/>
+    <ellipse cx="30" cy="18" rx="17" ry="14"/>
+  </g>
+  <rect x="182" y="690" width="30" height="6" fill="#888888"/>
+  <rect x="182" y="690" width="22" height="6" fill="#ffffff"/>
+  <rect x="182" y="700" width="30" height="6" fill="#888888"/>
+  <rect x="182" y="700" width="17" height="6" fill="#ffff00"/>
+
+  <!-- 連邦艦（味方）: HULL_FEDERATION #4488ff -->
+  <g transform="translate(126,566) scale(0.56)" fill="#4488ff">
+    <rect x="20" y="40" width="20" height="9"/>
+    <rect x="25" y="34" width="10" height="18"/>
+    <rect x="15" y="36" width="6" height="16"/>
+    <rect x="39" y="36" width="6" height="16"/>
+    <ellipse cx="30" cy="20" rx="14" ry="15.5"/>
+  </g>
+  <rect x="130" y="600" width="27" height="5" fill="#888888"/>
+  <rect x="130" y="600" width="20" height="5" fill="#ffffff"/>
+
+  <!-- 敵艦: HULL_ENEMY #008800 -->
+  <g transform="translate(308,578) scale(0.6)" fill="#008800">
+    <path d="M32 55 L54 40 L54 21 L50 21 L50 32 L31 41 L30 41 L10 32 L10 21 L6 21 L6 40 L28 55 Z"/>
+    <rect x="26" y="10" width="8" height="35"/>
+    <ellipse cx="30" cy="15" rx="9" ry="9.5"/>
+  </g>
+  <rect x="312" y="616" width="29" height="5" fill="#888888"/>
+  <rect x="312" y="616" width="12" height="5" fill="#ff8800"/>
+
+  <!-- 引き出し線。ラベルは線源の高さの順に並べてあり、線どうしが
+       できるだけ交差しないようにしている -->
+  <g stroke="#0088ff" stroke-width="1" fill="none" opacity="0.6">
+    <path d="M271 452 L452 454"/>
+    <path d="M322 508 L452 494"/>
+    <path d="M160 566 L452 534"/>
+    <path d="M344 588 L452 574"/>
+    <path d="M252 600 L452 614"/>
+    <path d="M340 610 L452 654"/>
+    <path d="M206 658 L452 694"/>
+    <path d="M290 669 L452 734"/>
+    <path d="M216 694 L452 808"/>
+  </g>
+
+  <g font-family="monospace" font-size="13">
+    <text x="460" y="458" fill="#0088ff">宇宙域の境界</text>
+    <text x="460" y="475" fill="#8ff">外へ出た敵は撤退する。自機も出られない</text>
+
+    <text x="460" y="498" fill="#a0a0a0">恒星（障害物）</text>
+    <text x="460" y="515" fill="#8ff">ぶつかれない。射線も遮る</text>
+
+    <text x="460" y="538" fill="#4488ff">連邦艦（味方）</text>
+    <text x="460" y="555" fill="#8ff">自機と同系色で一段暗い。自律的に戦う</text>
+
+    <text x="460" y="578" fill="#3c3">敵艦</text>
+    <text x="460" y="595" fill="#8ff">撃破ではなく、弱らせて宇宙域の外へ追い出す</text>
+
+    <text x="460" y="618" fill="#88ffff">宇宙基地</text>
+    <text x="460" y="635" fill="#8ff">守る対象。落ちると敗北。ドッキングで補給できる</text>
+
+    <text x="460" y="658" fill="#ffffff">シールドの輪</text>
+    <text x="460" y="675" fill="#8ff">艦と基地を囲む。残量が減ると細くなり、色も変わる</text>
+
+    <text x="460" y="698" fill="#66ddff">自機</text>
+    <text x="460" y="715" fill="#8ff">明るいシアン。操作できるのはこの艦だけ</text>
+
+    <text x="460" y="738" fill="#00ffff">射程円（自機は二重）</text>
+    <text x="460" y="755" fill="#8ff">内側 = 有効射程。ここで威力は半分になる</text>
+    <text x="460" y="772" fill="#8ff">外側 = 最大射程。ここで威力は 5 分の 1。外は当たらない</text>
+    <text x="460" y="789" fill="#8ff">敵と味方は有効射程の円だけが出る（シアン=自軍 / 黄=敵）</text>
+
+    <text x="460" y="812" fill="#ffffff">艦の下のバー</text>
+    <text x="460" y="829" fill="#8ff">上 = シールド量（色が艦種を示す）</text>
+    <text x="460" y="846" fill="#ffff00">下 = エネルギー量（自機だけ）</text>
+  </g>
+  <text x="30" y="836" fill="#0ff" font-family="monospace" font-size="13">＋ － ボタン</text>
+  <text x="30" y="853" fill="#8ff" font-family="monospace" font-size="13">拡大・縮小する。拡大中はドラッグで見る場所を動かせる</text>
+</svg>
