@@ -16,6 +16,22 @@
 const DEFAULT_SEED = 20260728;
 
 /**
+ * 演出を何倍速で進めるか。
+ *
+ * ゲームの待ち時間の大半は演出（`TIMING` の各値）で、テストは
+ * 「動いているものが無くなるまで」待つのでそれがそのまま実行時間になる。
+ * ゲーム本体の `TIMING` はプレイヤーに届く値なので変えられない。
+ * 代わりに Phaser の時計そのものを速める。
+ *
+ * **盤面の推移は速さに依らない。** 移動先も攻撃の結果も、演出が始まる前に
+ * 計算し終えている。トゥイーンは見せ方でしかない。それを証明しているのが
+ * determinism と regression で、この2つが通る限り速めても嘘にならない。
+ *
+ * `--headed` で動きを見たいときは `PW_TIME_SCALE=1` を付けて等倍に戻す。
+ */
+const TIME_SCALE = Number(process.env.PW_TIME_SCALE || 8);
+
+/**
  * ゲームを開く。
  *
  * 乱数はページのスクリプトより先に差し替える。起動後に差し替えて
@@ -49,6 +65,32 @@ async function openGame(page, options = {}) {
   // クエリを付けてキャッシュを避ける
   await page.goto(`/${file}?t=${Date.now()}`);
   await waitForBoot(page);
+  await applyTimeScale(page);
+}
+
+/**
+ * 演出の時計を速める。
+ *
+ * 起動後に当てるのは、`gameState.curScene` が出来てからでないと
+ * 触れないため。`scene.restart()` を挟むテストのために、待ちの節目でも
+ * 当て直す（`waitForBoot` を通る経路はここを通る）。
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+async function applyTimeScale(page) {
+  if (TIME_SCALE === 1) {
+    return;
+  }
+  await page.evaluate((scale) => {
+    const scene = gameState && gameState.curScene;
+    if (!scene) {
+      return;
+    }
+    scene.time.timeScale = scale;
+    // scene.restart() を挟むとトゥイーンの管理だけが作り直され、
+    // 倍率が 1 に戻る（時計のほうは残る）。だから毎回当て直す
+    scene.tweens.timeScale = scale;
+  }, TIME_SCALE);
 }
 
 /**
@@ -77,10 +119,18 @@ async function waitForBoot(page) {
  * @param {number} [timeout] ミリ秒
  */
 async function waitForIdle(page, timeout = 20000) {
-  await page.waitForFunction(() => {
+  await page.waitForFunction((scale) => {
     const scene = gameState.curScene;
     if (!scene) {
       return false;
+    }
+    // 倍率をここで当て直す。scene.restart() を挟むとトゥイーンの管理だけが
+    // 作り直されて 1 に戻るため（時計のほうは残る）。判定のついでにやるのは、
+    // 往復を増やさないため。別に evaluate を挟むと、演出の少ないテスト
+    // （layout など）では倍速の得より往復の損が上回った（実測 74秒→82秒）
+    if (scale !== 1) {
+      scene.time.timeScale = scale;
+      scene.tweens.timeScale = scale;
     }
     const movingCount = scene.tweens.getTweens().length;
     // 予約された直後の処理は _pendingInsertion に入り、次の更新まで
@@ -90,7 +140,7 @@ async function waitForIdle(page, timeout = 20000) {
     const pendingCount = (clock._active || []).length
       + (clock._pendingInsertion || []).length;
     return movingCount === 0 && pendingCount === 0;
-  }, null, { timeout, polling: 50 });
+  }, TIME_SCALE, { timeout, polling: 50 });
 }
 
 /**
@@ -400,6 +450,7 @@ function collectConsoleIssues(page) {
 }
 
 module.exports = {
+  TIME_SCALE, applyTimeScale,
   DEFAULT_SEED,
   openGame,
   waitForBoot,
