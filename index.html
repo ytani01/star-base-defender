@@ -735,6 +735,30 @@
      } // isPathBlockedBy()
 
      /**
+      * src から dst へ向かう向きに、距離 length だけ進んだ点を返す。
+      *
+      * 射程外へ撃ったときに、ビームを届く範囲までで切るために使う。
+      * 相手の位置まで線を引いてしまうと、届いていないのに届いたように見える。
+      *
+      * @param {{x:number, y:number}} src 始点
+      * @param {{x:number, y:number}} dst 向きを決める点
+      * @param {number} length 始点からの距離
+      * @return {{x:number, y:number}} 進んだ先の点。src と dst が同じなら src
+      */
+     function pointAlongPath(src, dst, length) {
+       const dx = dst.x - src.x;
+       const dy = dst.y - src.y;
+       const dist = Math.hypot(dx, dy);
+       if (dist < 0.001) {
+         return { x: src.x, y: src.y };
+       }
+       return {
+         x: src.x + (dx / dist) * length,
+         y: src.y + (dy / dist) * length,
+       };
+     } // pointAlongPath()
+
+     /**
       * src から dst への射線上で、src に最も近い対象を返す。
       *
       * 「遮られているか」だけでは、恒星と味方が両方とも射線上にいるときに
@@ -1918,9 +1942,12 @@
          );
 
          if (hitDist > reach) {
-           // 射線上のものにも狙った相手にも届かなかった
+           // 射線上のものにも狙った相手にも届かなかった。
+           // ビームは最大射程で切る。相手まで線を引くと、届いていないのに
+           // 届いたように見えてしまう
            setMsg(SPEAKER.TACTICAL, "射程範囲外のため敵艦にダメージなし", MSG_COLOR.WARN);
-           fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
+           fireBeam(scene, player, pointAlongPath(player, this, reach),
+                    DRAW_COLOR.BEAM_MISS);
            endTurn();
            return true;
          }
@@ -2869,6 +2896,14 @@
      /**
       * ビームの描画と発射音の再生。
       * 一定時間後に自動で破棄される、その場限りのグラフィックスとして描く。
+      *
+      * 終点は座標しか見ないので、艦だけでなく座標そのものも渡せる。
+      * 射程外へ撃ったときに、届く範囲までで線を切るのに使う。
+      *
+      * @param {Phaser.Scene} scene
+      * @param {GameObj} srcObj 撃った側
+      * @param {{x:number, y:number}} targetObj 終点。艦でも座標でもよい
+      * @param {number} color
       */
      function fireBeam(scene, srcObj, targetObj, color) {
        const beam = scene.add.graphics();
