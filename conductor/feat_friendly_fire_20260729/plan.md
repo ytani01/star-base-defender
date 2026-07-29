@@ -21,7 +21,7 @@ Phase 1 の判定を Phase 2・3 の両方が使う。ここが曖昧なまま�
 
 - [x] Task: 「純粋な計算」ブロックに `findFirstBlockerOnPath(src, dst, objs)` を作る。射線と交わる対象のうち、`src` に最も近いものを返す（無ければ `null`）。既存の `intersectSegmentCircle()` が返す `t1` を距離の順序として使い、`hasObstacleOnPath()` と同じ近傍の除外（`t < 0.05` / `t > 0.95`）を守る 〔spec: 恒星と味方の両方が射線上にある場合、手前が優先される〕 [965705e]
 - [x] Task: `tests.html` に検査を足す。手前・奥の順序、射線から外れた対象を選ばないこと、始点と終点の近傍を拾わないこと、空リスト。**わざと順序を逆にして落ちることを確かめる**。※ 順序を逆にすると4件、近傍の除外を外すと1件が落ちることを確認 [965705e]
-- [~] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md) [965705e]
 
 ---
 
