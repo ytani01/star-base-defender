@@ -83,7 +83,7 @@
 
 ---
 
-## Phase 1: ファイル単位で並列に走らせる
+## Phase 1: ファイル単位で並列に走らせる [checkpoint: 1d82f8e]
 
 コミット種別: `chore:`（設定の変更。テストの中身は変えない）
 
@@ -138,7 +138,7 @@
 
   **4通りすべて、件数もテスト名も完全に一致した**（A:5件 / B:4件 / C:10件 / D:1件）。
   並列にしても見逃すようにはなっていない。
-- [~] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md) [1d82f8e]
 
 ---
 
@@ -146,12 +146,12 @@
 
 コミット種別: `test:`（テスト側の待ち方の変更）
 
-- [ ] Task: `openGame()` で、起動後に Phaser の時計とトゥイーンを速める。`scene.time.timeScale` と `scene.tweens.timeScale` を上げる。**ゲーム本体には触れない**（`TIMING` の値は変えない）〔spec: 決定事項 3〕
-- [ ] Task: 倍率を決める。上げすぎると `waitForIdle()` が「まだ始まっていない」状態を「片付いた」と誤判定しうる。**倍率を変えながら determinism が通り続ける上限**を探し、そこから余裕をみた値にする。決め方を書き残す
-- [ ] Task: 速める処理を切れるようにするか判断する。`--headed` で動きを見たいときに邪魔になるため。要否と理由を記録する
-- [ ] Task: `determinism` と `regression` が通ることを確かめる。**盤面の推移が演出の速さに依存していない**ことの証明になる 〔spec: 機能要件〕
-- [ ] Task: Phase 0 で控えた「わざと壊したときに落ちる集合」が変わらないことを確かめる
-- [ ] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [~] Task: `openGame()` で、起動後に Phaser の時計とトゥイーンを速める。`scene.time.timeScale` と `scene.tweens.timeScale` を上げる。**ゲーム本体には触れない**（`TIMING` の値は変えない）〔spec: 決定事項 3〕
+- [~] Task: 倍率を決める。上げすぎると `waitForIdle()` が「まだ始まっていない」状態を「片付いた」と誤判定しうる。**倍率を変えながら determinism が通り続ける上限**を探し、そこから余裕をみた値にする。決め方を書き残す
+- [~] Task: 速める処理を切れるようにするか判断する。`--headed` で動きを見たいときに邪魔になるため。要否と理由を記録する
+- [~] Task: `determinism` と `regression` が通ることを確かめる。**盤面の推移が演出の速さに依存していない**ことの証明になる 〔spec: 機能要件〕
+- [~] Task: Phase 0 で控えた「わざと壊したときに落ちる集合」が変わらないことを確かめる
+- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
 
 ---
 
