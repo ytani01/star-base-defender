@@ -32,7 +32,7 @@
 - [x] Task: `README.md` に「画面の見方」の節を新設し、「操作方法」の前に置いて図を貼る。図だけで伝わらないしきい値は図中に書く。※ 射程による威力の変化は README 本文にも書いた 〔spec: 参照〕 [1334614]
 - [x] Task: `conductor/product-guidelines.md` の「レトロ SF スタイル」の色の対応表のあとに、図への参照を1行足す。**規約の内容自体は変えない** 〔spec: 参照〕 [1334614]
 - [x] Task: 古い `docs/screenshot1.png` を削除し、README からの参照も外す。v0.3 期のもので現在の画面と食い違うため 〔spec: 古いスクリーンショットの削除〕 [1334614]
-- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md) [1334614]
 
 ---
 
@@ -40,7 +40,7 @@
 
 コミット種別: `docs:` / `conductor:`
 
-- [ ] Task: 図の色としきい値を `index.html` の定義と突き合わせる。16進の値を並べて目視で照合する 〔spec: 完了の定義〕
+- [~] Task: 図の色としきい値を `index.html` の定義と突き合わせる。16進の値を並べて目視で照合する 〔spec: 完了の定義〕
 - [ ] Task: 実際のゲーム画面と図を並べて見比べる。説明もれの記号がないこと、図にしかない記号がないことを確かめる 〔spec: 完了の定義〕
 - [ ] Task: `npx playwright test` を通す。`index.html` は変更していないが、意図しない差分が混ざっていないことの確認として実行する
 - [ ] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` の「進行中」を「なし」に戻して「完了・保管済み」へ加える
