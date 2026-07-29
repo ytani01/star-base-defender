@@ -573,6 +573,79 @@ test.describe('射線上の味方への誤射', () => {
     expect(after.enemy, '敵は無傷').toBe(before.enemy);
     expect((await readLog(page, 3)).join('\n')).toContain('誤射');
   });
+
+  test('狙った敵が射程外でも、手前の味方には当たる', async ({ page }) => {
+    // ビームは最大射程まで飛んでいる。狙いが届かないことと、
+    // 途中にいる味方に当たらないことは別の話。
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const pos = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.x = cx - 200;
+      p.y = cy;
+      gameObjs.starBase.x = cx - 140;   // 自機のすぐ先。射程の内側
+      gameObjs.starBase.y = cy;
+      const e = gameObjs.enemies[0];
+      e.active = true;
+      e.sprite.setVisible(true);
+      e.shield = EnemyShip.SHIELD_MAX;
+      // 最大射程より遠くに置く。狙い自体は届かない
+      e.x = p.x + p.weapon.maxRange() + 80;
+      e.y = cy;
+      return { x: e.x, y: e.y };
+    });
+    const before = await page.evaluate(() => ({
+      base: gameObjs.starBase.shield, enemy: gameObjs.enemies[0].shield,
+    }));
+
+    await clickWorld(page, pos);
+    const after = await page.evaluate(() => ({
+      base: gameObjs.starBase.shield, enemy: gameObjs.enemies[0].shield,
+    }));
+
+    expect(after.base, '射程内にある基地には当たる').toBeLessThan(before.base);
+    expect(after.enemy, '射程外の敵には届かない').toBe(before.enemy);
+    expect((await readLog(page, 3)).join('\n')).toContain('誤射');
+  });
+
+  test('味方も敵も射程の外なら、射程外として報告する', async ({ page }) => {
+    // 射線上にいても、ビームが届いていなければ当たらない
+    await openGame(page);
+    await clearField(page);
+    await suppressNpcTurn(page);
+    const pos = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.x = cx - 260;
+      p.y = cy;
+      // 基地も敵も最大射程の外に置く
+      gameObjs.starBase.x = p.x + p.weapon.maxRange() + 40;
+      gameObjs.starBase.y = cy;
+      const e = gameObjs.enemies[0];
+      e.active = true;
+      e.sprite.setVisible(true);
+      e.shield = EnemyShip.SHIELD_MAX;
+      e.x = p.x + p.weapon.maxRange() + 140;
+      e.y = cy;
+      return { x: e.x, y: e.y };
+    });
+    const before = await page.evaluate(() => ({
+      base: gameObjs.starBase.shield, enemy: gameObjs.enemies[0].shield,
+    }));
+
+    await clickWorld(page, pos);
+    const after = await page.evaluate(() => ({
+      base: gameObjs.starBase.shield, enemy: gameObjs.enemies[0].shield,
+    }));
+
+    expect(after.base, '射程外の基地には当たらない').toBe(before.base);
+    expect(after.enemy, '敵にも当たらない').toBe(before.enemy);
+    expect((await readLog(page, 3)).join('\n')).toContain('射程範囲外');
+  });
 });
 
 test.describe('ズーム中のスクロール', () => {

@@ -1908,32 +1908,36 @@
          player.energy -= player.weapon.cost;
          const dist = Phaser.Math.Distance.Between(player.x, player.y, this.x, this.y);
 
-         if (dist > player.weapon.maxRange()) {
-           setMsg(SPEAKER.TACTICAL, "射程範囲外のため敵艦にダメージなし", MSG_COLOR.WARN);
-           fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
-           endTurn();
-           return true;
-         }
-         // 射線上に何があるかで結果が変わる。基地も味方として扱うため、
+         // ビームは最大射程まで飛ぶ。その範囲で最初に当たったものが結果を決める。
+         // 狙った敵が射程外でも、手前の味方や恒星には当たる（撃った以上、
+         // ビームはそこまで飛んでいる）。基地も味方として扱うため、
          // ここで基地を素通りさせる特例（かつての checkBase = false）はない
+         const reach = player.weapon.maxRange();
          const path = resolveBeamPath(player, this);
+         const distTo = (obj) =>
+               Phaser.Math.Distance.Between(player.x, player.y, obj.x, obj.y);
 
-         if (path.kind === 'blocked') {
+         if (path.kind === 'blocked' && distTo(path.obj) <= reach) {
            setMsg(SPEAKER.TACTICAL, "障害物に遮られました", MSG_COLOR.WARN);
-           fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
+           fireBeam(scene, player, path.obj, DRAW_COLOR.BEAM_MISS);
            endTurn();
            return true;
          }
 
-         if (path.kind === 'friendly') {
+         if (path.kind === 'friendly' && distTo(path.obj) <= reach) {
            // 撃ってしまった以上、なかったことにはしない。
            // エネルギーはすでに消費しており、ダメージも味方に入る
-           const friendlyDamage = player.weapon.calcDamage(
-             Phaser.Math.Distance.Between(player.x, player.y, path.obj.x, path.obj.y)
-           );
            fireBeam(scene, player, path.obj, DRAW_COLOR.BEAM_PLAYER);
-           path.obj.takeDamage(friendlyDamage);
+           path.obj.takeDamage(player.weapon.calcDamage(distTo(path.obj)));
            onFriendlyFire(scene, path.obj);
+           endTurn();
+           return true;
+         }
+
+         // 射線上の何にも届かなかった場合に、初めて射程外を報告する
+         if (dist > reach) {
+           setMsg(SPEAKER.TACTICAL, "射程範囲外のため敵艦にダメージなし", MSG_COLOR.WARN);
+           fireBeam(scene, player, this, DRAW_COLOR.BEAM_MISS);
            endTurn();
            return true;
          }
