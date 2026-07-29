@@ -46,7 +46,7 @@ star-base-defender/
 
 ### 進行中
 
-なし
+- [balance_destroy_spirit_20260729](./balance_destroy_spirit_20260729/index.md) — 敵を撃破したときに生存中の敵の士気を上げ、撤退による低下と対称にする
 
 ### 完了・保管済み
 

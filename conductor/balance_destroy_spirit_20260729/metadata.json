@@ -1,0 +1,8 @@
+{
+  "track_id": "balance_destroy_spirit_20260729",
+  "type": "balance",
+  "status": "todo",
+  "created_at": "2026-07-29",
+  "updated_at": "2026-07-29",
+  "description": "敵を撃破したときに生存中の敵の士気を上げ、撤退による低下と対称にする"
+}
