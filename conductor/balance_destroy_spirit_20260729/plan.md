@@ -59,11 +59,21 @@
 
 コミット種別: `balance:`
 
-- [ ] Task: `EnemyShip.onDestroyed()` に士気の上昇を足す。`gameObjs.removeEnemy()` → 士気の上昇 → `spawnEnemy()` の順にする。**増援が上昇を受けないのはこの順序による**ので、理由をコメントに残す 〔spec: 機能要件〕
-- [ ] Task: 上昇のログを足す。発信者は**副長**（撤退の報告と同じ担当）。文面は一報告一文、色は `MSG_COLOR.WARN`（戦況が不利に動いたことの警告）〔product-guidelines: 発信者を必ず名乗らせる／文体のルール〕
-- [ ] Task: ログを `onDestroyed()` の中に置く。前 Track では「発信者と文面が経路ごとに違う」ためログを呼び出し側に置いたが、**士気の上昇は誰が撃っても同じ報告**になるので、ここは中に置くのが正しい。判断の理由をコメントに残す
-- [ ] Task: Phase 1 のテストが全て通ることを確かめる。既存のテストも全て通ること
-- [ ] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: `EnemyShip.onDestroyed()` に士気の上昇を足す。`gameObjs.removeEnemy()` → 士気の上昇 → `spawnEnemy()` の順にする。**増援が上昇を受けないのはこの順序による**ので、理由をコメントに残す 〔spec: 機能要件〕 [96d2f05]
+- [x] Task: 上昇のログを足す。発信者は**副長**（撤退の報告と同じ担当）。文面は一報告一文、色は `MSG_COLOR.WARN`（戦況が不利に動いたことの警告）〔product-guidelines: 発信者を必ず名乗らせる／文体のルール〕 [96d2f05]
+
+  文面は「撃破により敵の士気が高まっています」。原因を一文に含めたのは、
+  ログが**因果を伝える唯一の手がかり**になるため。用語は
+  `conductor/product.md` に合わせて「戦意」ではなく「士気」を使った。
+
+  `getActiveEnemyCount() > 0` の番人を付けた。最後の1隻を撃破したときに
+  「敵の士気が高まっています」と言わないため。`onLeaveArea()` と同じ形。
+- [x] Task: ログを `onDestroyed()` の中に置く。前 Track では「発信者と文面が経路ごとに違う」ためログを呼び出し側に置いたが、**士気の上昇は誰が撃っても同じ報告**になるので、ここは中に置くのが正しい。判断の理由をコメントに残す [96d2f05]
+- [x] Task: Phase 1 のテストが全て通ることを確かめる。既存のテストも全て通ること [96d2f05]
+
+  テスト一式 92 passed（Phase 1 の4件を含め全通過）。`source-rules` 7 passed。
+  構文チェック OK。
+- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
 
 ---
 
