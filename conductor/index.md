@@ -46,7 +46,7 @@ star-base-defender/
 
 ### 進行中
 
-なし
+- [feat_friendly_fire_20260729](./feat_friendly_fire_20260729/index.md) — 射線上の味方にビームが当たるようにし、NPC は味方を巻き込む射線では撃たないようにする
 
 ### 完了・保管済み
 
