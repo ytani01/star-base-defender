@@ -82,6 +82,7 @@ CSS では `:root` のカスタムプロパティ経由が原則。ただし**�
 | 挙動を変えないはずの変更 | `node make-baseline.js <ref>` → `npx playwright test regression` |
 | 不具合の修正 | **その不具合を検出できるテストを足し、修正前のコードで実際に失敗させたか** |
 | 新しい艦種・振る舞い | `instanceof` で分岐していないか（基底クラスのメソッドを override する） |
+| Track のフェーズ完了 | **承認後に `conductor(checkpoint):` コミットを作り、`plan.md` のフェーズ見出しに `[checkpoint: <sha>]` を追記したか**（飛ばされやすい） |
 
 ## 4. 最後に
 
