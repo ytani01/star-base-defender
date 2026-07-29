@@ -1564,15 +1564,36 @@
        /**
         * 攻撃実行の共通処理
         */
-       attack(target, distance) {
-         // 自身の scene と getBeamColor() を使用してビームを描画
-         fireBeam(this.scene, this, target, this.getBeamColor());
-         
-         const damage = this.weapon.calcDamage(distance);
-         target.takeDamage(damage);
+       attack(target) {
+         // 当たるのは射線上で最も手前にあるもの。プレイヤーの攻撃と同じ規則で
+         // 解決する。評価（evaluateTactics）から実行までのあいだに味方が
+         // 動くことがあるため、撃つ時点でもう一度見る。
+         // 距離も実際の位置から取る。評価時の値を持ち回すと、動いたぶんだけ
+         // 威力がずれる
+         const reach = this.weapon.maxRange();
+         const path = resolveBeamPath(this, target);
+         const hitDist = Phaser.Math.Distance.Between(
+           this.x, this.y, path.obj.x, path.obj.y
+         );
+
+         if (path.kind === 'blocked' || hitDist > reach) {
+           // 遮られた、または届かなかった。無駄撃ちとして撃つ姿だけ見せる
+           fireBeam(this.scene, this, pointAlongPath(this, target, Math.min(hitDist, reach)),
+                    DRAW_COLOR.BEAM_MISS);
+           return;
+         }
+
+         const victim = path.obj;
+         fireBeam(this.scene, this, victim, this.getBeamColor());
+         victim.takeDamage(this.weapon.calcDamage(hitDist));
+
+         if (path.kind === 'friendly') {
+           onFriendlyFire(this.scene, victim);
+           return;
+         }
 
          // 艦種ごとの攻撃後処理（メッセージ通知や撃破判定）を呼び出し
-         this.onAfterAttack(target);
+         this.onAfterAttack(victim);
        } // attack()
 
        /**
@@ -1631,10 +1652,13 @@
              closestTarget = t;
            }
 
-           // 攻撃可能な対象を評価
+           // 攻撃可能な対象を評価。
+           // 射線が通らない相手は狙わない。恒星に遮られる場合はもちろん、
+           // 味方に当たってしまう場合も撃たない（NPC は誤射を避ける）。
+           // 手前に別の敵がいる場合は、そちらに当たるだけなので撃ってよい
            if (!isFleeing && d <= this.weapon.maxRange() * (1.0 - this.spirit)) {
-             const checkBaseObstacle = (t !== gameObjs.starBase);
-             if (!isLOSBlocked(this, t, checkBaseObstacle)) {
+             const path = resolveBeamPath(this, t);
+             if (path.kind === 'hit') {
                if (d < bestAttackableDist) {
                  bestAttackableDist = d;
                  bestAttackableTarget = t;
@@ -2955,7 +2979,7 @@
        if (context.isFleeing) {
          npcMove(scene, npc, context);
        } else if (context.canAttack && !npc.isDocked) {
-         npc.attack(context.target, context.distToTarget);
+         npc.attack(context.target);
        } else {
          // ドッキング中は自機と同じく兵器を使用できないため、攻撃したい
          // 状況ならまずドックを出る（npcMove() が押し出しを行う）

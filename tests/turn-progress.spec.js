@@ -270,3 +270,161 @@ test.describe('ターン進行と戦況', () => {
     expect(issues.warnings).toEqual([]);
   });
 });
+
+
+/**
+ * NPC が撃つかどうかは、射線だけでなく交戦距離でも決まる
+ * （最大射程 × (1 - 士気)。連邦艦は 104、敵艦は 70）。
+ * 距離が足りずに撃たなかったのを「射線を避けた」と読み違えないよう、
+ * 配置が交戦距離の内側であることをテスト自身で確かめる。
+ */
+async function assertWithinEngagementRange(page, shooterKind, targetKind) {
+  const d = await page.evaluate(({ shooterKind, targetKind }) => {
+    const pick = (kind) => kind === 'player' ? gameObjs.player
+      : kind === 'federation'
+        ? gameObjs.federationShips[gameObjs.federationShips.length - 1]
+        : gameObjs.enemies.filter((e) => e.active)[kind === 'enemyFar' ? 1 : 0];
+    const s = pick(shooterKind);
+    const t = pick(targetKind);
+    return {
+      dist: Phaser.Math.Distance.Between(s.x, s.y, t.x, t.y),
+      limit: s.weapon.maxRange() * (1.0 - s.spirit),
+    };
+  }, { shooterKind, targetKind });
+  expect(d.dist, `${shooterKind} が ${targetKind} を撃てる距離にいる（上限 ${Math.round(d.limit)}）`)
+    .toBeLessThanOrEqual(d.limit);
+}
+
+test.describe('NPC は味方を巻き込まない', () => {
+  test('射線上に味方がいる相手を敵は撃たない', async ({ page }) => {
+    // 敵(奥)・敵(手前)・自機 を一直線に並べる。
+    // 奥の敵から見ると手前の敵が射線上にいるので撃てない
+    await openGame(page);
+    await setupField(page, 2);
+    const before = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      gameObjs.starBase.x = cx;
+      gameObjs.starBase.y = cy - 250;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.shield = PlayerShip.SHIELD_MAX;
+      p.x = cx - 20;
+      p.y = cy;
+      const [near, far] = gameObjs.enemies.filter((e) => e.active);
+      // 逃走に転じないよう、シールドは満タンにしておく
+      [near, far].forEach((e) => { e.shield = EnemyShip.SHIELD_MAX; e.y = cy; });
+      near.x = cx + 10;   // 自機から 30
+      far.x = cx + 40;    // 自機から 60（交戦距離 70 の内側）、手前の敵から 30
+      return { near: near.shield };
+    });
+    // 奥の敵は距離としては自機を撃てる位置にいる
+    await assertWithinEngagementRange(page, 'enemyFar', 'player');
+
+    const farBefore = await page.evaluate(() => {
+      const far = gameObjs.enemies.filter((e) => e.active)[1];
+      return { x: far.x, y: far.y };
+    });
+
+    await runNpcTurn(page);
+
+    const after = await page.evaluate((prev) => {
+      const [near, far] = gameObjs.enemies.filter((e) => e.active);
+      return {
+        near: near.shield,
+        farMoved: Phaser.Math.Distance.Between(far.x, far.y, prev.x, prev.y),
+      };
+    }, farBefore);
+
+    expect(after.near, '手前の味方が撃たれていない').toBe(before.near);
+    // 撃てないと判断した NPC は接近に転じる（execNPCAction）。
+    // 撃っていれば、その場に留まったままになる
+    expect(after.farMoved, '奥の敵は撃たずに動いている').toBeGreaterThan(1);
+  });
+
+  test('連邦艦は自機を巻き込む射線では撃たない', async ({ page }) => {
+    // 連邦艦・自機・敵 の順に並べる。連邦艦から見ると自機が射線上にいる
+    await openGame(page);
+    await setupField(page, 1);
+    await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      gameObjs.starBase.x = cx;
+      gameObjs.starBase.y = cy - 250;
+      newFederationShip(gameState.curScene, 0.1, 0.2);
+      const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+      f.active = true;
+      f.sprite.setVisible(true);
+      f.isDocked = false;
+      f.shield = FederationShip.SHIELD_MAX;
+      f.x = cx - 60;
+      f.y = cy;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.shield = PlayerShip.SHIELD_MAX;
+      p.x = cx - 20;     // 連邦艦と敵のあいだ
+      p.y = cy;
+      const e = gameObjs.enemies.find((en) => en.active);
+      e.shield = EnemyShip.SHIELD_MAX;
+      e.x = cx + 20;     // 連邦艦から 80。交戦距離 104 の内側
+      e.y = cy;
+    });
+    await assertWithinEngagementRange(page, 'federation', 'enemyNear');
+    const before = await page.evaluate(() => {
+      const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+      return { x: f.x, y: f.y, enemy: gameObjs.enemies.find((e) => e.active).shield };
+    });
+
+    await runNpcTurn(page);
+
+    const after = await page.evaluate((prev) => {
+      const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+      return {
+        moved: Phaser.Math.Distance.Between(f.x, f.y, prev.x, prev.y),
+        enemy: gameObjs.enemies.find((e) => e.active).shield,
+      };
+    }, before);
+
+    const log = (await readLog(page, 8)).join('\n');
+    expect(log, '連邦艦の誤射が起きていない').not.toContain('誤射');
+    expect(after.enemy, '敵も撃たれていない').toBe(before.enemy);
+    // 撃てないと判断した NPC は接近に転じる（execNPCAction）
+    expect(after.moved, '連邦艦は撃たずに動いている').toBeGreaterThan(1);
+  });
+
+  test('射線が通れば連邦艦は撃つ', async ({ page }) => {
+    // 上の裏返し。自機だけを射線から外すと攻撃が成立する。
+    // これが通ることで、上のテストが「距離不足で撃たなかった」のでは
+    // ないことが裏づけられる
+    await openGame(page);
+    await setupField(page, 1);
+    const before = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      gameObjs.starBase.x = cx;
+      gameObjs.starBase.y = cy - 250;
+      newFederationShip(gameState.curScene, 0.1, 0.2);
+      const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+      f.active = true;
+      f.sprite.setVisible(true);
+      f.isDocked = false;
+      f.shield = FederationShip.SHIELD_MAX;
+      f.x = cx - 60;
+      f.y = cy;
+      const p = gameObjs.player;
+      p.isDocked = false;
+      p.x = cx - 20;
+      p.y = cy + 150;    // 射線から外す。それ以外は上のテストと同じ
+      const e = gameObjs.enemies.find((en) => en.active);
+      e.shield = EnemyShip.SHIELD_MAX;
+      e.x = cx + 20;
+      e.y = cy;
+      return { enemy: e.shield };
+    });
+    await assertWithinEngagementRange(page, 'federation', 'enemyNear');
+
+    await runNpcTurn(page);
+
+    const after = await page.evaluate(() => ({
+      enemy: gameObjs.enemies.find((e) => e.active).shield,
+    }));
+    expect(after.enemy, '敵が攻撃を受けている').toBeLessThan(before.enemy);
+  });
+});
