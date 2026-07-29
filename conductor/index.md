@@ -46,10 +46,11 @@ star-base-defender/
 
 ### 進行中
 
-- [refactor_test_speed_20260729](./refactor_test_speed_20260729/index.md) — シナリオテストを並列実行にし、演出の時計を速めて実行時間を短くする
+なし
 
 ### 完了・保管済み
 
+- [refactor_test_speed_20260729](./archive/refactor_test_speed_20260729/index.md) — シナリオテストを並列実行にし、演出の時計を速めて実行時間を短くする（214秒 → 106秒）
 - [balance_destroy_spirit_20260729](./archive/balance_destroy_spirit_20260729/index.md) — 敵を撃破したときに生存中の敵の士気を上げ、撤退による低下と対称にする
 - [fix_destroy_spawn_20260729](./archive/fix_destroy_spawn_20260729/index.md) — 敵を撃破したときの増援出現を、プレイヤー・連邦艦・敵の誤射のすべての経路から通す
 - [feat_friendly_fire_20260729](./archive/feat_friendly_fire_20260729/index.md) — ビームが射線上で最も近いオブジェクトに当たるようにし、NPC は味方を巻き込む射線では撃たないようにする
