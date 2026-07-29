@@ -34,7 +34,10 @@ Phase 1 の判定を Phase 2・3 の両方が使う。ここが曖昧なまま�
 - [x] Task: 基地を誤射の対象に含める。プレイヤーが基地越しに撃てる現状の非対称を解消する（`isLOSBlocked(player, this, false)` の `false`）〔spec: 決定事項 2〕 [5c526c1]
 - [x] Task: 誤射のログを追加する。「遮られた」ではなく「味方に当てた」と分かる文面にする。発信者は戦術士官（攻撃の報告）〔product-guidelines: 発信者を必ず名乗らせる〕 [5c526c1]
 - [x] Task: シナリオテストを追加する。味方越しに撃つと味方が減り敵は無傷、恒星が手前なら無駄撃ち、ドック内の味方は当たらない、エネルギーは消費する。**修正前のコードで失敗することを確かめる** [5c526c1]
-- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: 当たり判定を「射線上で最も近いもの」に改める（spec 改定 da354a8 による追加）[818cd7e]
+- [x] Task: 射程外へ撃ったビームを最大射程で切る（追加）[7c8bc38]
+- [x] Task: 仕様変更に伴う文書の修正。README・product.md に射線の説明、CLAUDE.md の入力処理の記述を実装に合わせる [5e1bd3a] [9f51087]
+- [x] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md) [7c8bc38]
 
 ---
 
@@ -42,7 +45,7 @@ Phase 1 の判定を Phase 2・3 の両方が使う。ここが曖昧なまま�
 
 コミット種別: `feat:`
 
-- [ ] Task: `evaluateTactics()` で、射線上に味方がいる相手を「攻撃可能」から外す。判定は1箇所にまとめ、艦種ごとに分散させない 〔spec: NPC の行動〕
+- [~] Task: `evaluateTactics()` で、射線上に味方がいる相手を「攻撃可能」から外す。判定は1箇所にまとめ、艦種ごとに分散させない 〔spec: NPC の行動〕
 - [ ] Task: `SpaceShip.attack()` 側でも誤射を解決する。評価と実行がずれた場合（評価後に味方が動くなど）に、撃った結果が判定と食い違わないようにする
 - [ ] Task: シナリオテストを追加する。味方が射線上にいる敵は攻撃されない、遮るものが無くなれば攻撃する、連邦艦が自機を巻き込む位置では撃たない。**修正前のコードで失敗することを確かめる**
 - [ ] Task: 挙動の変化を確かめる。`node make-baseline.js 0.5.1` → `npx playwright test regression`。**一致しないのが正しい。** 差が出た箇所が誤射と回避だけであることを読む
