@@ -213,7 +213,7 @@
 そこは 2 倍以上速くなる。全件の数字は伸びしろが別の場所
 （起動の回数）にあることを示しているだけで、この変更が無駄なわけではない。
 
-## Phase 3: 番人であることを通しで確かめる
+## Phase 3: 番人であることを通しで確かめる [checkpoint: 7471cf7]
 
 コミット種別: なし（確認のみ。必要なら追加の修正）
 
@@ -271,7 +271,7 @@
 
   伸びしろは**テストごとの起動**（92回、直列時間の約半分）に残っているが、
   これはテストの構成に手を入れることになるので今回の範囲外。
-- [~] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md) [7471cf7]
 
 ---
 
@@ -279,12 +279,12 @@
 
 コミット種別: `docs:` / `conductor:`
 
-- [ ] Task: `conductor/tech-stack.md` のテストの節に、並列実行と演出の時計について書く。**「なぜ安全と言えるか」**を残す。速さのために待ち方を変えるときの落とし穴（甘い待ちは静かにテストを無力化する）も添える
-- [ ] Task: `CLAUDE.md` のテストを書くときの注意に、**演出の時計を速めていること**を1行足すか判断する。新しくテストを書く人が固定の待ち時間を入れないための情報として要るか
-- [ ] Task: `conductor/workflow.md` のコミット種別の表に `test` を足す。**実際には使われているのに表にない**（`4323b15` / `74ca4eb` などの実績があり、この Track でも使う）
-- [ ] Task: バージョンは更新しない。**`index.html` を変えないため**（`v0.<機能追加>.<修正>` のどちらにも当たらない）。判断として記録する
-- [ ] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` を更新する。移動で壊れる相対リンクも直す
-- [ ] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
+- [~] Task: `conductor/tech-stack.md` のテストの節に、並列実行と演出の時計について書く。**「なぜ安全と言えるか」**を残す。速さのために待ち方を変えるときの落とし穴（甘い待ちは静かにテストを無力化する）も添える
+- [~] Task: `CLAUDE.md` のテストを書くときの注意に、**演出の時計を速めていること**を1行足すか判断する。新しくテストを書く人が固定の待ち時間を入れないための情報として要るか
+- [~] Task: `conductor/workflow.md` のコミット種別の表に `test` を足す。**実際には使われているのに表にない**（`4323b15` / `74ca4eb` などの実績があり、この Track でも使う）
+- [~] Task: バージョンは更新しない。**`index.html` を変えないため**（`v0.<機能追加>.<修正>` のどちらにも当たらない）。判断として記録する
+- [~] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` を更新する。移動で壊れる相対リンクも直す
+- [~] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
 
 ---
 
