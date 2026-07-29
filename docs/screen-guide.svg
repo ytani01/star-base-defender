@@ -4,8 +4,17 @@
 
   <!-- 艦の形は index.html の preload() の描画命令をそのまま移したもの。
        元は 60x60（基地は 100x100）の座標系なので、transform で置いている。
-       色は DRAW_COLOR / MSG_COLOR と同じ値。GitHub は SVG から style と
-       script を取り除くため、指定はすべて属性に直接書いてある。 -->
+       色は index.html と同じ値を使う。出どころは DRAW_COLOR / MSG_COLOR /
+       各クラスの SHIELD_COLOR・ENERGY_COLOR / drawGauge() のゲージ背景 /
+       CSS のカスタムプロパティ。盤面の背景 #0a0a2a は Phaser の backgroundColor。
+
+       図のためだけに使っている色は次の2つ。ゲームには出てこない。
+         #0a0a1e  この図の地の色
+         #33cc33  敵艦のラベル文字。艦体の #008800 は暗すぎて文字だと読めないため。
+                  艦体そのものは #008800 で描いてある
+
+       GitHub は SVG から style と script を取り除くため、
+       指定はすべて属性に直接書いてある。 -->
 
   <rect width="960" height="880" fill="#0a0a1e"/>
 
@@ -85,8 +94,17 @@
         font-weight="bold">② 宇宙域（キャンバス）</text>
 
   <!-- 盤面の背景と境界 -->
-  <rect x="30" y="432" width="400" height="380" fill="#0d0d28"/>
+  <rect x="30" y="432" width="400" height="380" fill="#0a0a2a"/>
   <circle cx="230" cy="622" r="175" fill="none" stroke="#0088ff" stroke-width="2"/>
+
+  <!-- ズームボタン。実際の画面でもキャンバスの左上に重なって出る
+       （縦に余裕のある画面では盤面の外へ出る） -->
+  <circle cx="58" cy="462" r="17" fill="#0088ff" fill-opacity="0.5" stroke="#0ff" stroke-width="2"/>
+  <text x="58" y="469" fill="#ffffff" font-family="monospace" font-size="19"
+        text-anchor="middle">＋</text>
+  <circle cx="58" cy="502" r="17" fill="#0088ff" fill-opacity="0.5" stroke="#0ff" stroke-width="2"/>
+  <text x="58" y="509" fill="#ffffff" font-family="monospace" font-size="19"
+        text-anchor="middle">－</text>
 
   <!-- 恒星（障害物）: HULL_STAR #a0a0a0 -->
   <circle cx="128" cy="536" r="9" fill="#a0a0a0"/>
@@ -203,4 +221,6 @@
     <text x="460" y="829" fill="#8ff">上 = シールド量（色が艦種を示す）</text>
     <text x="460" y="846" fill="#ffff00">下 = エネルギー量（自機だけ）</text>
   </g>
+  <text x="30" y="836" fill="#0ff" font-family="monospace" font-size="13">＋ － ボタン</text>
+  <text x="30" y="853" fill="#8ff" font-family="monospace" font-size="13">拡大・縮小する。拡大中はドラッグで見る場所を動かせる</text>
 </svg>
