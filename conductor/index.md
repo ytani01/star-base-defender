@@ -46,7 +46,7 @@ star-base-defender/
 
 ### 進行中
 
-なし
+- [refactor_test_speed_20260729](./refactor_test_speed_20260729/index.md) — シナリオテストを並列実行にし、演出の時計を速めて実行時間を短くする
 
 ### 完了・保管済み
 

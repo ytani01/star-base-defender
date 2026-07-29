@@ -1,0 +1,8 @@
+{
+  "track_id": "refactor_test_speed_20260729",
+  "type": "refactor",
+  "status": "todo",
+  "created_at": "2026-07-29",
+  "updated_at": "2026-07-29",
+  "description": "シナリオテストを並列実行にし、演出の時計を速めて実行時間を短くする（ゲーム本体は変えない）"
+}
