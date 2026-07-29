@@ -735,6 +735,51 @@
      } // isPathBlockedBy()
 
      /**
+      * src から dst への射線上で、src に最も近い対象を返す。
+      *
+      * 「遮られているか」だけでは、恒星と味方が両方とも射線上にいるときに
+      * どちらが先かを決められない。手前が恒星なら無駄撃ち、手前が味方なら
+      * 誤射になるため、順序まで分かる形が要る。
+      *
+      * 交点の近さは intersectSegmentCircle() が返す t（0 が始点、1 が終点）で
+      * 比べる。除外する近傍の範囲は hasObstacleOnPath() と揃えてあり、
+      * 射手自身や目標との接触を拾わない。
+      *
+      * @param {{x:number, y:number}} src 始点
+      * @param {{x:number, y:number}} dst 終点
+      * @param {Array<GameObj>} objs 調べる対象
+      * @return {?GameObj} 最も手前の対象。射線上に無ければ null
+      */
+     function findFirstBlockerOnPath(src, dst, objs) {
+       const dx = dst.x - src.x, dy = dst.y - src.y;
+       const a = dx * dx + dy * dy;
+       if (a < 0.001) {
+         return null;
+       }
+
+       let nearest = null;
+       let nearestT = Infinity;
+       for (const obj of objs) {
+         if (!obj) {
+           continue;
+         }
+         const hit = intersectSegmentCircle(dx, dy, a, src.x - obj.x, src.y - obj.y, obj.r);
+         if (!hit) {
+           continue;
+         }
+         // 線分に入った側（t1）を採る。src が対象に食い込んでいる場合は
+         // t1 が範囲外になるので、抜ける側（t2）で拾う
+         const t = (hit.t1 > 0.05 && hit.t1 < 0.95) ? hit.t1
+                 : (hit.t2 > 0.05 && hit.t2 < 0.95) ? hit.t2 : null;
+         if (t !== null && t < nearestT) {
+           nearestT = t;
+           nearest = obj;
+         }
+       }
+       return nearest;
+     } // findFirstBlockerOnPath()
+
+     /**
       * ターン経過による減点。宇宙域に艦が残っているほど不利になり、
       * もたつくと損をする（Product Guide「スコアの考え方」）。
       * @param {number} enemyCount 生存している敵艦の数
