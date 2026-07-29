@@ -438,40 +438,40 @@ test.describe('NPC は味方を巻き込まない', () => {
  * 敵の誤射でも起きる。プレイヤーの経路だけが増援を出していると、
  * 味方に敵を削らせるのが最も有利という、設計と正反対の攻略法が成立する。
  */
+/**
+ * 盤面から邪魔物を退け、指定した数の敵だけを一直線上に並べる下ごしらえ。
+ *
+ * 基地と自機を射線から遠ざけるのは、射線上の何に当たったかを
+ * 一意にするため。恒星も同じ理由で退ける。
+ */
+async function clearFieldFor(page, enemyCount) {
+  await setupField(page, enemyCount);
+  await page.evaluate(() => {
+    const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+    // 射線（y = cy の横一線）から外す
+    gameObjs.starBase.x = cx;
+    gameObjs.starBase.y = cy - 250;
+    gameObjs.player.x = cx;
+    gameObjs.player.y = cy + 250;
+    gameObjs.player.isDocked = false;
+  });
+}
+
+/** 連邦艦を1隻出し、宇宙域の中心からの相対位置に置く */
+async function placeFederation(page, dx, dy) {
+  await page.evaluate(({ dx, dy }) => {
+    newFederationShip(gameState.curScene, 0.1, 0.2);
+    const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+    f.active = true;
+    f.sprite.setVisible(true);
+    f.isDocked = false;
+    f.shield = FederationShip.SHIELD_MAX;
+    f.x = AREA_CENTER.X + dx;
+    f.y = AREA_CENTER.Y + dy;
+  }, { dx, dy });
+}
+
 test.describe('撃破に伴う増援は撃った相手によらない', () => {
-  /**
-   * 盤面から邪魔物を退け、指定した数の敵だけを一直線上に並べる下ごしらえ。
-   *
-   * 基地と自機を射線から遠ざけるのは、射線上の何に当たったかを
-   * 一意にするため。恒星も同じ理由で退ける。
-   */
-  async function clearFieldFor(page, enemyCount) {
-    await setupField(page, enemyCount);
-    await page.evaluate(() => {
-      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
-      // 射線（y = cy の横一線）から外す
-      gameObjs.starBase.x = cx;
-      gameObjs.starBase.y = cy - 250;
-      gameObjs.player.x = cx;
-      gameObjs.player.y = cy + 250;
-      gameObjs.player.isDocked = false;
-    });
-  }
-
-  /** 連邦艦を1隻出し、宇宙域の中心からの相対位置に置く */
-  async function placeFederation(page, dx, dy) {
-    await page.evaluate(({ dx, dy }) => {
-      newFederationShip(gameState.curScene, 0.1, 0.2);
-      const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
-      f.active = true;
-      f.sprite.setVisible(true);
-      f.isDocked = false;
-      f.shield = FederationShip.SHIELD_MAX;
-      f.x = AREA_CENTER.X + dx;
-      f.y = AREA_CENTER.Y + dy;
-    }, { dx, dy });
-  }
-
   test('連邦艦が敵を撃破すると、新たな敵が現れて数が減らない', async ({ page }) => {
     await openGame(page);
     await clearFieldFor(page, 2);
@@ -627,5 +627,145 @@ test.describe('撃破に伴う増援は撃った相手によらない', () => {
     const log = (await readLog(page, 8)).join('\n');
     expect(log, '撤退として報告される').toContain('離脱');
     expect(after, '撤退した分は補充されない').toBe(before.count - 1);
+  });
+});
+
+
+/**
+ * **撃破すれば士気が上がり、撤退させれば士気が下がる**（conductor/product.md）。
+ *
+ * 破壊が戦局を悪化させることの担保のひとつ。士気は画面に出ない値なので、
+ * 効いていなくても遊んでいて気づけない。ここが唯一の番人になる。
+ *
+ * 士気は2つのことに効く。逃走の閾値（`1 - spirit`）と、
+ * 交戦距離（`maxRange * (1 - spirit)`）。どちらも敵が強くなる方向に働く。
+ */
+test.describe('撃破は敵の士気を上げる', () => {
+  /**
+   * 生存中の敵を「もとからいた敵」と「撃破に伴う増援」に分ける。
+   *
+   * 増援は宇宙域の外縁部（`AREA_R` の 0.8〜0.95）に出るのに対し、
+   * `setupField()` が並べる敵は中心から 200 なので、中心からの距離で分けられる。
+   * 撃破された艦は配列から取り除かれるため、添字では追えない。
+   */
+  async function readSpirits(page) {
+    return page.evaluate(() => {
+      const dist = (e) => Phaser.Math.Distance.Between(
+        e.x, e.y, AREA_CENTER.X, AREA_CENTER.Y);
+      const actives = gameObjs.enemies.filter((e) => e.active);
+      return {
+        survivors: actives.filter((e) => dist(e) <= AREA_R * 0.75)
+          .map((e) => e.spirit),
+        reinforcements: actives.filter((e) => dist(e) > AREA_R * 0.75)
+          .map((e) => e.spirit),
+        step: EnemyShip.SPIRIT.STEP,
+        max: EnemyShip.SPIRIT.MAX,
+        init: EnemyShip.SPIRIT.INIT,
+      };
+    });
+  }
+
+  test('プレイヤーが敵を撃破すると、残った敵の士気が上がる', async ({ page }) => {
+    await openGame(page);
+    await setupField(page, 3);
+    const target = await page.evaluate(() => {
+      const e = gameObjs.enemies.find((x) => x.active);
+      // 至近距離に置き、一撃で落ちる残量にする
+      e.x = gameObjs.player.x + 30;
+      e.y = gameObjs.player.y;
+      e.shield = 1;
+      return { x: e.x, y: e.y };
+    });
+    const before = await readSpirits(page);
+    // 落とす1隻を除いた、残る敵の士気
+    const remaining = before.survivors.slice(1);
+
+    await clickWorld(page, target);
+
+    const after = await readSpirits(page);
+    expect(after.survivors.length, '残った敵の数').toBe(remaining.length);
+    expect(after.survivors, '残った敵の士気が上がる').toEqual(
+      remaining.map((s) => Math.min(before.max, s + before.step)));
+    expect((await readLog(page, 6)).join('\n'), '士気の変化が報告される')
+      .toContain('士気');
+  });
+
+  test('撃破に伴う増援は、上昇を受けず初期値の士気で現れる', async ({ page }) => {
+    // 増援はいま到着したところで、仲間が落ちる場を見ていない。
+    // removeEnemy → 士気の上昇 → spawnEnemy の順であることの裏づけでもある
+    await openGame(page);
+    await setupField(page, 2);
+    await page.evaluate(() => {
+      const e = gameObjs.enemies.find((x) => x.active);
+      e.takeDamage(e.shield);
+    });
+    await waitForIdle(page);
+
+    const after = await readSpirits(page);
+    expect(after.reinforcements.length, '増援が1隻出ている').toBe(1);
+    expect(after.reinforcements[0], '増援の士気は初期値').toBe(after.init);
+    expect(after.survivors[0], 'もとからいた敵は上がっている')
+      .toBe(after.init + after.step);
+  });
+
+  test('士気は上限を超えない', async ({ page }) => {
+    await openGame(page);
+    await setupField(page, 2);
+    const before = await page.evaluate(() => {
+      // 残る敵を上限の一歩手前に置く。上げ幅ぶんを足すと超えてしまう位置
+      const [victim, survivor] = gameObjs.enemies.filter((e) => e.active);
+      survivor.spirit = EnemyShip.SPIRIT.MAX - (EnemyShip.SPIRIT.STEP / 2);
+      victim.takeDamage(victim.shield);
+      return { max: EnemyShip.SPIRIT.MAX };
+    });
+    await waitForIdle(page);
+
+    const after = await readSpirits(page);
+    expect(after.survivors[0], '上限で頭打ちになる').toBe(before.max);
+  });
+
+  test('連邦艦が撃破した場合も、残った敵の士気が上がる', async ({ page }) => {
+    // 撃破の入口は onDestroyed() ひとつなので、撃った相手を問わず効く
+    await openGame(page);
+    await clearFieldFor(page, 2);
+    await placeFederation(page, -10, 0);
+
+    const before = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+      const [target, survivor] = gameObjs.enemies.filter((e) => e.active);
+
+      target.x = cx;
+      target.y = cy;
+      // 連邦艦は逃走中の敵を撃たない。逃走しない士気にして、
+      // シールドはその一撃ぶんちょうどにする（バランス値を直接書かない）
+      target.spirit = EnemyShip.SPIRIT.MAX;
+      target.shield = f.weapon.calcDamage(
+        Phaser.Math.Distance.Between(f.x, f.y, target.x, target.y));
+
+      // もう1隻は射線からも交戦距離からも離す。ただし中心から離しすぎると
+      // 増援と見分けがつかなくなるので、AREA_R の 0.75 より内側に置く
+      survivor.x = cx - 150;
+      survivor.y = cy + 100;
+      survivor.shield = EnemyShip.SHIELD_MAX;
+      survivor.spirit = EnemyShip.SPIRIT.INIT;
+      return { fleeing: target.isFleeing(), spirit: survivor.spirit };
+    });
+    expect(before.fleeing, '狙われる敵は逃走していない').toBe(false);
+
+    await runNpcTurn(page);
+
+    const after = await page.evaluate(() => {
+      const dist = (e) => Phaser.Math.Distance.Between(
+        e.x, e.y, AREA_CENTER.X, AREA_CENTER.Y);
+      // 中心（撃破された位置）にも外縁部（増援）にもいない敵が、離して置いた1隻
+      const survivor = gameObjs.enemies.filter(
+        (e) => e.active && dist(e) <= AREA_R * 0.75)[0];
+      return { spirit: survivor.spirit, step: EnemyShip.SPIRIT.STEP };
+    });
+    expect((await readLog(page, 8)).join('\n'), '連邦艦が撃破している')
+      .toContain('連邦艦が敵艦を撃破');
+    expect(after.spirit, '残った敵の士気が上がる')
+      .toBe(before.spirit + after.step);
   });
 });
