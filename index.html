@@ -1974,8 +1974,7 @@
 
          if (!victim.active) {
            // 撃墜
-           gameObjs.removeEnemy(victim);
-           spawnEnemy(scene, 0.8, 0.95);
+           onEnemyDestroyed(scene, victim);
            setMsg(SPEAKER.TACTICAL, "敵艦を撃破！ 別の新たな敵艦を検知しました！", MSG_COLOR.WARN);
          }
          endTurn();
@@ -2251,6 +2250,29 @@
        gameObjs.addEnemy(enemy);
        return enemy;
      } // spawnEnemy()
+
+     /**
+      * 敵を撃破したときの後始末。
+      *
+      * **撃破しても敵の数は減らない。** 撃破は敵意を煽って増援を呼ぶ。
+      * 「破壊は割に合わない」というこのゲームの中核ルールの担保であり、
+      * 誰が撃ったかで変わってはならない。
+      *
+      * 撃破はプレイヤーの攻撃だけでなく、連邦艦の攻撃・射線上の巻き添え・
+      * 敵の誤射でも起こる。経路ごとに書くと必ずどれかが抜けるため、
+      * ここに集約する。ログは発信者と文面が経路ごとに違うので呼び出し側に置く。
+      *
+      * ゲームオーバー後に呼ばれることはない。プレイヤーの攻撃は
+      * `handlePointerTap()` が、NPC の攻撃は `execNPCAction()` が、
+      * それぞれ入口で `isGameOver` を見て弾いている。
+      *
+      * @param {Phaser.Scene} scene
+      * @param {EnemyShip} enemy 撃破された敵
+      */
+     function onEnemyDestroyed(scene, enemy) {
+       gameObjs.removeEnemy(enemy);
+       spawnEnemy(scene, 0.8, 0.95);
+     } // onEnemyDestroyed()
 
      /**
       * 画像の生成
