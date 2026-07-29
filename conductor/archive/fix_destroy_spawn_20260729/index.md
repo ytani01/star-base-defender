@@ -9,7 +9,7 @@
 
 ## なぜやるか
 
-[Product Guide](../product.md) は「敵艦を撃破すると敵意を煽って増援を呼び」と定めている。
+[Product Guide](../../product.md) は「敵艦を撃破すると敵意を煽って増援を呼び」と定めている。
 **破壊が割に合わないこと**がこのゲームの中核ルールで、増援はその担保の一つ。
 
 いま増援を出しているのは `EnemyShip.onInteract()` の1箇所だけで、
@@ -34,7 +34,7 @@
 （`regression`）は「一致しない」のが正しく、
 差が撃破後の敵数だけであることを読む形になる。
 
-同じ形の見落としが [feat_friendly_fire_20260729](../archive/feat_friendly_fire_20260729/index.md)
+同じ形の見落としが [feat_friendly_fire_20260729](../feat_friendly_fire_20260729/index.md)
 でも起きている。**プレイヤーの攻撃（`EnemyShip.onInteract()`）と
 NPC の攻撃（`SpaceShip.attack()`）で経路が分かれている**ことが原因で、
 片方だけ直すと再発する。

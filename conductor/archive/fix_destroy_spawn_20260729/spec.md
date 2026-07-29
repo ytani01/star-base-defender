@@ -20,7 +20,7 @@ Product Guide は「敵艦を撃破すると敵意を煽って増援を呼び、
 設計意図と正反対の攻略法が成立している。スコアの減点（`calcShipLossPenalty()`）は
 `takeDamage()` 側にあるため誰が撃っても効くが、増援だけが抜けている。
 
-これは [feat_friendly_fire_20260729](../archive/feat_friendly_fire_20260729/index.md) と
+これは [feat_friendly_fire_20260729](../feat_friendly_fire_20260729/index.md) と
 同じ形の見落としで、**プレイヤーの攻撃と NPC の攻撃で経路が分かれている**ことに起因する。
 片方だけ直しても再発する。
 

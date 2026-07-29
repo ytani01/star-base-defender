@@ -2,7 +2,7 @@
 
 対象: `index.html`、`tests/`。
 
-**進め方:** [Workflow](../workflow.md) に従う。着手時に `[ ]` → `[~]`、完了時に `[x]` + コミットハッシュ7桁。
+**進め方:** [Workflow](../../workflow.md) に従う。着手時に `[ ]` → `[~]`、完了時に `[x]` + コミットハッシュ7桁。
 `plan.md` の更新は別コミット（`conductor(plan): ...`）にする。
 フェーズ完了時はユーザーの承認を得てからチェックポイントを作る。
 
@@ -145,18 +145,28 @@
 
 コミット種別: `docs:` / `chore:` / `conductor:`
 
-- [ ] Task: `conductor/product.md` の増援に関する記述が実装と合っているか確かめる。今回の修正で記述どおりになるはずなので、**変更が要るかどうかの判断**まで行う（要らなければ「不要」と記録する）
-- [ ] Task: 士気（spirit）の乖離を `docs/TBD.md` に書き残す。「撃破すれば士気が上がり」が増援間隔でしか起きていない件 〔spec: 範囲外〕
-- [ ] Task: `index.html` のバージョンを更新し、バージョン更新だけの `chore:` コミットを1つ作る（不具合修正なので `v0.6.1`）
-- [ ] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` を更新する
-- [ ] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
+- [x] Task: `conductor/product.md` の増援に関する記述が実装と合っているか確かめる。今回の修正で記述どおりになるはずなので、**変更が要るかどうかの判断**まで行う（要らなければ「不要」と記録する） [93e4033]
+
+  **判断: 変更は必須ではないが、足した。** ビジョンの1行
+  「敵艦を撃破すると敵意を煽って増援を呼び」は実装と矛盾していない。
+  ただしメカニクスとしての記述がここしかなく、**「プレイヤーが撃破したとき」
+  だけの話とも読める。** 今回の見落としはまさにその読み違いから生まれたので、
+  「### 撃破しても敵は減らない」を新設し、誰が撃破しても同じであること、
+  追い返した場合は補充されないことを明示した。
+- [x] Task: 士気（spirit）の乖離を `docs/TBD.md` に書き残す。「撃破すれば士気が上がり」が増援間隔でしか起きていない件 〔spec: 範囲外〕 [93e4033]
+
+  「案3 撃破したその場で敵の士気を上げる」として記録。直すなら
+  `EnemyShip.onDestroyed()` に足す形になるが、`balance:` の別コミットになる。
+- [x] Task: `index.html` のバージョンを更新し、バージョン更新だけの `chore:` コミットを1つ作る（不具合修正なので `v0.6.1`） [9e13009]
+- [x] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` を更新する
+- [~] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
 
 ---
 
 ## 補足: この Track で気をつける点
 
 - **撃破の経路は4つある**（spec の表）。プレイヤー経路だけを見て「直った」としない。
-  同じ形の見落としが [feat_friendly_fire_20260729](../archive/feat_friendly_fire_20260729/index.md) でも起きている。
+  同じ形の見落としが [feat_friendly_fire_20260729](../feat_friendly_fire_20260729/index.md) でも起きている。
 - **撤退と撃破を取り違えない。** `onLeaveArea()` も `die()` を通るが、
   撤退は勝利条件そのもので、増援を出してはならない。
 - **敵の数は `getActiveEnemyCount()` で数える。** `gameObjs.enemies.length` には
