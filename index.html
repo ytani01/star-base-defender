@@ -1866,6 +1866,23 @@
         */
        onDestroyed() {
          gameObjs.removeEnemy(this);
+
+         // 仲間が落ちれば残りは強気になる。撤退させたときに士気が下がるのと
+         // 裏返しの関係で、下げ幅と同じ SPIRIT.STEP を使う
+         gameObjs.enemies.forEach(e => {
+           e.spirit = Math.min(
+             EnemyShip.SPIRIT.MAX, e.spirit + EnemyShip.SPIRIT.STEP
+           );
+         });
+         // 士気は画面に出ないため、報告がないと「破壊は戦局を悪化させる」を
+         // 学べない。誰が撃っても同じ報告になるので、経路ごとのログとは違い
+         // ここに置く。発信者は戦況全体を要約する副長（撤退の報告と同じ担当）
+         if (getActiveEnemyCount() > 0) {
+           setMsg(SPEAKER.XO, "撃破により敵の士気が高まっています", MSG_COLOR.WARN);
+         }
+
+         // 増援は士気を上げたあとに出す。いま到着したところで、
+         // 仲間が落ちる場を見ていないため初期値のまま戦列に加わる
          spawnEnemy(this.scene, 0.8, 0.95);
        } // onDestroyed()
 
