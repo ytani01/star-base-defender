@@ -51,7 +51,7 @@
   足されるので、添字では追えない。中心からの距離で「もとからいた敵」と
   「増援」を分けている。上げ幅の比較はページ側から読んだ `SPIRIT.STEP` を
   使い、両辺を同じ演算にそろえてある（浮動小数の差が出ない）。
-- [~] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md) [9d66331]
 
 ---
 
@@ -73,7 +73,7 @@
 
   テスト一式 92 passed（Phase 1 の4件を含め全通過）。`source-rules` 7 passed。
   構文チェック OK。
-- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md) [96d2f05]
 
 ---
 
@@ -130,7 +130,7 @@
   通常は飛ばされる突き合わせも含めて全件走っている）。
   表示に関わるコードは触れていないため `/layout-check` は不要と判断した。
   〈人〉の項目はユーザーの手動確認に回す。
-- [~] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md) [c171c59]
 
 ---
 
@@ -159,7 +159,7 @@
   **ユーザー判断により `v0.6.2`。** 提案した `v0.7.0` は採られず、
   修正の桁を上げることになった。
 - [x] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` を更新する。移動で壊れる相対リンクも直す
-- [~] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md) [c4f3279]
 
 ---
 

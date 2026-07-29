@@ -56,7 +56,7 @@
   ログは「通信士＞味方を撃墜してしまいました……」と出る。
   敵の誤射を自軍の通信士が報告しており、発信者の担当（product-guidelines）に
   合っていない。ログを整えるタスクで合わせて見る。
-- [~] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md) [cadfca6]
 
 ---
 
@@ -85,7 +85,7 @@
   テスト一式 86 passed / 3 failed（Phase 1 の3件のみ）。
   さらに `node make-baseline.js HEAD` → `npx playwright test regression` で
   2 passed。**挙動が変わっていないことを実測で確かめた。**
-- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md) [93c9ec3]
 
 ---
 
@@ -137,7 +137,7 @@
   縦画面・横画面・横長比率の走査を含む）。`source-rules` 7 passed。
   表示に関わるコードは触れていないため `/layout-check` は不要と判断した。
   〈人〉の項目はユーザーの手動確認に回す。
-- [~] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md) [72f79c3]
 
 ---
 
@@ -159,7 +159,7 @@
   `EnemyShip.onDestroyed()` に足す形になるが、`balance:` の別コミットになる。
 - [x] Task: `index.html` のバージョンを更新し、バージョン更新だけの `chore:` コミットを1つ作る（不具合修正なので `v0.6.1`） [9e13009]
 - [x] Task: Track を `conductor/archive/` へ移し、`conductor/index.md` を更新する
-- [~] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md) [1511826]
 
 ---
 
