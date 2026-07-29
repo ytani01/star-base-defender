@@ -18,13 +18,68 @@
 
 コミット種別: `conductor:`（測るだけ。コードは変えない）
 
-- [ ] Task: 通し実行の時間を3回測り、ばらつきを含めて plan に記録する。`--reporter=json` でファイル別・テスト別も取る
-- [ ] Task: **わざと壊したときに落ちるテストの集合**を控える。`index.html` を一時的に壊し、落ちた件数とテスト名を記録して元に戻す。壊し方は次の4つ（別々に行う）
-  - 撃破時に `spawnEnemy()` を呼ばない（増援）
-  - `EnemyShip.onDestroyed()` の士気の上昇を消す（バランス）
-  - `resolveBeamPath()` が常に `{kind:'hit', obj:targetObj}` を返す（射線）
-  - ズームボタンの `min-height` を 20px にする（表示）
-- [ ] Task: Conductor - User Manual Verification 'Phase 0' (Protocol in workflow.md)
+- [x] Task: 通し実行の時間を3回測り、ばらつきを含めて plan に記録する。`--reporter=json` でファイル別・テスト別も取る
+
+  **壁時計: 212 / 214 / 217 秒（平均 214秒）。** ばらつきは 5 秒（2.3%）で小さい。
+  結果はいずれも 92 passed / 1 skipped
+  （`regression` の突き合わせは `_baseline.html` が無いと飛ばされる。
+  通常の開発時と同じ状態で測った）。実行環境の CPU は 16 コア。
+
+  テスト自身の所要時間の合計は 211.8 秒。**壁時計とほぼ一致しており、
+  待ち時間がそのまま実行時間になっている**（並列の余地が丸ごと残っている）。
+
+  | ファイル | 件数 | 合計 | 平均 |
+  |---|---|---|---|
+  | `layout.spec.js` | 25 | 47.5s | 1.9s |
+  | `basic-operations.spec.js` | 25 | 42.0s | 1.7s |
+  | `turn-progress.spec.js` | 19 | 38.1s | 2.0s |
+  | `endgame.spec.js` | 9 | 35.4s | 3.9s |
+  | `determinism.spec.js` | 6 | 28.7s | 4.8s |
+  | `regression.spec.js` | 2 | 20.2s | 10.1s |
+  | `source-rules.spec.js` | 7 | 0.0s | — |
+- [x] Task: **わざと壊したときに落ちるテストの集合**を控える。`index.html` を一時的に壊し、落ちた件数とテスト名を記録して元に戻す。壊し方は次の4つ（別々に行う）
+
+  **これが Phase 1 以降の合格条件になる。** 高速化のあとで同じ4つを通し、
+  落ちる集合がここと一致しなければ、速くしたことで見逃すようになったということ。
+
+  ズームボタンは `min-height` ではなく `width` / `height` の
+  `clamp(48px, 11vw, 68px)` で決まっていたので、下限を 20px にして壊した。
+
+  **(A) 撃破時に `spawnEnemy()` を呼ばない — 5件**
+  - `turn-progress` 敵を撃破するとスコアが減り、新たな敵が出現する
+  - `turn-progress` 連邦艦が敵を撃破すると、新たな敵が現れて数が減らない
+  - `turn-progress` 連邦艦のビームが射線上の別の敵を落としても、新たな敵が現れる
+  - `turn-progress` 敵が誤射で別の敵を落としても、新たな敵が現れる
+  - `turn-progress` 撃破に伴う増援は、上昇を受けず初期値の士気で現れる
+
+  **(B) `EnemyShip.onDestroyed()` の士気の上昇を消す — 4件**
+  - `turn-progress` プレイヤーが敵を撃破すると、残った敵の士気が上がる
+  - `turn-progress` 撃破に伴う増援は、上昇を受けず初期値の士気で現れる
+  - `turn-progress` 士気は上限を超えない
+  - `turn-progress` 連邦艦が撃破した場合も、残った敵の士気が上がる
+
+  **(C) `resolveBeamPath()` が常に `{kind:'hit', obj:targetObj}` を返す — 10件**
+  - `basic-operations` 障害物越しに撃つと遮られる
+  - `basic-operations` 味方越しに敵を撃つと、味方に当たって敵には届かない
+  - `basic-operations` 恒星が味方より手前にあれば、誤射ではなく無駄撃ちになる
+  - `basic-operations` 基地が射線上にあると基地を誤射する
+  - `basic-operations` 狙った敵が射程外でも、手前の味方には当たる
+  - `basic-operations` 奥の敵を狙っても、射線上の手前の敵に当たる
+  - `turn-progress` 射線上に味方がいる相手を敵は撃たない
+  - `turn-progress` 連邦艦は自機を巻き込む射線では撃たない
+  - `turn-progress` 連邦艦のビームが射線上の別の敵を落としても、新たな敵が現れる
+  - `turn-progress` 敵が誤射で別の敵を落としても、新たな敵が現れる
+
+  **(D) ズームボタンを 48px 未満にする — 1件**
+  - `layout` ズームボタンがタップできる大きさを保っている
+
+  **注意:** `layout` の「【既知の未達】ハイスコアのボタンも 48px を満たす」は
+  常に `✘` と表示されるが、`test.fail()` の想定内の失敗で件数には入らない。
+  読み違えないこと。
+
+  **気づき:** (D) が1件しか捕まえていない。表示の壊れ方に対する網は
+  ふるまいの側より粗い。この Track の範囲外だが、記録しておく。
+- [~] Task: Conductor - User Manual Verification 'Phase 0' (Protocol in workflow.md)
 
 ---
 
