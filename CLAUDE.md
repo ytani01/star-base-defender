@@ -27,7 +27,7 @@ python3 -m http.server 8765   # → http://localhost:8765/
 
 # シナリオテスト（初回は npm install と npx playwright install chromium）
 cd tests && npx playwright test
-cd tests && npx playwright test --headed        # 動く様子を見る
+cd tests && PW_TIME_SCALE=1 npx playwright test --headed   # 動く様子を見る（等倍に戻す）
 cd tests && npx playwright test layout          # ファイル名で絞り込む
 
 # 挙動を変えないはずの変更をしたとき、変更前と突き合わせる
@@ -52,6 +52,7 @@ awk '/<script>/{flag=1; next} /<\/script>/{flag=0} flag' index.html > /tmp/extra
 - 盤面を再現するには、ページのスクリプトより**先に** `Math.random` を差し替える
 - 読み込み URL にクエリを付けてキャッシュを避ける
 - 固定の待ち時間を使わない。演出と予約された処理が片付くまで待つ
+- **演出は8倍速で走る**（テスト側が Phaser の時計を速めている）。実時間を当てにしない
 - **通るテストを書くだけでなく、わざと壊して検出できることを確かめる**
 
 ## 最重要ルール

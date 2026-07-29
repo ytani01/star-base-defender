@@ -107,6 +107,7 @@ develop  ── 通常の開発はここで行う
 | `refactor` | 挙動を変えないコード整理 |
 | `style` | 整形・命名の統一（挙動もロジックも変えない） |
 | `balance` | ゲームバランスの数値調整 |
+| `test` | テストの追加・修正（`tests/` `tests.html`）。ゲーム本体は変えない |
 | `docs` | README・`conductor/` などの文書のみの変更 |
 | `chore` | バージョン更新、ファイル整理などの雑務 |
 | `conductor` | Track の `plan.md` / `metadata.json` の更新 |
