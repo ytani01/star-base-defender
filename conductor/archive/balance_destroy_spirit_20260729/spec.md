@@ -27,7 +27,7 @@
 そのため「破壊は戦局を悪化させる」という中核の言い分のうち、
 いま効いているのは増援と減点だけになっている。
 
-この乖離は [fix_destroy_spawn_20260729](../archive/fix_destroy_spawn_20260729/index.md)
+この乖離は [fix_destroy_spawn_20260729](../fix_destroy_spawn_20260729/index.md)
 の作業中に見つかり、バランスに直結するため `docs/TBD.md`（案3）へ送っていた。
 
 ## 士気が効くところ

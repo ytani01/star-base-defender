@@ -8,7 +8,7 @@
 
 ## なぜやるか
 
-[Product Guide](../product.md)「敵の心理」は
+[Product Guide](../../product.md)「敵の心理」は
 **「撃破すれば士気が上がり、撤退させれば士気が下がります」**と定めているが、
 実装で動いているのは**撤退側だけ**だった。
 
@@ -40,6 +40,6 @@
 撃破の罰が増援・減点・士気の3つ重なることになる。強すぎないかは
 実際に遊んで見るほかない（Plan の Phase 3）。
 
-撃破の入口は前 Track [fix_destroy_spawn_20260729](../archive/fix_destroy_spawn_20260729/index.md)
+撃破の入口は前 Track [fix_destroy_spawn_20260729](../fix_destroy_spawn_20260729/index.md)
 で `EnemyShip.onDestroyed()` に集約済みで、経路ごとの取りこぼしは起きない。
 **逆に、ここに書いたことは4経路すべてに効く。**
