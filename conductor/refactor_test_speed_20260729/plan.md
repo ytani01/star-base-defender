@@ -142,7 +142,7 @@
 
 ---
 
-## Phase 2: 演出の時計を速める
+## Phase 2: 演出の時計を速める [checkpoint: 22becb5]
 
 コミット種別: `test:`（テスト側の待ち方の変更）
 
@@ -187,7 +187,7 @@
 - [x] Task: Phase 0 で控えた「わざと壊したときに落ちる集合」が変わらないことを確かめる [bf06ae5]
 
   **4通りすべて、件数もテスト名も完全に一致した**（A:5件 / B:4件 / C:10件 / D:1件）。
-- [~] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md) [22becb5]
 
 ---
 
@@ -217,12 +217,12 @@
 
 コミット種別: なし（確認のみ。必要なら追加の修正）
 
-- [ ] Task: Phase 0 の4つの壊し方をもう一度すべて通し、**落ちるテストの集合が Phase 0 と一致する**ことを確かめる。1件でも減っていたら、速くしたことで見逃すようになったということなので直す 〔spec: 何より優先すること〕
-- [ ] Task: 通し実行を5回まわし、すべて通ることを確かめる。ばらつき（最速・最遅）を記録する
-- [ ] Task: 部分実行が今までどおり効くことを確かめる（`npx playwright test layout` / `regression` / `-g` での絞り込み）
-- [ ] Task: 失敗時の trace とスクリーンショットが残ることを確かめる。わざと1件落として実際に開く
-- [ ] Task: 短縮の結果を数字でまとめる（Phase 0 との対比）
-- [ ] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
+- [~] Task: Phase 0 の4つの壊し方をもう一度すべて通し、**落ちるテストの集合が Phase 0 と一致する**ことを確かめる。1件でも減っていたら、速くしたことで見逃すようになったということなので直す 〔spec: 何より優先すること〕
+- [~] Task: 通し実行を5回まわし、すべて通ることを確かめる。ばらつき（最速・最遅）を記録する
+- [~] Task: 部分実行が今までどおり効くことを確かめる（`npx playwright test layout` / `regression` / `-g` での絞り込み）
+- [~] Task: 失敗時の trace とスクリーンショットが残ることを確かめる。わざと1件落として実際に開く
+- [~] Task: 短縮の結果を数字でまとめる（Phase 0 との対比）
+- [~] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
 
 ---
 
