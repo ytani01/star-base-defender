@@ -428,3 +428,204 @@ test.describe('NPC は味方を巻き込まない', () => {
     expect(after.enemy, '敵が攻撃を受けている').toBeLessThan(before.enemy);
   });
 });
+
+
+/**
+ * 撃破に伴う増援は「破壊は割に合わない」という中核ルールの担保であり、
+ * **誰が撃ったかで変わってはならない**（conductor/product.md）。
+ *
+ * 撃破はプレイヤーの攻撃だけでなく、連邦艦の攻撃・射線上の巻き添え・
+ * 敵の誤射でも起きる。プレイヤーの経路だけが増援を出していると、
+ * 味方に敵を削らせるのが最も有利という、設計と正反対の攻略法が成立する。
+ */
+test.describe('撃破に伴う増援は撃った相手によらない', () => {
+  /**
+   * 盤面から邪魔物を退け、指定した数の敵だけを一直線上に並べる下ごしらえ。
+   *
+   * 基地と自機を射線から遠ざけるのは、射線上の何に当たったかを
+   * 一意にするため。恒星も同じ理由で退ける。
+   */
+  async function clearFieldFor(page, enemyCount) {
+    await setupField(page, enemyCount);
+    await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      // 射線（y = cy の横一線）から外す
+      gameObjs.starBase.x = cx;
+      gameObjs.starBase.y = cy - 250;
+      gameObjs.player.x = cx;
+      gameObjs.player.y = cy + 250;
+      gameObjs.player.isDocked = false;
+    });
+  }
+
+  /** 連邦艦を1隻出し、宇宙域の中心からの相対位置に置く */
+  async function placeFederation(page, dx, dy) {
+    await page.evaluate(({ dx, dy }) => {
+      newFederationShip(gameState.curScene, 0.1, 0.2);
+      const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+      f.active = true;
+      f.sprite.setVisible(true);
+      f.isDocked = false;
+      f.shield = FederationShip.SHIELD_MAX;
+      f.x = AREA_CENTER.X + dx;
+      f.y = AREA_CENTER.Y + dy;
+    }, { dx, dy });
+  }
+
+  test('連邦艦が敵を撃破すると、新たな敵が現れて数が減らない', async ({ page }) => {
+    await openGame(page);
+    await clearFieldFor(page, 2);
+    await placeFederation(page, -10, 0);
+
+    const before = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+      const [target, bystander] = gameObjs.enemies.filter((e) => e.active);
+
+      target.x = cx;
+      target.y = cy;
+      // 連邦艦は逃走中の敵を撃たない。撃破が起きるのは「逃走していない敵を
+      // 一撃で落とす」ときだけなので、士気を上限にして粘る状態を作り、
+      // シールドはその一撃ぶんちょうどにする（バランス値を直接書かない）
+      target.spirit = EnemyShip.SPIRIT.MAX;
+      target.shield = f.weapon.calcDamage(
+        Phaser.Math.Distance.Between(f.x, f.y, target.x, target.y));
+
+      // もう1隻は射線からも交戦距離からも離す。全滅によるミッション
+      // 進行を起こさず、撃破の前後だけを見るため
+      bystander.x = cx - 200;
+      bystander.y = cy + 150;
+      bystander.shield = EnemyShip.SHIELD_MAX;
+
+      return {
+        count: getActiveEnemyCount(),
+        mission: gameState.curMission,
+        fleeing: target.isFleeing(),
+        shield: target.shield,
+      };
+    });
+    expect(before.fleeing, '狙われる敵は逃走していない（＝連邦艦の標的になる）')
+      .toBe(false);
+    expect(before.shield, '一撃で落ちる残量である').toBeGreaterThan(0);
+    await assertWithinEngagementRange(page, 'federation', 'enemyNear');
+
+    await runNpcTurn(page);
+
+    const after = await page.evaluate(() => ({
+      count: getActiveEnemyCount(),
+      mission: gameState.curMission,
+    }));
+    const log = (await readLog(page, 8)).join('\n');
+    expect(log, '連邦艦が撃破している').toContain('連邦艦が敵艦を撃破');
+    expect(after.mission, 'ミッションは進んでいない').toBe(before.mission);
+    expect(after.count, '撃破された分は補充され、数は減らない').toBe(before.count);
+  });
+
+  test('連邦艦のビームが射線上の別の敵を落としても、新たな敵が現れる', async ({ page }) => {
+    // 評価の時点では射線が通っていた相手が、撃つ時点では塞がれている、
+    // という食い違いを再現する。attack() が撃つ直前に射線を取り直すのは
+    // このためで、ここはその取り直しの先にある撃破を見ている
+    await openGame(page);
+    await clearFieldFor(page, 2);
+    await placeFederation(page, -100, 0);
+
+    const before = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      const [blocker, target] = gameObjs.enemies.filter((e) => e.active);
+      blocker.x = cx - 50;   // 連邦艦と狙う敵のちょうど中間
+      blocker.y = cy;
+      blocker.shield = 1;
+      target.x = cx;
+      target.y = cy;
+      target.shield = EnemyShip.SHIELD_MAX;
+      return { count: getActiveEnemyCount(), targetShield: target.shield };
+    });
+
+    await page.evaluate(() => {
+      const f = gameObjs.federationShips[gameObjs.federationShips.length - 1];
+      f.attack(gameObjs.enemies.filter((e) => e.active)[1]);
+    });
+    await waitForIdle(page);
+
+    const after = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      // 撃破された艦は配列から取り除かれるので、添字では追えない。
+      // 置いた位置で見る（増援は宇宙域の外縁部に出るため紛れない）
+      const at = (x, y) => gameObjs.enemies.find(
+        (e) => e.active && Phaser.Math.Distance.Between(e.x, e.y, x, y) < 1);
+      const target = at(cx, cy);
+      return {
+        count: getActiveEnemyCount(),
+        blockerGone: !at(cx - 50, cy),
+        targetShield: target ? target.shield : null,
+      };
+    });
+    expect(after.blockerGone, '手前の敵が落ちている').toBe(true);
+    expect(after.targetShield, '狙った敵には届いていない').toBe(before.targetShield);
+    expect(after.count, '撃破された分は補充され、数は減らない').toBe(before.count);
+  });
+
+  test('敵が誤射で別の敵を落としても、新たな敵が現れる', async ({ page }) => {
+    await openGame(page);
+    await clearFieldFor(page, 2);
+
+    const before = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      const [shooter, victim] = gameObjs.enemies.filter((e) => e.active);
+      // 敵 → 敵 → 自機 の順に並べる。自機を狙った弾が味方に当たる
+      shooter.x = cx - 100;
+      shooter.y = cy;
+      shooter.shield = EnemyShip.SHIELD_MAX;
+      victim.x = cx - 50;
+      victim.y = cy;
+      victim.shield = 1;
+      gameObjs.player.x = cx;
+      gameObjs.player.y = cy;
+      return { count: getActiveEnemyCount(), playerShield: gameObjs.player.shield };
+    });
+
+    await page.evaluate(() => {
+      gameObjs.enemies.filter((e) => e.active)[0].attack(gameObjs.player);
+    });
+    await waitForIdle(page);
+
+    const after = await page.evaluate(() => {
+      const cx = AREA_CENTER.X, cy = AREA_CENTER.Y;
+      const at = (x, y) => gameObjs.enemies.find(
+        (e) => e.active && Phaser.Math.Distance.Between(e.x, e.y, x, y) < 1);
+      return {
+        count: getActiveEnemyCount(),
+        victimGone: !at(cx - 50, cy),
+        playerShield: gameObjs.player.shield,
+      };
+    });
+    const log = (await readLog(page, 8)).join('\n');
+    expect(after.victimGone, '射線上の敵が落ちている').toBe(true);
+    expect(after.playerShield, '自機には届いていない').toBe(before.playerShield);
+    expect(log, '誤射による撃墜として報告される').toContain('味方を撃墜');
+    expect(after.count, '撃破された分は補充され、数は減らない').toBe(before.count);
+  });
+
+  test('敵が撤退したときは増援が出ない', async ({ page }) => {
+    // 追い返すことが勝利条件であり、撃破との差がゲームの根幹。
+    // 撃破の後処理を撤退にも通してしまう修正を弾く
+    await openGame(page);
+    await clearFieldFor(page, 3);
+
+    const before = await page.evaluate(() => {
+      const fleeing = gameObjs.enemies.find((e) => e.active);
+      // 宇宙域の縁に置き、逃走に転じる残量にする
+      fleeing.x = AREA_CENTER.X + AREA_R - 5;
+      fleeing.y = AREA_CENTER.Y;
+      fleeing.shield = EnemyShip.SHIELD_MAX * 0.05;
+      return { count: getActiveEnemyCount() };
+    });
+
+    await runNpcTurn(page);
+
+    const after = await page.evaluate(() => getActiveEnemyCount());
+    const log = (await readLog(page, 8)).join('\n');
+    expect(log, '撤退として報告される').toContain('離脱');
+    expect(after, '撤退した分は補充されない').toBe(before.count - 1);
+  });
+});
