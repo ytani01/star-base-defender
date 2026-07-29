@@ -1202,8 +1202,23 @@
          if (this.shield <= 0) {
            gameState.addScore(calcShipLossPenalty());
            this.die();
+           this.onDestroyed();
          }
        } // takeDamage()
+
+       /**
+        * 撃破されたときの後始末（子クラスで実装）。
+        *
+        * **`die()` ではなくここに書く。** `die()` は撤退（`onLeaveArea()`）
+        * からも呼ばれるが、撤退は勝利条件そのもので、撃破とは扱いが違う。
+        * 被弾で落ちた場合だけを捉えるために、`takeDamage()` から呼び分けている。
+        *
+        * 撃った相手（プレイヤー・連邦艦・敵の誤射）によらず必ず通るので、
+        * 経路ごとの取りこぼしが起きない。
+        */
+       onDestroyed() {
+         // 既定では何もしない
+       } // onDestroyed()
 
        /**
         * 消滅処理。撃破と宇宙域からの離脱（撤退）の両方から呼ばれる。
@@ -1559,7 +1574,7 @@
          victim.takeDamage(this.weapon.calcDamage(hitDist));
 
          if (path.kind === 'friendly') {
-           onFriendlyFire(this.scene, victim);
+           onFriendlyFire(this, victim);
            return;
          }
 
@@ -1838,6 +1853,22 @@
          return DRAW_COLOR.BEAM_ENEMY;
        }
 
+       /**
+        * override: **撃破しても敵の数は減らない。**
+        *
+        * 撃破は敵意を煽って増援を呼ぶ。「破壊は割に合わない」という
+        * このゲームの中核ルールの担保であり、誰が撃ったかで変わってはならない。
+        * 追い返す（`onLeaveArea()`）のとは対照的に、倒しても戦況は好転しない。
+        *
+        * ゲームオーバー後に呼ばれることはない。プレイヤーの攻撃は
+        * `handlePointerTap()` が、NPC の攻撃は `execNPCAction()` が、
+        * それぞれ入口で `isGameOver` を見て弾いている。
+        */
+       onDestroyed() {
+         gameObjs.removeEnemy(this);
+         spawnEnemy(this.scene, 0.8, 0.95);
+       } // onDestroyed()
+
        // --- 敵艦が攻撃した後の処理 ---
        onAfterAttack(target) {
          const targetShieldPercent = Math.floor(target.shieldPercent() * 100);
@@ -1962,7 +1993,7 @@
          if (path.kind === 'friendly') {
            // 撃ってしまった以上、なかったことにはしない。
            // エネルギーはすでに消費しており、ダメージも味方に入っている
-           onFriendlyFire(scene, victim);
+           onFriendlyFire(player, victim);
            endTurn();
            return true;
          }
@@ -1973,8 +2004,7 @@
          }
 
          if (!victim.active) {
-           // 撃墜
-           onEnemyDestroyed(scene, victim);
+           // 撃墜。増援は takeDamage() から onDestroyed() が呼ばれて出ている
            setMsg(SPEAKER.TACTICAL, "敵艦を撃破！ 別の新たな敵艦を検知しました！", MSG_COLOR.WARN);
          }
          endTurn();
@@ -2030,8 +2060,10 @@
         */
        onAfterAttack(target) {
          if (!target.active) {
-           gameObjs.removeEnemy(target);
            setMsg(SPEAKER.COMMS, "連邦艦が敵艦を撃破しました！", MSG_COLOR.ENEMY);
+           // 味方が撃っても撃破は増援を呼ぶ。撃破の報告だけで終えると、
+           // 敵が減ったように見えてしまう
+           setMsg(SPEAKER.TACTICAL, "新たな敵艦を検知しました！", MSG_COLOR.WARN);
            updateStatus();
          }
        } // onAfterAttack()
@@ -2250,29 +2282,6 @@
        gameObjs.addEnemy(enemy);
        return enemy;
      } // spawnEnemy()
-
-     /**
-      * 敵を撃破したときの後始末。
-      *
-      * **撃破しても敵の数は減らない。** 撃破は敵意を煽って増援を呼ぶ。
-      * 「破壊は割に合わない」というこのゲームの中核ルールの担保であり、
-      * 誰が撃ったかで変わってはならない。
-      *
-      * 撃破はプレイヤーの攻撃だけでなく、連邦艦の攻撃・射線上の巻き添え・
-      * 敵の誤射でも起こる。経路ごとに書くと必ずどれかが抜けるため、
-      * ここに集約する。ログは発信者と文面が経路ごとに違うので呼び出し側に置く。
-      *
-      * ゲームオーバー後に呼ばれることはない。プレイヤーの攻撃は
-      * `handlePointerTap()` が、NPC の攻撃は `execNPCAction()` が、
-      * それぞれ入口で `isGameOver` を見て弾いている。
-      *
-      * @param {Phaser.Scene} scene
-      * @param {EnemyShip} enemy 撃破された敵
-      */
-     function onEnemyDestroyed(scene, enemy) {
-       gameObjs.removeEnemy(enemy);
-       spawnEnemy(scene, 0.8, 0.95);
-     } // onEnemyDestroyed()
 
      /**
       * 画像の生成
@@ -2545,10 +2554,24 @@
       * 「遮られた」とは言い分けている。遮蔽は運が悪かっただけだが、
       * 誤射は撃つ前に避けられた失敗で、次の一手が変わるため。
       *
-      * @param {Phaser.Scene} scene
+      * 敵が敵を巻き込んだ場合は自軍の失敗ではないため、報告する立場が変わる。
+      * 誰が撃ったかは `isFriendly()` で見る（`instanceof` を並べない）。
+      *
+      * @param {GameObj} shooter 撃った側
       * @param {GameObj} victim 巻き込んだ相手
       */
-     function onFriendlyFire(scene, victim) {
+     function onFriendlyFire(shooter, victim) {
+       if (!shooter.isFriendly()) {
+         // 敵艦同士の同士討ち。自軍の失敗ではないので戦術士官が状況として報告する
+         if (victim.active) {
+           setMsg(SPEAKER.TACTICAL, "敵艦同士が同士討ちしました", MSG_COLOR.ENEMY);
+           return;
+         }
+         setMsg(SPEAKER.TACTICAL,
+                "敵艦の同士討ちで1隻撃墜！ 別の新たな敵艦を検知しました！",
+                MSG_COLOR.WARN);
+         return;
+       }
        if (victim === gameObjs.starBase) {
          setMsg(SPEAKER.BASE, "こちら基地！ 味方の誤射を受けている！", MSG_COLOR.DANGER);
          return;

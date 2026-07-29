@@ -602,7 +602,7 @@ test.describe('撃破に伴う増援は撃った相手によらない', () => {
     const log = (await readLog(page, 8)).join('\n');
     expect(after.victimGone, '射線上の敵が落ちている').toBe(true);
     expect(after.playerShield, '自機には届いていない').toBe(before.playerShield);
-    expect(log, '誤射による撃墜として報告される').toContain('味方を撃墜');
+    expect(log, '敵の同士討ちとして報告される').toContain('同士討ち');
     expect(after.count, '撃破された分は補充され、数は減らない').toBe(before.count);
   });
 
