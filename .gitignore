@@ -12,6 +12,7 @@
 auto-save-list
 tramp
 .\#*
+.markdown-preview.html
 
 # Org-mode
 .org-id-locations
