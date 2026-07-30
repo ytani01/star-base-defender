@@ -2421,14 +2421,17 @@
          spawnEnemy(this, 0.6, 0.9);
        }
 
+       const dist_min = 0.2;
+       const dist_max = 0.3;
+
        // Federation
        gameObjs.federationShips = [];
        for (let i=0; i < gameState.qtyFederationShip; i++) {
-         newFederationShip(this, 0.3, 0.6);
+         newFederationShip(this, dist_min, dist_max);
        }
        
        // Player
-       const pp = getSafeRandPos(0.1, 0.3);
+       const pp = getSafeRandPos(dist_min, dist_max);
        gameObjs.player = new PlayerShip(this, pp.x, pp.y);
 
        // Camera
